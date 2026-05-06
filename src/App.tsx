@@ -1,6 +1,6 @@
 import { Component, startTransition, useEffect, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { nativeApi } from './services/native';
 import { TitleBar } from './components/TitleBar';
 import { MainView } from './components/MainView';
 import { useStore } from './store';
@@ -115,7 +115,7 @@ function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      void invoke('cleanup_runtime').catch(() => {});
+      void nativeApi.invoke('cleanup_runtime').catch(() => {});
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);

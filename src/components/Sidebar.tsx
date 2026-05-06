@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { open } from "@tauri-apps/plugin-dialog"
-import { invoke } from "@tauri-apps/api/core"
+import { nativeApi } from "../services/native"
 import {
   Boxes,
   FolderPlus,
@@ -232,7 +231,7 @@ export function Sidebar() {
           }
 
           try {
-            const dataUrl = await invoke<string>("read_image_data_url", { path: project.logoPath })
+            const dataUrl = await nativeApi.invoke("read_image_data_url", { path: project.logoPath })
             return [project.id, dataUrl] as const
           } catch {
             return [project.id, ""] as const
@@ -260,7 +259,7 @@ export function Sidebar() {
       }
 
       try {
-        const dataUrl = await invoke<string>("read_image_data_url", { path: draftProjectLogoPath })
+        const dataUrl = await nativeApi.invoke("read_image_data_url", { path: draftProjectLogoPath })
         if (!isDisposed) {
           setDraftProjectLogoUrl(dataUrl)
         }
@@ -349,7 +348,7 @@ export function Sidebar() {
   }
 
   const handleChooseProjectLogo = async () => {
-    const selected = await open({
+    const selected = await nativeApi.open({
       multiple: false,
       title: "Choose Project Logo",
       filters: [
@@ -381,7 +380,7 @@ export function Sidebar() {
   }
 
   const handleAddProject = async () => {
-    const selected = await open({
+    const selected = await nativeApi.open({
       directory: true,
       multiple: false,
       title: "Select Project Folder",

@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { getCurrentWindow } from "@tauri-apps/api/window"
-import { invoke } from "@tauri-apps/api/core"
-import { listen } from "@tauri-apps/api/event"
-import { platform } from "@tauri-apps/plugin-os"
+import { nativeApi } from "../services/native"
 import { ChevronDown, Folder, GitBranch, Play } from "lucide-react"
 import { CliAvatar } from "./CliAvatar"
 import { useStore } from "../store"
@@ -26,7 +23,7 @@ interface ProjectFsEvent {
   paths: string[]
 }
 
-function mapTauriPlatform(value: string): OsPlatform {
+function mapNativePlatform(value: string): OsPlatform {
   switch (value) {
     case "macos":
       return "macos"
@@ -77,7 +74,7 @@ async function runWindowAction(action: string, operation: () => Promise<void>) {
 }
 
 function currentWindow() {
-  return getCurrentWindow()
+  return nativeApi.window()
 }
 
 function WindowsGlyph({
@@ -171,10 +168,8 @@ function MacControls() {
       <TitlebarButton
         label="Maximize"
         onClick={async () => {
-          await runWindowAction("toggle fullscreen", async () => {
-            const window = currentWindow()
-            const fullscreen = await window.isFullscreen()
-            await window.setFullscreen(!fullscreen)
+          await runWindowAction("toggle maximize", async () => {
+            await currentWindow().toggleMaximize()
           })
         }}
         className="flex h-3 w-3 items-center justify-center rounded-full border border-black/[0.12] bg-[#28c93f] text-black/60"
@@ -274,9 +269,9 @@ export function TitleBar() {
     }
 
     try {
-      const branch = await invoke<GitBranchInfo>("get_git_branch", {
+      const branch = await nativeApi.invoke("get_git_branch", {
         path: projectPath,
-      })
+      }) as GitBranchInfo
       setBranchInfo(branch)
     } catch {
       setBranchInfo(null)
@@ -305,9 +300,9 @@ export function TitleBar() {
 
     const sync = async () => {
       try {
-        const currentPlatform = await platform()
+        const currentPlatform = nativeApi.platform()
         if (mounted) {
-          setOsPlatform(mapTauriPlatform(currentPlatform))
+          setOsPlatform(mapNativePlatform(currentPlatform))
         }
 
         const maximized = await windowHandle.isMaximized()
@@ -372,7 +367,7 @@ export function TitleBar() {
   useEffect(() => {
     if (!currentProject?.path) return
 
-    const unlistenProjectPromise = listen<ProjectFsEvent>("project-fs-event", (event) => {
+    const unlistenProjectPromise = nativeApi.listen<ProjectFsEvent>("project-fs-event", (event) => {
       if (event.payload.projectPath !== currentProject.path) return
 
       const touchesGitState = event.payload.paths.some((path) => {
@@ -476,7 +471,7 @@ export function TitleBar() {
       </div>
 
       <div
-        data-tauri-drag-region
+        data-electron-drag-region
         className="min-w-0 flex-1 self-stretch px-3 text-center text-[12px] font-medium text-current/60"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       />

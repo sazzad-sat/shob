@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { platform } from '@tauri-apps/plugin-os';
+import { nativeApi } from '../services/native';
 import { api } from '../services/api';
 import { STORAGE_KEYS } from '../constants/storage';
 import {
@@ -639,7 +639,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     let detectedPlatform: string | null = null;
     try {
-      detectedPlatform = await Promise.resolve(platform());
+      detectedPlatform = nativeApi.platform();
     } catch {
       detectedPlatform = null;
     }

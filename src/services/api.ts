@@ -1,20 +1,20 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invokeNative } from './native';
 import type { Project } from '../types';
 import type { CliProbeResult } from '../config/check';
 
 export const api = {
-  getProjects: () => invoke<Project[]>('get_projects'),
+  getProjects: () => invokeNative('get_projects'),
   
-  saveProject: (project: Project) => invoke<Project>('save_project', { project }),
+  saveProject: (project: Project) => invokeNative('save_project', { project }),
   
-  deleteProject: (projectId: string) => invoke('delete_project', { projectId }),
+  deleteProject: (projectId: string) => invokeNative('delete_project', { projectId }),
 
-  saveSessionOutput: (sessionId: string, output: string) => invoke<void>('save_session_output', { sessionId, output }),
+  saveSessionOutput: (sessionId: string, output: string) => invokeNative('save_session_output', { sessionId, output }),
 
-  loadSessionOutput: (sessionId: string) => invoke<string>('load_session_output', { sessionId }),
+  loadSessionOutput: (sessionId: string) => invokeNative('load_session_output', { sessionId }),
   
-  getAvailableShells: () => invoke<string[]>('get_available_shells'),
+  getAvailableShells: () => invokeNative('get_available_shells'),
   
   probeCliTools: (items: { id: string; commands: string[] }[]) =>
-    invoke<CliProbeResult[]>('probe_cli_tools', { items }),
+    invokeNative('probe_cli_tools', { items }) as Promise<CliProbeResult[]>,
 };

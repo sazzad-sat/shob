@@ -6,8 +6,7 @@ import {
   useState,
   memo,
 } from "react"
-import { invoke } from "@tauri-apps/api/core"
-import { listen } from "@tauri-apps/api/event"
+import { nativeApi } from "../services/native"
 import {
   Check,
   ChevronDown,
@@ -350,7 +349,7 @@ function ContextMenu({
   }
 
   const revealInFinder = async () => {
-    try { await invoke("reveal_in_finder", { path: state.entry.path }) } catch { /* silent */ }
+    try { await nativeApi.invoke("reveal_in_finder", { path: state.entry.path }) } catch { /* silent */ }
     onClose()
   }
 
@@ -751,7 +750,7 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
     async (path: string) => {
       setLoadingPaths((p) => ({ ...p, [path]: true }))
       try {
-        const entries = await invoke<FileTreeEntry[]>("list_directory", { path }).catch(() => [])
+        const entries = await nativeApi.invoke("list_directory", { path }).catch(() => []) as FileTreeEntry[]
         const sorted = sortEntries(mergeDeletedEntries(entries, path))
         setChildrenByPath((p) => ({ ...p, [path]: sorted }))
         return sorted
@@ -765,7 +764,7 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
   const loadGitStatus = useCallback(async () => {
     if (!currentProject?.path) { setGitStatus(null); return }
     try {
-      const summary = await invoke<GitStatusSummary>("get_git_status", { path: currentProject.path })
+      const summary = await nativeApi.invoke("get_git_status", { path: currentProject.path }) as GitStatusSummary
       setGitStatus(summary)
     } catch {
       setGitStatus(null)
@@ -794,7 +793,7 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
           setChildrenByPath({})
         }
 
-        const rawRoot = await invoke<FileTreeEntry[]>("list_directory", { path: currentProject.path })
+        const rawRoot = await nativeApi.invoke("list_directory", { path: currentProject.path }) as FileTreeEntry[]
         const root = sortEntries(mergeDeletedEntries(rawRoot, currentProject.path))
 
         // Re-load all currently expanded directories using the ref (stable reference)
@@ -805,7 +804,7 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
         const nextChildren: Record<string, FileTreeEntry[]> = {}
         await Promise.all(
           expandedList.map(async (path) => {
-            const entries = await invoke<FileTreeEntry[]>("list_directory", { path }).catch(() => [])
+            const entries = await nativeApi.invoke("list_directory", { path }).catch(() => []) as FileTreeEntry[]
             nextChildren[path] = sortEntries(mergeDeletedEntries(entries, path))
           }),
         )
@@ -876,7 +875,7 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
       // Small delay to batch rapid path changes
       await new Promise(resolve => { timeoutId = window.setTimeout(resolve, 50) })
       if (isCancelled) return
-      void invoke("set_project_watch", { path: currentProject?.path ?? null }).catch(console.error)
+      void nativeApi.invoke("set_project_watch", { path: currentProject?.path ?? null }).catch(console.error)
     }
 
     void setupWatcher()
@@ -884,7 +883,7 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
     return () => {
       isCancelled = true
       if (timeoutId) window.clearTimeout(timeoutId)
-      void invoke("set_project_watch", { path: null }).catch(console.error)
+      void nativeApi.invoke("set_project_watch", { path: null }).catch(console.error)
     }
   }, [currentProject?.path])
 
@@ -895,7 +894,7 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
     let fsTimer: number | null = null
     let gitTimer: number | null = null
 
-    const unlistenPromise = listen<ProjectFsEvent>("project-fs-event", (event) => {
+    const unlistenPromise = nativeApi.listen<ProjectFsEvent>("project-fs-event", (event) => {
       if (event.payload.projectPath !== currentProject.path) return
       const relevant = event.payload.paths.filter((p) => !isIgnoredProjectEventPath(p))
       if (relevant.length === 0) return

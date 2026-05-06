@@ -5,8 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links"
 import { SearchAddon } from "@xterm/addon-search"
 import { SerializeAddon } from "@xterm/addon-serialize"
 import { Unicode11Addon } from "@xterm/addon-unicode11"
-import { invoke } from "@tauri-apps/api/core"
-import { spawn, type IPty } from "tauri-pty"
+import { nativeApi } from "../services/native"
 import { Search, X, ArrowUp, ArrowDown, Save, Trash2 } from "lucide-react"
 import { CLI_ALIAS_TO_ID } from "../config/check"
 import { useStore } from "../store"
@@ -32,6 +31,13 @@ interface TerminalHostInfo {
 }
 
 type TerminalOs = TerminalHostInfo["os"]
+
+interface IPty {
+  write(data: string): void
+  resize(cols: number, rows: number): void
+  kill(): void
+  onData(callback: (chunk: string) => void): void
+}
 
 const launchedPendingCommandKeys = new Set<string>()
 const ACTIVITY_THROTTLE_MS = 15_000
@@ -80,6 +86,52 @@ function decodePtyChunk(chunk: unknown, decoder: TextDecoder): string {
   if (chunk instanceof Uint8Array) return decoder.decode(chunk, { stream: true })
   if (Array.isArray(chunk)) return decoder.decode(Uint8Array.from(chunk), { stream: true })
   return ""
+}
+
+async function spawnNativePty(options: {
+  sessionId: string
+  shell: string
+  cwd?: string
+  rows: number
+  cols: number
+  env: Record<string, string>
+}): Promise<IPty> {
+  const terminal = nativeApi.terminal()
+  const { id } = await terminal.spawn({
+    id: options.sessionId,
+    shell: options.shell,
+    cwd: options.cwd,
+    rows: options.rows,
+    cols: options.cols,
+    env: options.env,
+  })
+  const dataCallbacks = new Set<(chunk: string) => void>()
+  const offData = terminal.onData(id, (data) => {
+    for (const callback of dataCallbacks) callback(data)
+  })
+  const offExit = terminal.onExit(id, () => {
+    dataCallbacks.clear()
+    offData()
+    offExit()
+  })
+
+  return {
+    write: (data) => {
+      void terminal.write(id, data)
+    },
+    resize: (cols, rows) => {
+      void terminal.resize(id, cols, rows)
+    },
+    kill: () => {
+      offData()
+      offExit()
+      dataCallbacks.clear()
+      void terminal.kill(id)
+    },
+    onData: (callback) => {
+      dataCallbacks.add(callback)
+    },
+  }
 }
 
 function supportsClipboardRead() {
@@ -381,7 +433,7 @@ export function Terminal({ sessionId, isActive = true, shouldBoot = true }: Term
           return
         }
 
-        const hostInfo = await invoke<TerminalHostInfo>("get_terminal_host_info")
+        const hostInfo = await nativeApi.invoke("get_terminal_host_info") as TerminalHostInfo
         console.log("[Terminal] hostInfo:", hostInfo)
         const isWindows = hostInfo.os === "windows"
         const windowsBuildNumber =
@@ -581,26 +633,18 @@ export function Terminal({ sessionId, isActive = true, shouldBoot = true }: Term
         // Only use ConPTY on Windows 10 1809+ (build 17763+)
         const useConpty: boolean = Boolean(ptyIsWindows && ptyWindowsBuildNumber && ptyWindowsBuildNumber >= 17763)
         
-        const pty = spawn(resolvedShell, [], {
+        const pty = await spawnNativePty({
+          sessionId,
+          shell: resolvedShell,
           cwd: bootProjectPath || undefined,
           rows: spawnRows,
           cols: spawnCols,
-          useConpty,
           env: {
             TERM: "xterm-256color",
             COLORTERM: "truecolor",
             TERM_PROGRAM: "shob",
           },
         })
-        const initPromise = (pty as IPty & { _init?: Promise<unknown> })._init
-        if (initPromise) {
-          try {
-            await initPromise
-          } catch (initErr) {
-            console.error("PTY init failed:", initErr)
-            throw initErr
-          }
-        }
 
         ptyRef.current = pty
         ptyKilledRef.current = false
@@ -972,12 +1016,8 @@ export function Terminal({ sessionId, isActive = true, shouldBoot = true }: Term
         }
 
         // Fetch host info for Windows ConPTY check
-        const hostInfo = await invoke<TerminalHostInfo>("get_terminal_host_info")
+        const hostInfo = await nativeApi.invoke("get_terminal_host_info") as TerminalHostInfo
         const isWindows = hostInfo.os === "windows"
-        const windowsBuildNumber =
-          typeof hostInfo.windowsBuildNumber === "number" && hostInfo.windowsBuildNumber > 0
-            ? hostInfo.windowsBuildNumber
-            : null
 
         spawnInFlightRef.current = true
         try {
@@ -1003,29 +1043,18 @@ export function Terminal({ sessionId, isActive = true, shouldBoot = true }: Term
             throw new Error("Invalid terminal dimensions")
           }
           
-          // Only use ConPTY on Windows 10 1809+ (build 17763+)
-          const useConpty: boolean = Boolean(isWindows && windowsBuildNumber && windowsBuildNumber >= 17763)
-          
-          const pty = spawn(resolvedShell, [], {
+          const pty = await spawnNativePty({
+            sessionId,
+            shell: resolvedShell,
             cwd: currentProjectPath || undefined,
             rows: spawnRows,
             cols: spawnCols,
-            useConpty,
             env: {
               TERM: "xterm-256color",
               COLORTERM: "truecolor",
               TERM_PROGRAM: "shob",
             },
           })
-          const initPromise = (pty as IPty & { _init?: Promise<unknown> })._init
-          if (initPromise) {
-            try {
-              await initPromise
-            } catch (initErr) {
-              console.error("PTY init failed:", initErr)
-              throw initErr
-            }
-          }
           ptyRef.current = pty
           ptyKilledRef.current = false
           lastPtySizeRef.current = { rows: spawnRows, cols: spawnCols }

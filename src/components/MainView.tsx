@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react"
-import { open } from "@tauri-apps/plugin-dialog"
+import { nativeApi } from "../services/native"
 import { Sidebar } from "./Sidebar"
 import { TabBar } from "./TabBar"
 import { Terminal } from "./Terminal"
@@ -70,7 +70,7 @@ export function MainView() {
   }
 
   const handleOpenFolder = async () => {
-    const selected = await open({
+    const selected = await nativeApi.open({
       directory: true,
       multiple: false,
       title: "Select Project Folder",

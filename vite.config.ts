@@ -5,6 +5,9 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    outDir: 'dist-renderer',
+  },
   server: {
     port: 5173,
     strictPort: true,
