@@ -9,7 +9,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11"
 import { nativeApi } from "../services/native"
 import { Search, X, ArrowUp, ArrowDown, Save, Trash2 } from "lucide-solid"
 import { CLI_ALIAS_TO_ID } from "../config/check"
-import { useStore } from "../store"
+import { store, useStore } from "../store"
 import { api } from "../services/api"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,6 @@ import "@xterm/xterm/css/xterm.css"
 
 interface TerminalProps {
   sessionId: string
-  isActive?: boolean
 }
 
 interface RerunCliEventDetail {
@@ -299,7 +298,7 @@ function parseCliInvocation(input: string): { cliTool: string; promptText: strin
 
 export function Terminal(props: TerminalProps) {
   const sessionId = props.sessionId
-  const isActive = () => props.isActive ?? true
+  const isActive = () => store.activeSessionId === sessionId
 
   let terminalRef: HTMLDivElement | undefined
   let xtermRef: XTerm | null = null
@@ -975,7 +974,21 @@ export function Terminal(props: TerminalProps) {
       }
     }
 
-    void bootTerminal()
+    let hasBooted = false
+    const tryBoot = () => {
+      if (hasBooted || cancelled) return
+      if (!isActive()) return
+      hasBooted = true
+      void bootTerminal()
+    }
+
+    // Boot now if active, or defer until first activation
+    tryBoot()
+    createEffect(() => {
+      if (isActive() && !hasBooted) {
+        tryBoot()
+      }
+    })
 
     onCleanup(() => {
       cancelled = true
@@ -1159,8 +1172,8 @@ export function Terminal(props: TerminalProps) {
       aria-hidden={isActive() ? undefined : "true"}
       inert={isActive() ? undefined : true}
       style={{
-        display: isActive() ? "flex" : "none",
-        "pointer-events": isActive() ? "auto" : "none",
+        get display() { return isActive() ? "flex" : "none" },
+        get "pointer-events"() { return isActive() ? "auto" : "none" },
       }}
     >
       <div class="absolute right-4 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100 terminal-toolbar">

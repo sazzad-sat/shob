@@ -1,10 +1,10 @@
-import { createEffect, createMemo, createSignal, lazy, Show, Suspense } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, lazy, Suspense } from 'solid-js'
 import { nativeApi } from '../services/native'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { Terminal } from './Terminal'
 import { WelcomeScreen } from './WelcomeScreen'
-import { useStore } from '../store'
+import { store, useStore } from '../store'
 
 const FileTree = lazy(async () => {
   const mod = await import('./FileTree')
@@ -100,14 +100,11 @@ export function MainView() {
         <TabBar />
         <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
           <div class="relative h-full w-full min-h-0 min-w-0 overflow-hidden" style={{ display: projectSessions().length > 0 ? 'block' : 'none' }}>
-            <Show when={activeProjectSessionId()} keyed>
-              {(sessionId) => (
-                <Terminal
-                  sessionId={sessionId}
-                  isActive
-                />
+            <For each={projectSessions()}>
+              {(session) => (
+                <Terminal sessionId={session.id} />
               )}
-            </Show>
+            </For>
           </div>
 
           {projectSessions().length === 0 && (
