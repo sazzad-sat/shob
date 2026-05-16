@@ -1,6 +1,6 @@
 # Shob - Run multiple CLI agents across sessions within a single project
 
-<img width="1918" height="1037" alt="image" src="https://github.com/user-attachments/assets/e00073ba-361b-46fc-992f-419ce329e6de" />
+<img width="1359" height="894" alt="image" src="https://github.com/user-attachments/assets/3b34d4b5-89f2-4e83-bbc4-03b53f9a9639" />
 
 
 Shob is a desktop app for running and organizing multiple CLI agents in one workspace.
