@@ -215,28 +215,33 @@ function sanitizeClipboardPasteText(input: string): string {
 }
 
 function getShadcnTerminalTheme() {
+  const css = getComputedStyle(document.documentElement)
+  const bg = css.getPropertyValue("--term-bg").trim() || css.getPropertyValue("--background").trim() || "#09090b"
+  const fg = css.getPropertyValue("--foreground").trim() || "#fafafa"
+  const primary = css.getPropertyValue("--primary").trim() || "#3b82f6"
+  const destructive = css.getPropertyValue("--destructive").trim() || "#ef4444"
   return {
-    background: "#09090b",
-    foreground: "#fafafa",
-    cursor: "#fafafa",
-    cursorAccent: "#09090b",
+    background: bg,
+    foreground: fg,
+    cursor: fg,
+    cursorAccent: bg,
     selectionBackground: "rgba(255, 255, 255, 0.15)",
     selectionForeground: "#fafafa",
     black: "#09090b",
     brightBlack: "#71717a",
-    red: "#ef4444",
+    red: destructive,
     brightRed: "#f87171",
     green: "#22c55e",
     brightGreen: "#4ade80",
     yellow: "#eab308",
     brightYellow: "#facc15",
-    blue: "#3b82f6",
+    blue: primary,
     brightBlue: "#60a5fa",
     magenta: "#a855f7",
     brightMagenta: "#c084fc",
     cyan: "#06b6d4",
     brightCyan: "#22d3ee",
-    white: "#fafafa",
+    white: fg,
     brightWhite: "#ffffff",
   }
 }
@@ -299,6 +304,8 @@ function parseCliInvocation(input: string): { cliTool: string; promptText: strin
 export function Terminal(props: TerminalProps) {
   const sessionId = props.sessionId
   const isActive = () => store.activeSessionId === sessionId
+  const themeId = useStore((s) => s.themeId)
+  const colorScheme = useStore((s) => s.colorScheme)
 
   let terminalRef: HTMLDivElement | undefined
   let xtermRef: XTerm | null = null
@@ -318,6 +325,13 @@ export function Terminal(props: TerminalProps) {
   let hasRecordedStartupMetricRef = false
   let captureModeRef: CaptureMode = "text"
   let captureEscapePendingRef = false
+  createEffect(() => {
+    themeId()
+    colorScheme()
+    if (!xtermRef) return
+    xtermRef.options.theme = getShadcnTerminalTheme()
+    xtermRef.refresh(0, xtermRef.rows - 1)
+  })
   let fitRafRef: number | null = null
   let spawnInFlightRef = false
   let spawnStartedAtRef: number | null = null
@@ -1274,11 +1288,9 @@ export function Terminal(props: TerminalProps) {
         ref={terminalRef}
         class="terminal-wrapper h-full w-full min-h-0 min-w-0 overflow-hidden"
         style={{
-          "background-color": "#09090b",
+          "background-color": "var(--term-bg)",
         }}
       />
     </Card>
   )
 }
-
-

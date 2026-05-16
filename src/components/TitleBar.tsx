@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { nativeApi } from "../services/native"
-import { ChevronDown, Folder, GitBranch, Play } from "lucide-solid"
+import { ChevronDown, Folder, GitBranch } from "lucide-solid"
 import { CliAvatar } from "./CliAvatar"
 import { useStore } from "../store"
 import { Button } from "@/components/ui/button"
@@ -108,7 +108,7 @@ function WindowsControls({
   setIsMaximized: (value: boolean) => void
 }) {
   const baseButtonClass = "bg-transparent text-foreground/90 hover:bg-white/[0.06] active:bg-white/[0.04]"
-  const closeButtonClass = "bg-transparent text-foreground/90 hover:bg-[#c42b1c] hover:text-white active:bg-[#a1261b]"
+  const closeButtonClass = "bg-transparent text-foreground/90 hover:bg-destructive hover:text-white active:opacity-90"
 
   return (
     <div class="flex h-8" style={{ "-webkit-app-region": "no-drag" }}>
@@ -426,8 +426,8 @@ export function TitleBar() {
     window.dispatchEvent(new Event("gg-toggle-file-tree"))
   }
 
-  const headerClass = "border-white/[0.06] bg-[#121212] text-white"
-  const navButtonClass = "text-[#6f6f6f] hover:bg-white/[0.05] hover:text-white"
+  const headerClass = "border-border bg-background text-foreground"
+  const navButtonClass = "text-muted-foreground hover:bg-accent hover:text-foreground"
 
   return (
     <header class={`relative z-50 flex h-[40px] shrink-0 select-none items-center border-b ${headerClass}`}>
@@ -465,7 +465,7 @@ export function TitleBar() {
         style={{ "-webkit-app-region": "drag" }}
       />
 
-      <div class="flex items-center gap-2 px-2" style={{ "-webkit-app-region": "no-drag" }}>
+      <div class="ml-3 flex items-center gap-2 pl-2 pr-0" style={{ "-webkit-app-region": "no-drag", transform: "translateX(-18px)" }}>
         <div class="relative flex items-center">
           <DropdownMenu open={isLauncherOpen()} onOpenChange={setIsLauncherOpen}>
             <DropdownMenuTrigger>
@@ -473,31 +473,35 @@ export function TitleBar() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                class="h-7 min-w-[108px] items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 text-xs font-medium leading-none text-current/80 hover:bg-white/[0.06]"
+                class="h-8 min-w-[138px] items-center justify-between gap-2 rounded-[9px] border border-border bg-card px-3 text-xs leading-none font-medium text-foreground hover:bg-accent"
                 title={currentCliTool() ? `Current CLI: ${currentCliTool()!.label}` : "Choose CLI launcher"}
               >
-                {currentCliTool() ? (
-                  <>
-                    <CliAvatar cliId={currentCliTool()!.id} label={currentCliTool()!.label} size="sm" />
-                    <span class="hidden sm:inline">{currentCliTool()!.label}</span>
-                  </>
-                ) : (
-                  <Play class="h-3.5 w-3.5 fill-current" stroke-width={1.8} />
-                )}
-                <ChevronDown class={`h-3.5 w-3.5 transition ${isLauncherOpen() ? "rotate-180" : ""}`} stroke-width={1.9} />
+                <span class="flex min-w-0 items-center gap-2">
+                  {currentCliTool() ? (
+                    <>
+                      <CliAvatar cliId={currentCliTool()!.id} label={currentCliTool()!.label} size="md" class="h-[18px] w-[18px]" />
+                      <span class="truncate text-[13px] leading-none">{currentCliTool()!.label}</span>
+                    </>
+                  ) : (
+                    <span class="text-[11px] text-current/70">Choose CLI</span>
+                  )}
+                </span>
+                <ChevronDown class={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${isLauncherOpen() ? "rotate-180" : ""}`} />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent class="w-[208px]">
+            <DropdownMenuContent
+              class="w-[210px] rounded-[12px] border border-border bg-card p-2 shadow-[0_12px_32px_rgba(0,0,0,0.58)]"
+              placement="bottom-start"
+              gutter={6}
+              >
               {installedCliTools().length > 0 ? (
                 installedCliTools().map((tool) => (
                   <DropdownMenuItem
                     onClick={() => void handleLaunchSession(tool.id)}
-                    class="gap-2.5 px-3 py-2"
+                    class="h-11 items-center gap-2.5 rounded-[9px] px-2.5 text-foreground hover:bg-accent focus:bg-accent"
                   >
-                    <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted/50">
-                      <CliAvatar cliId={tool.id} label={tool.label} size="sm" class="rounded-md" />
-                    </span>
-                    <span class="min-w-0 flex-1 truncate text-[13px] font-medium">{tool.label}</span>
+                    <CliAvatar cliId={tool.id} label={tool.label} size="md" class="h-5 w-5 shrink-0" />
+                    <span class="min-w-0 flex-1 truncate text-[13px] leading-none font-medium">{tool.label}</span>
                   </DropdownMenuItem>
                 ))
               ) : (
@@ -514,7 +518,7 @@ export function TitleBar() {
           size="icon-sm"
           class={`h-7 w-7 ${
             isFileTreeVisible()
-              ? "bg-[#1e2a1f] text-[#9bdd9f]"
+              ? "bg-accent text-foreground"
               : "text-current/65 hover:bg-white/[0.05] hover:text-current"
           }`}
           title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}

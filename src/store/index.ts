@@ -75,6 +75,7 @@ const findProjectBySessionId = (projects: Project[], sessionId: string | null) =
 };
 
 export type CliLaunchMode = 'new-tab' | 'replace-current';
+export type ThemeScheme = 'system' | 'light' | 'dark';
 
 interface AppState {
   projects: Project[];
@@ -85,6 +86,8 @@ interface AppState {
   cliLaunchMode: CliLaunchMode;
   cliTools: CliTool[];
   availableShells: string[];
+  themeId: string;
+  colorScheme: ThemeScheme;
   isLoading: boolean;
 }
 
@@ -110,6 +113,8 @@ interface AppActions {
   setPreferredCliTool: (cliId: string | null) => void;
   setPreferredShell: (shell: string | null) => void;
   setCliLaunchMode: (mode: CliLaunchMode) => void;
+  setThemeId: (themeId: string) => void;
+  setColorScheme: (scheme: ThemeScheme) => void;
   installCliTool: (cliId: string, installCommand?: string | null) => Promise<Session>;
 }
 
@@ -122,6 +127,8 @@ const [store, setStore] = createStore<AppState>({
   cliLaunchMode: getStoredValue(STORAGE_KEYS.cliLaunchMode) === 'replace-current' ? 'replace-current' : 'new-tab',
   cliTools: buildCatalogCliTools(),
   availableShells: [],
+  themeId: getStoredValue(STORAGE_KEYS.themeId) ?? 'oc-2',
+  colorScheme: (getStoredValue(STORAGE_KEYS.colorScheme) as ThemeScheme) ?? 'system',
   isLoading: true,
 });
 
@@ -283,9 +290,22 @@ export const actions: AppActions = {
 
   addSession: async (projectId: string, shell: string) => {
     const createdAt = Date.now();
+    const project = store.projects.find((p) => p.id === projectId);
+    if (!project) throw new Error('Project not found');
+
+    let sessionName = 'Terminal';
+    try {
+      const branchInfo = await api.getGitBranch(project.path);
+      if (branchInfo?.head) {
+        sessionName = branchInfo.head;
+      }
+    } catch {
+      sessionName = 'Terminal';
+    }
+
     const session: Session = {
       id: crypto.randomUUID(),
-      name: `Terminal ${createdAt}`,
+      name: sessionName,
       shell,
       cliTool: null,
       pendingLaunchCommand: null,
@@ -294,9 +314,6 @@ export const actions: AppActions = {
       commandCount: 0,
       startupDurationMs: null,
     };
-
-    const project = store.projects.find((p) => p.id === projectId);
-    if (!project) throw new Error('Project not found');
 
     const updatedProject = {
       ...project,
@@ -334,9 +351,25 @@ export const actions: AppActions = {
         installedCliTools[0] ??
         null;
 
+      const latestProjects = normalizeProjects(await api.getProjects());
+      const project =
+        latestProjects.find((p) => p.id === projectId) ??
+        store.projects.find((p) => p.id === projectId);
+      if (!project) throw new Error('Project not found');
+
+      let sessionName = 'Terminal';
+      try {
+        const branchInfo = await api.getGitBranch(project.path);
+        if (branchInfo?.head) {
+          sessionName = branchInfo.head;
+        }
+      } catch {
+        sessionName = 'Terminal';
+      }
+
       const session: Session = {
         id: crypto.randomUUID(),
-        name: `Terminal ${createdAt}`,
+        name: sessionName,
         shell,
         cliTool: selectedCli?.id ?? null,
         pendingLaunchCommand: selectedCli?.matchedCommand ?? null,
@@ -345,12 +378,6 @@ export const actions: AppActions = {
         commandCount: 0,
         startupDurationMs: null,
       };
-
-      const latestProjects = normalizeProjects(await api.getProjects());
-      const project =
-        latestProjects.find((p) => p.id === projectId) ??
-        store.projects.find((p) => p.id === projectId);
-      if (!project) throw new Error('Project not found');
 
       const updatedProject = {
         ...project,
@@ -627,6 +654,14 @@ export const actions: AppActions = {
   setCliLaunchMode: (mode: CliLaunchMode) => {
     setStoredValue(STORAGE_KEYS.cliLaunchMode, mode);
     setStore({ cliLaunchMode: mode });
+  },
+  setThemeId: (themeId: string) => {
+    setStoredValue(STORAGE_KEYS.themeId, themeId);
+    setStore({ themeId });
+  },
+  setColorScheme: (scheme: ThemeScheme) => {
+    setStoredValue(STORAGE_KEYS.colorScheme, scheme);
+    setStore({ colorScheme: scheme });
   },
 
   installCliTool: async (cliId: string, installCommand?: string | null) => {

@@ -1,6 +1,7 @@
 import { invokeNative } from './native';
 import type { Project } from '../types';
 import type { CliProbeResult } from '../config/check';
+import type { ElectronGitBranchInfo } from '../electron';
 
 const toSerializableProject = (project: Project): Project =>
   JSON.parse(JSON.stringify(project)) as Project;
@@ -21,4 +22,6 @@ export const api = {
   
   probeCliTools: (items: { id: string; commands: string[] }[]) =>
     invokeNative('probe_cli_tools', { items }) as Promise<CliProbeResult[]>,
+
+  getGitBranch: (cwd: string) => invokeNative('get_git_branch', { path: cwd }) as Promise<ElectronGitBranchInfo>,
 };

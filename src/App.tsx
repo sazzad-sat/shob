@@ -1,11 +1,14 @@
-import { createSignal, onCleanup, onMount, ErrorBoundary } from 'solid-js'
+import { createSignal, onCleanup, onMount, ErrorBoundary, createEffect } from 'solid-js'
 import { nativeApi } from './services/native'
 import { TitleBar } from './components/TitleBar'
 import { MainView } from './components/MainView'
 import { useStore } from './store'
+import { getThemeById, resolveAppThemeTokens } from './theme'
 
 function App() {
   const { loadProjects, loadCliTools, loadAvailableShells } = useStore()
+  const themeId = useStore((s) => s.themeId)
+  const colorScheme = useStore((s) => s.colorScheme)
   const [isBooting, setIsBooting] = createSignal(true)
 
   onMount(() => {
@@ -27,6 +30,19 @@ function App() {
     }
 
     void initialize()
+  })
+
+  createEffect(() => {
+    const scheme = colorScheme()
+    const isDark = scheme === 'dark' || (scheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    const mode = isDark ? 'dark' : 'light'
+    const theme = getThemeById(themeId())
+    const tokens = resolveAppThemeTokens(theme, mode)
+    Object.entries(tokens).forEach(([key, value]) => document.documentElement.style.setProperty(key, value))
+    document.documentElement.dataset.theme = theme.id
+    document.documentElement.dataset.colorScheme = mode
+    document.documentElement.style.colorScheme = mode
+    document.documentElement.classList.toggle('dark', mode === 'dark')
   })
 
   onMount(() => {

@@ -1,4 +1,3 @@
-import { Bot } from "lucide-solid"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getCliDisplayLabel, getCliIconAsset, getCliFallbackText } from "../config/cli-ui"
 
@@ -22,13 +21,11 @@ export function CliAvatar({ cliId, label, size = "md", class: className = "" }: 
   return (
     <Avatar class={`${sizeClass} ${className}`} data-size={size}>
       {logo && <AvatarImage src={logo} alt={resolvedLabel} />}
-      <AvatarFallback class="text-[8px] bg-muted/50">
-        {cliId ? (
-          <Bot class={size === "sm" ? "h-3 w-3" : "h-4 w-4"} stroke-width={1.9} />
-        ) : (
-          getCliFallbackText(cliId, resolvedLabel)
-        )}
-      </AvatarFallback>
+      {!logo && (
+        <AvatarFallback class="text-[8px] bg-muted/50">
+          {getCliFallbackText(cliId, resolvedLabel)}
+        </AvatarFallback>
+      )}
     </Avatar>
   )
 }

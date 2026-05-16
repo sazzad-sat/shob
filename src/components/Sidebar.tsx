@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import { Folder, MoreHorizontal, Plus, Settings, SquarePen } from "lucide-solid"
+import { Folder, MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucide-solid"
 import { nativeApi } from "../services/native"
 import { useStore } from "../store"
 import type { Project } from "../types"
@@ -25,35 +25,76 @@ function FolderSection(props: {
   onSelectProject: (id: string) => void
   onSelectSession: (projectId: string, sessionId: string) => void
   onCreateSession: (projectId: string) => void
+  onDeleteSession: (projectId: string, sessionId: string) => void
+  onDeleteProject: (projectId: string) => void
   onOpenWorkspacePage?: () => void
 }) {
   const [isOpen, setIsOpen] = createSignal(true)
+  const [showMenu, setShowMenu] = createSignal(false)
+  let menuRef: HTMLDivElement | undefined
+
+  const handleMenuClick = (e: MouseEvent) => {
+    if (menuRef && !menuRef.contains(e.target as Node)) {
+      setShowMenu(false)
+    }
+  }
+
+  createEffect(() => {
+    if (showMenu()) {
+      document.addEventListener("mousedown", handleMenuClick)
+    }
+  })
+
+  onCleanup(() => {
+    document.removeEventListener("mousedown", handleMenuClick)
+  })
 
   return (
     <div class="flex flex-col">
       <div
-        class="group mx-2 flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 hover:bg-[#2a2d2e]"
+        class="group mx-2 flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 hover:bg-sidebar-accent"
         onClick={() => {
           props.onOpenWorkspacePage?.()
           props.onSelectProject(props.project.id)
           setIsOpen(!isOpen())
         }}
       >
-        <div class="flex items-center gap-2.5 text-[#cccccc]">
+        <div class="flex items-center gap-2.5 text-sidebar-foreground">
           <Folder size={15} class="stroke-[1.5]" />
           <span class="text-[13px] leading-none font-medium">{props.project.name}</span>
         </div>
 
         <div class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <button
-            class="rounded p-1 text-[#cccccc] transition-colors hover:bg-[#3c3c3c]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal size={14} />
-          </button>
+          <div class="relative flex items-center" ref={menuRef}>
+            <button
+              class="rounded p-1 text-sidebar-foreground transition-colors hover:bg-accent"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMenu(!showMenu())
+              }}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+
+            <Show when={showMenu()}>
+              <div class="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded border border-border bg-card py-1 text-[12px] text-sidebar-foreground shadow-xl">
+                <button
+                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-destructive transition-colors hover:bg-accent"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowMenu(false)
+                    props.onDeleteProject(props.project.id)
+                  }}
+                >
+                  <Trash2 size={13} />
+                  Close Project
+                </button>
+              </div>
+            </Show>
+          </div>
           <div class="relative flex items-center">
             <button
-              class="peer rounded p-1 text-[#cccccc] transition-colors hover:bg-[#3c3c3c]"
+              class="peer rounded p-1 text-sidebar-foreground transition-colors hover:bg-accent"
               onClick={(e) => {
                 e.stopPropagation()
                 void props.onCreateSession(props.project.id)
@@ -62,7 +103,7 @@ function FolderSection(props: {
               <SquarePen size={14} />
             </button>
 
-            <div class="pointer-events-none absolute top-full right-0 z-50 mt-1.5 whitespace-nowrap rounded border border-[#454545] bg-[#252526] px-3 py-1.5 text-[12px] text-[#cccccc] opacity-0 shadow-xl transition-opacity peer-hover:opacity-100">
+            <div class="pointer-events-none absolute top-full right-0 z-50 mt-1.5 whitespace-nowrap rounded border border-border bg-card px-3 py-1.5 text-[12px] text-sidebar-foreground opacity-0 shadow-xl transition-opacity peer-hover:opacity-100">
               Start new chat in {props.project.name}
             </div>
           </div>
@@ -73,23 +114,35 @@ function FolderSection(props: {
         <div class="mt-0.5 flex flex-col">
           <Show
             when={props.project.sessions.length > 0}
-            fallback={<div class="py-[5px] pr-4 pl-[38px] text-[13px] text-[#858585]">No sessions</div>}
+            fallback={<div class="py-[5px] pr-4 pl-[38px] text-[13px] text-muted-foreground">No sessions</div>}
           >
             <For each={props.project.sessions}>
               {(session) => (
                 <div
-                  class={`group flex cursor-pointer items-center justify-between py-[5px] pr-4 pl-[38px] hover:bg-[#2a2d2e] ${
-                    props.activeSessionId === session.id ? "bg-[#2a2d2e]" : ""
+                  class={`group flex cursor-pointer items-center justify-between py-[5px] pr-4 pl-[38px] hover:bg-sidebar-accent ${
+                    props.activeSessionId === session.id ? "bg-sidebar-accent" : ""
                   }`}
                   onClick={() => props.onSelectSession(props.project.id, session.id)}
                 >
-                  <span class={`truncate text-[13px] ${props.activeSessionId === session.id ? "text-[#cccccc]" : "text-[#b8b8b8]"}`}>
+                  <span class={`truncate text-[13px] ${props.activeSessionId === session.id ? "text-sidebar-foreground" : "text-muted-foreground"}`}>
                     {session.name}
                   </span>
 
-                  <span class="ml-3 shrink-0 rounded bg-[#2d2d2d] px-1.5 py-[1px] text-[11px] font-medium text-[#858585] transition-colors group-hover:bg-[#3c3c3c]">
-                    {formatSessionAge(session.lastActiveAt ?? session.createdAt)}
-                  </span>
+                  <div class="ml-3 flex shrink-0 items-center gap-1">
+                    <button
+                      class="hidden rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive group-hover:block"
+                      title="Delete session"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        props.onDeleteSession(props.project.id, session.id)
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                    <span class="rounded bg-muted px-1.5 py-[1px] text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent">
+                      {formatSessionAge(session.lastActiveAt ?? session.createdAt)}
+                    </span>
+                  </div>
                 </div>
               )}
             </For>
@@ -111,6 +164,8 @@ export function Sidebar(props: {
   const setActiveSession = useStore((s) => s.setActiveSession)
   const addProject = useStore((s) => s.addProject)
   const launchCliSession = useStore((s) => s.launchCliSession)
+  const removeSession = useStore((s) => s.removeSession)
+  const deleteProject = useStore((s) => s.deleteProject)
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
 
   createEffect(() => {
@@ -159,6 +214,14 @@ export function Sidebar(props: {
     await launchCliSession(projectId)
   }
 
+  const handleDeleteSession = async (projectId: string, sessionId: string) => {
+    await removeSession(projectId, sessionId)
+  }
+
+  const handleDeleteProject = async (projectId: string) => {
+    await deleteProject(projectId)
+  }
+
   const handleSelectSession = (projectId: string, sessionId: string) => {
     props.onOpenWorkspacePage?.()
     setCurrentProject(projectId)
@@ -168,15 +231,15 @@ export function Sidebar(props: {
   return (
     <aside
       class={`relative h-full shrink-0 transition-all duration-200 ${
-        isSidebarVisible() ? "w-[320px] border-r border-[#2d2d2d]" : "w-0 border-r-0"
+        isSidebarVisible() ? "w-[320px] border-r border-sidebar-border" : "w-0 border-r-0"
       }`}
     >
-      <div class="relative flex h-full max-h-full flex-col bg-[#1e1e1e] select-none">
-      <div class="sticky top-0 z-10 flex items-center justify-between bg-[#1e1e1e] px-3 pt-4 pb-2">
-        <div class="px-2 text-[13px] font-medium text-[#858585]">Projects</div>
-        <div class="flex items-center gap-0.5 text-[#858585]">
+      <div class="relative flex h-full max-h-full flex-col bg-sidebar select-none">
+      <div class="sticky top-0 z-10 flex items-center justify-between bg-sidebar px-3 pt-4 pb-2">
+        <div class="px-2 text-[13px] font-medium text-muted-foreground">Projects</div>
+        <div class="flex items-center gap-0.5 text-muted-foreground">
           <button
-            class="flex items-center justify-center rounded-md p-1.5 transition-colors hover:bg-[#3c3c3c] hover:text-[#cccccc]"
+            class="flex items-center justify-center rounded-md p-1.5 transition-colors hover:bg-accent hover:text-sidebar-foreground"
             title="New Project"
             onClick={() => void handleAddProject()}
           >
@@ -185,8 +248,7 @@ export function Sidebar(props: {
         </div>
       </div>
 
-      <div class="custom-scrollbar mt-2 flex-1 overflow-y-auto">
-        <div class="mb-2 px-5 text-[11px] font-semibold tracking-wider text-[#858585] uppercase">Projects</div>
+      <div class="custom-scrollbar flex-1 overflow-y-auto">
         <div class="flex flex-col gap-0.5 pb-3">
           <For each={projects()}>
             {(project) => (
@@ -196,6 +258,8 @@ export function Sidebar(props: {
                 onSelectProject={setCurrentProject}
                 onSelectSession={handleSelectSession}
                 onCreateSession={handleCreateSession}
+                onDeleteSession={handleDeleteSession}
+                onDeleteProject={handleDeleteProject}
                 onOpenWorkspacePage={props.onOpenWorkspacePage}
               />
             )}
@@ -203,10 +267,10 @@ export function Sidebar(props: {
         </div>
       </div>
 
-      <div class="border-t border-[#2d2d2d] p-2">
+      <div class="border-t border-sidebar-border p-2">
         <button
           type="button"
-          class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-[#e4e4e4] transition-colors hover:bg-[#2a2d2e]"
+          class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-foreground transition-colors hover:bg-sidebar-accent"
           title="Settings"
           onClick={() => {
             props.onOpenSettingsPage?.()
@@ -220,3 +284,4 @@ export function Sidebar(props: {
     </aside>
   )
 }
+

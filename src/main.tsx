@@ -2,9 +2,6 @@ import { render } from 'solid-js/web'
 import './index.css'
 import App from './App.tsx'
 
-document.documentElement.classList.add('dark')
-document.documentElement.style.colorScheme = 'dark'
-
 render(() => <App />, document.getElementById('root')!)
 
 const bootSplash = document.getElementById('boot-splash')

@@ -19,14 +19,16 @@ function DropdownMenuTrigger(props: any) {
 
 function DropdownMenuContent(props: any) {
   const resolvedChildren = children(() => props.children)
+  const { class: className, children: _children, ...rest } = props
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         class={cn(
           "z-50 max-h-[var(--kb-menu-content-available-height)] w-[var(--kb-menu-trigger-width)] min-w-32 origin-[var(--kb-menu-content-transform-origin)] overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-expanded:animate-in data-expanded:fade-in-0 data-expanded:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          props.class
+          className
         )}
+        {...rest}
       >
         {resolvedChildren()}
       </DropdownMenuPrimitive.Content>
@@ -40,14 +42,15 @@ function DropdownMenuGroup(props: any) {
 
 function DropdownMenuItem(props: any) {
   const resolvedChildren = children(() => props.children)
+  const { class: className, children: _children, ...rest } = props
   return (
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       class={cn(
         "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        props.class
+        className
       )}
-      {...props}
+      {...rest}
     >
       {resolvedChildren()}
     </DropdownMenuPrimitive.Item>

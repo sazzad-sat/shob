@@ -234,7 +234,7 @@ function insertSession(db: DatabaseSync, projectId: string, session: StoredSessi
   `).run(
     session.id,
     projectId,
-    session.name || `Terminal ${createdAt}`,
+    session.name || 'Terminal',
     session.shell || "powershell.exe",
     optionalString(session.cliTool),
     optionalString(session.pendingLaunchCommand),

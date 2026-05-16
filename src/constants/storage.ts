@@ -4,4 +4,6 @@ export const STORAGE_KEYS = {
   preferredCliId: 'shob.preferredCliId',
   preferredShell: 'shob.preferredShell',
   cliLaunchMode: 'shob.cliLaunchMode',
+  themeId: 'opencode-theme-id',
+  colorScheme: 'opencode-color-scheme',
 } as const;

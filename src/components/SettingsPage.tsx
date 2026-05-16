@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { Boxes, SlidersHorizontal, Terminal } from "lucide-solid"
 import { useStore } from "../store"
+import { OPEN_CODE_THEME_LIST } from "../theme"
 import { CliAvatar } from "./CliAvatar"
 import { Button } from "@/components/ui/button"
 
@@ -18,14 +19,18 @@ export function SettingsPage() {
   const setPreferredShell = useStore((s) => s.setPreferredShell)
   const setCliLaunchMode = useStore((s) => s.setCliLaunchMode)
   const installCliTool = useStore((s) => s.installCliTool)
+  const themeId = useStore((s) => s.themeId)
+  const colorScheme = useStore((s) => s.colorScheme)
+  const setThemeId = useStore((s) => s.setThemeId)
+  const setColorScheme = useStore((s) => s.setColorScheme)
   const [section, setSection] = createSignal<SettingsSection>("general")
 
   const installedCliTools = createMemo(() => cliTools().filter((tool) => tool.installed))
 
   return (
-    <div class="min-h-0 flex-1 bg-[#1e1e1e] text-[#cccccc]">
+    <div class="min-h-0 flex-1 bg-background text-foreground">
       <div class="flex h-full">
-        <aside class="w-[220px] border-r border-[#2d2d2d] p-3">
+        <aside class="w-[220px] border-r border-border p-3">
           <div class="grid gap-1">
             <Button type="button" variant={section() === "general" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("general")}>
               <SlidersHorizontal class="mr-2 h-4 w-4" /> General
@@ -44,16 +49,40 @@ export function SettingsPage() {
             <div class="space-y-6">
               <h2 class="text-lg font-semibold">General</h2>
 
-              <div class="rounded-lg border border-[#2d2d2d] bg-[#252526] p-4">
-                <label class="mb-2 block text-sm text-[#bdbdbd]">Default CLI</label>
+              <div class="rounded-lg border border-border bg-card p-4">
+                <label class="mb-2 block text-sm text-muted-foreground">Color Scheme</label>
+                <select
+                  value={colorScheme()}
+                  onChange={(event) => setColorScheme(event.currentTarget.value === "light" ? "light" : event.currentTarget.value === "dark" ? "dark" : "system")}
+                  class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="system">System</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
+
+              <div class="rounded-lg border border-border bg-card p-4">
+                <label class="mb-2 block text-sm text-muted-foreground">Theme</label>
+                <select
+                  value={themeId()}
+                  onChange={(event) => setThemeId(event.currentTarget.value)}
+                  class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <For each={OPEN_CODE_THEME_LIST}>{(theme) => <option value={theme.id}>{theme.name}</option>}</For>
+                </select>
+              </div>
+
+              <div class="rounded-lg border border-border bg-card p-4">
+                <label class="mb-2 block text-sm text-muted-foreground">Default CLI</label>
                 <div class="flex items-center gap-2">
-                  <span class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#2f2f32]">
+                  <span class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-muted">
                     <CliAvatar cliId={preferredCliId() ?? installedCliTools()[0]?.id ?? null} label="Default CLI" size="sm" />
                   </span>
                   <select
                     value={preferredCliId() ?? installedCliTools()[0]?.id ?? ""}
                     onChange={(event) => setPreferredCliTool(event.currentTarget.value || null)}
-                    class="h-10 w-full rounded-md border border-[#3a3a3a] bg-[#1f1f20] px-3 text-sm"
+                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <Show when={installedCliTools().length > 0} fallback={<option value="" disabled>No CLI tools detected</option>}>
                       <For each={installedCliTools()}>{(tool) => <option value={tool.id}>{tool.label}</option>}</For>
@@ -62,12 +91,12 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              <div class="rounded-lg border border-[#2d2d2d] bg-[#252526] p-4">
-                <label class="mb-2 block text-sm text-[#bdbdbd]">Default Shell</label>
+              <div class="rounded-lg border border-border bg-card p-4">
+                <label class="mb-2 block text-sm text-muted-foreground">Default Shell</label>
                 <select
                   value={preferredShell() ?? availableShells()[0] ?? ""}
                   onChange={(event) => setPreferredShell(event.currentTarget.value || null)}
-                  class="h-10 w-full rounded-md border border-[#3a3a3a] bg-[#1f1f20] px-3 text-sm"
+                  class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <Show when={availableShells().length > 0} fallback={<option value="" disabled>No shells detected</option>}>
                     <For each={availableShells()}>{(shell) => <option value={shell}>{getShellLabel(shell)}</option>}</For>
@@ -80,12 +109,12 @@ export function SettingsPage() {
           <Show when={section() === "providers"}>
             <div class="space-y-6">
               <h2 class="text-lg font-semibold">Providers</h2>
-              <div class="rounded-lg border border-[#2d2d2d] bg-[#252526] p-4">
-                <label class="mb-2 block text-sm text-[#bdbdbd]">Provider Switch Mode</label>
+              <div class="rounded-lg border border-border bg-card p-4">
+                <label class="mb-2 block text-sm text-muted-foreground">Provider Switch Mode</label>
                 <select
                   value={cliLaunchMode()}
                   onChange={(event) => setCliLaunchMode(event.currentTarget.value === "replace-current" ? "replace-current" : "new-tab")}
-                  class="h-10 w-full rounded-md border border-[#3a3a3a] bg-[#1f1f20] px-3 text-sm"
+                  class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="new-tab">Open in new tab</option>
                   <option value="replace-current">Replace current tab</option>
@@ -100,7 +129,7 @@ export function SettingsPage() {
               <div class="space-y-2">
                 <For each={cliTools()}>
                   {(tool) => (
-                    <div class="flex items-center justify-between rounded-md border border-[#2d2d2d] bg-[#252526] px-3 py-2">
+                    <div class="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
                       <div class="flex items-center gap-2">
                         <CliAvatar cliId={tool.id} label={tool.label} size="sm" />
                         <span class="text-sm">{tool.label}</span>
@@ -113,7 +142,7 @@ export function SettingsPage() {
                           </Button>
                         }
                       >
-                        <span class="text-xs text-[#8dcf94]">Installed</span>
+                        <span class="text-xs text-green-500">Installed</span>
                       </Show>
                     </div>
                   )}
@@ -126,3 +155,4 @@ export function SettingsPage() {
     </div>
   )
 }
+
