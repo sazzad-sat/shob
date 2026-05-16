@@ -340,20 +340,19 @@ export function Terminal(props: TerminalProps) {
   let startupDurationMsRef: number | null = null
   let hasInitializedSessionStateRef = false
 
-  const sessionProjectId = useStore((state) => {
-    const project = state.projects.find((item) => item.sessions.some((session) => session.id === sessionId))
-    return project?.id ?? null
+  const sessionProject = useStore((state) => {
+    for (const project of state.projects) {
+      if (project.sessions.some((s) => s.id === sessionId)) return project
+    }
+    return null
   })
-  const sessionProjectPath = useStore((state) => {
-    const project = state.projects.find((item) => item.sessions.some((session) => session.id === sessionId))
-    return project?.path ?? null
-  })
+  const sessionProjectId = () => sessionProject()?.id ?? null
+  const sessionProjectPath = () => sessionProject()?.path ?? null
   const session = useStore((state) => {
     for (const project of state.projects) {
       const match = project.sessions.find((item) => item.id === sessionId)
       if (match) return match
     }
-
     return null
   })
   const renameSession = useStore((state) => state.renameSession)
@@ -1100,6 +1099,24 @@ export function Terminal(props: TerminalProps) {
           ptyKilledRef = false
           lastPtySizeRef = { rows: spawnRows, cols: spawnCols }
           fitTerminal()
+          let rerunWriteScheduled = false
+          let rerunIsWriting = false
+          const rerunPendingChunks: string[] = []
+          const scheduleRerunFlush = () => {
+            if (rerunWriteScheduled || rerunIsWriting) return
+            rerunWriteScheduled = true
+            queueMicrotask(() => {
+              rerunWriteScheduled = false
+              if (!xtermRef || rerunIsWriting || rerunPendingChunks.length === 0) return
+              rerunIsWriting = true
+              const chunk = rerunPendingChunks.join("")
+              rerunPendingChunks.length = 0
+              xtermRef.write(chunk, () => {
+                rerunIsWriting = false
+                if (rerunPendingChunks.length > 0) scheduleRerunFlush()
+              })
+            })
+          }
           pty.onData((chunk) => {
             const data = decodePtyChunk(chunk, decoderRef)
             if (!data) return
@@ -1108,7 +1125,8 @@ export function Terminal(props: TerminalProps) {
                 detail: { sessionId, data },
               }),
             )
-            xtermRef?.write(data)
+            rerunPendingChunks.push(data)
+            scheduleRerunFlush()
           })
           if (!ptyKilledRef) {
             try { pty.write(`${detail.command}\r`) } catch { /* ignore */ }

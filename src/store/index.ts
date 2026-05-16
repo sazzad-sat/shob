@@ -180,7 +180,8 @@ export const actions: AppActions = {
       });
 
       const cleanupTargets = projects.filter((project, index) => {
-        return project.sessions.length !== normalizedProjects[index]?.sessions.length;
+        const original = normalizedProjects[index];
+        return original ? project.sessions.length !== original.sessions.length : false;
       });
       if (cleanupTargets.length > 0) {
         await Promise.all(cleanupTargets.map((project) => api.saveProject(project)));
@@ -200,10 +201,7 @@ export const actions: AppActions = {
       setStoredValue(STORAGE_KEYS.activeSessionId, resolvedSessionId);
       setStore({
         projects,
-        currentProjectId:
-          store.currentProjectId && projects.some((project) => project.id === store.currentProjectId)
-            ? store.currentProjectId
-            : resolvedProjectId,
+        currentProjectId: resolvedProjectId,
         activeSessionId: resolvedSessionId,
       });
     } catch (error) {
@@ -737,6 +735,13 @@ export const actions: AppActions = {
   },
 };
 
+const combinedTarget = new Proxy({} as AppState & AppActions, {
+  get(_, prop: string) {
+    if (prop in actions) return (actions as any)[prop];
+    return (store as any)[prop];
+  },
+});
+
 export function useStore(): AppState & AppActions;
 export function useStore<T>(
   selector: (state: AppState & AppActions) => T,
@@ -744,14 +749,12 @@ export function useStore<T>(
 export function useStore<T>(
   selector?: (state: AppState & AppActions) => T,
 ): (T extends (...args: any[]) => any ? T : () => T) | (AppState & AppActions) {
-  const combinedState = () => ({ ...store, ...actions } as AppState & AppActions);
-
   if (!selector) {
-    return combinedState();
+    return combinedTarget;
   }
 
   return ((...args: unknown[]) => {
-    const selected = selector(combinedState());
+    const selected = selector(combinedTarget);
     if (typeof selected === 'function') {
       return (selected as (...fnArgs: unknown[]) => unknown)(...args);
     }

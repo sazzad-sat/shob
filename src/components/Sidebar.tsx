@@ -40,13 +40,9 @@ function FolderSection(props: {
   }
 
   createEffect(() => {
-    if (showMenu()) {
-      document.addEventListener("mousedown", handleMenuClick)
-    }
-  })
-
-  onCleanup(() => {
-    document.removeEventListener("mousedown", handleMenuClick)
+    if (!showMenu()) return
+    document.addEventListener("mousedown", handleMenuClick)
+    onCleanup(() => document.removeEventListener("mousedown", handleMenuClick))
   })
 
   return (

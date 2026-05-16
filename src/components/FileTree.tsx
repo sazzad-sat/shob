@@ -245,15 +245,18 @@ const isIgnoredProjectEventPath = (path: string) => {
   )
 }
 
-const isChangedPath = (entryPath: string, changeMap: Record<string, GitFileChange>) => {
-  const normalizedEntry = normalizePath(entryPath).toLowerCase()
-  return Object.values(changeMap).some((change) => {
-    const normalizedChange = normalizePath(change.absolutePath).toLowerCase()
-    return (
-      normalizedChange === normalizedEntry ||
-      normalizedChange.startsWith(`${normalizedEntry}/`)
-    )
-  })
+const buildChangedPrefixes = (changes: GitFileChange[]) => {
+  const prefixes = new Set<string>()
+  for (const change of changes) {
+    const normalized = normalizePath(change.absolutePath).toLowerCase()
+    prefixes.add(normalized)
+    let idx = normalized.lastIndexOf('/')
+    while (idx > 0) {
+      prefixes.add(normalized.slice(0, idx))
+      idx = normalized.lastIndexOf('/', idx - 1)
+    }
+  }
+  return prefixes
 }
 
 const getStatusTone = (statusCode: string) => {
@@ -679,9 +682,11 @@ export function FileTree({ selectedFilePath, onFileSelect }: FileTreeProps) {
 
   const allChanges = createMemo(() => Object.values(changeMap()))
 
+  const changedPrefixes = createMemo(() => buildChangedPrefixes(allChanges()))
+
   const changedFileCount = () => gitStatus()?.changedFiles.length ?? 0
 
-  const entryHasChanges = (entryPath: string) => isChangedPath(entryPath, changeMap())
+  const entryHasChanges = (entryPath: string) => changedPrefixes().has(normalizePath(entryPath).toLowerCase())
 
   const sortEntries = (entries: FileTreeEntry[]) =>
     [...entries].sort((a, b) => {

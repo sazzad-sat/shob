@@ -312,6 +312,7 @@ function finishPty(id: string, session: PtyRuntime) {
   session.outputQueue.chunks.length = 0;
   session.outputQueue.scheduled = false;
   flushPersistedPtyOutput(id, session);
+  try { session.proc.kill(); } catch { /* already exited */ }
   mainWindow?.webContents.send("shob:terminal-exit", { id });
 }
 
@@ -319,11 +320,6 @@ function killPty(id: string) {
   const session = ptySessions.get(id);
   if (!session) return;
   finishPty(id, session);
-  try {
-    session.proc.kill();
-  } catch {
-    // best effort cleanup
-  }
 }
 
 function killAllPtys() {
@@ -582,11 +578,6 @@ function registerIpc() {
       }
 
       finishPty(id, existing);
-      try {
-        existing.proc.kill();
-      } catch {
-        // best effort cleanup before replacing a broken PTY
-      }
     }
 
     const proc = pty.spawn(options.shell, options.args || [], {
