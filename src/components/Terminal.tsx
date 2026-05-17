@@ -11,8 +11,6 @@ import { Search, X, ArrowUp, ArrowDown, Save, Trash2 } from "lucide-solid"
 import { CLI_ALIAS_TO_ID } from "../config/check"
 import { store, useStore } from "../store"
 import { api } from "../services/api"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import "@xterm/xterm/css/xterm.css"
 
 interface TerminalProps {
@@ -1198,54 +1196,46 @@ export function Terminal(props: TerminalProps) {
   }
 
   return (
-    <Card
-      class="terminal-container absolute inset-0 h-full w-full min-h-0 min-w-0 overflow-hidden rounded-none border-0 bg-background p-0"
+    <div
+      class="terminal-container absolute inset-0 h-full w-full min-h-0 min-w-0 overflow-hidden bg-background"
       data-active={isActive() ? "true" : "false"}
-      aria-hidden={isActive() ? undefined : "true"}
-      inert={isActive() ? undefined : true}
       style={{
-        get display() { return isActive() ? "flex" : "none" },
-        get "pointer-events"() { return isActive() ? "auto" : "none" },
+        display: isActive() ? "flex" : "none",
+        pointerEvents: isActive() ? "auto" : "none",
       }}
     >
-      <div class="absolute right-4 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100 terminal-toolbar">
-        <Button
+      <div class="absolute right-2 top-2 z-10 flex items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100 terminal-toolbar">
+        <button
           type="button"
           onClick={() => {
             setShowSearch(true)
             setTimeout(() => searchInputRef?.focus(), 50)
           }}
-          variant="secondary"
-          size="icon-xs"
-          class="h-6 w-6 bg-background/80 backdrop-blur"
+          class="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           title="Search (Ctrl+F)"
         >
           <Search class="h-3.5 w-3.5" />
-        </Button>
-        <Button
+        </button>
+        <button
           type="button"
           onClick={handleClearTerminal}
-          variant="secondary"
-          size="icon-xs"
-          class="h-6 w-6 bg-background/80 backdrop-blur"
+          class="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           title="Clear Terminal"
         >
-          <Trash2 class="h-3.5 w-3.5 text-muted-foreground" />
-        </Button>
-        <Button
+          <Trash2 class="h-3.5 w-3.5" />
+        </button>
+        <button
           type="button"
           onClick={handleSaveOutput}
-          variant="secondary"
-          size="icon-xs"
-          class="h-6 w-6 bg-background/80 backdrop-blur"
+          class="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           title="Save Output"
         >
-          <Save class="h-3.5 w-3.5 text-muted-foreground" />
-        </Button>
+          <Save class="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <Show when={showSearch()}>
-        <div class="absolute right-4 top-10 z-20 flex items-center gap-1 rounded-md border bg-popover px-2 py-1.5 shadow-md">
+        <div class="absolute right-2 top-10 z-20 flex items-center gap-1 rounded-md border bg-popover px-2 py-1.5 shadow-md">
           <input
             ref={searchInputRef}
             class="w-40 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
@@ -1268,36 +1258,30 @@ export function Terminal(props: TerminalProps) {
             }}
           />
           <div class="flex items-center gap-0.5 border-l pl-1">
-            <Button
+            <button
               type="button"
               onClick={handleSearchPrev}
-              variant="ghost"
-              size="icon-xs"
-              class="h-6 w-6"
+              class="flex h-6 w-6 items-center justify-center rounded-sm hover:bg-muted"
             >
               <ArrowUp class="h-3.5 w-3.5" />
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
               onClick={handleSearchNext}
-              variant="ghost"
-              size="icon-xs"
-              class="h-6 w-6"
+              class="flex h-6 w-6 items-center justify-center rounded-sm hover:bg-muted"
             >
               <ArrowDown class="h-3.5 w-3.5" />
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
               onClick={() => {
                 setShowSearch(false)
                 xtermRef?.focus()
               }}
-              variant="ghost"
-              size="icon-xs"
-              class="h-6 w-6"
+              class="flex h-6 w-6 items-center justify-center rounded-sm hover:bg-muted"
             >
               <X class="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
         </div>
       </Show>
@@ -1309,6 +1293,6 @@ export function Terminal(props: TerminalProps) {
           "background-color": "var(--term-bg)",
         }}
       />
-    </Card>
+    </div>
   )
 }

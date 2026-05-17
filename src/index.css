@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@import "./components/ui/collapsible.css";
+@import "./components/ui/icon.css";
+@import "./components/ui/file-icon.css";
+
 @custom-variant dark (&:is(.dark *));
 
 /* ═══════════════════════════════════════════════════
@@ -64,6 +68,29 @@
   --tab-toolbar-divider: color-mix(in oklch, var(--border) 78%, transparent);
   --tab-button-hover-bg: color-mix(in oklch, var(--accent) 78%, var(--card) 22%);
   --tab-button-active-bg: color-mix(in oklch, var(--accent) 90%, var(--background) 10%);
+
+  /* ── File tree (opencode) ──────────────────────── */
+  --icon-base: #9192a0;
+  --icon-weaker: #6b6d78;
+  --icon-strong: #c4c5d0;
+  --icon-diff-add-base: #22c55e;
+  --icon-diff-delete-base: #ef4444;
+  --icon-diff-modified-base: #eab308;
+  --surface-raised-base: #16171b;
+  --surface-raised-base-hover: #1c1d22;
+  --surface-base: #101012;
+  --surface-base-active: #1e2027;
+  --text-strong: #f4f4f6;
+  --text-base: #c4c5d0;
+  --text-weak: #9192a0;
+  --text-weaker: #6b6d78;
+  --border-base: #222429;
+  --border-weak: #1c1d22;
+  --border-weak-base: #222429;
+  --font-family-sans: 'Geist Variable', sans-serif;
+  --font-size-small: 12px;
+  --line-height-large: 1.4;
+  --letter-spacing-normal: 0;
 
   /* ── Terminal surface ───────────────────────────── */
   --term-bg: #09090b;
@@ -700,6 +727,30 @@ button {
 }
 
 /* ═══════════════════════════════════════════════════
+   FILE TREE TYPOGRAPHY (opencode)
+   ═══════════════════════════════════════════════════ */
+.text-12-medium {
+  font-family: var(--font-family-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.text-12-regular {
+  font-family: var(--font-family-sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.text-12-bold {
+  font-family: var(--font-family-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════
    STARTUP SPLASH
    ═══════════════════════════════════════════════════ */
 .startup-splash {
@@ -775,4 +826,64 @@ button {
   width: 1px !important;
   height: 1px !important;
   opacity: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   TERMINAL PANEL (opencode style)
+   ═══════════════════════════════════════════════════ */
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  width: 100%;
+  background-color: var(--background);
+}
+
+.terminal-panel-resize-handle {
+  height: 4px;
+  cursor: row-resize;
+  background: transparent;
+  transition: background-color 150ms ease;
+  position: relative;
+}
+
+.terminal-panel-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 2px;
+  background-color: var(--border);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.terminal-panel-resize-handle:hover::after {
+  opacity: 1;
+}
+
+.terminal-panel-resize-handle:active::after {
+  background-color: var(--ring);
+  opacity: 1;
+}
+
+.terminal-panel-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.terminal-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
 }
