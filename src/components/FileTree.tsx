@@ -26,6 +26,7 @@ function pathToFileUrl(filepath: string): string {
 }
 
 type Kind = "add" | "del" | "mix"
+type DiffStats = { additions: number; deletions: number }
 
 type Filter = {
   files: Set<string>
@@ -117,6 +118,7 @@ const FileTreeNode = (
       nodeClass?: string
       draggable: boolean
       kinds?: ReadonlyMap<string, Kind>
+      stats?: ReadonlyMap<string, DiffStats>
       marks?: Set<string>
       as?: "div" | "button"
     },
@@ -128,6 +130,7 @@ const FileTreeNode = (
     "nodeClass",
     "draggable",
     "kinds",
+    "stats",
     "marks",
     "as",
     "children",
@@ -175,6 +178,20 @@ const FileTreeNode = (
         {local.node.name}
       </span>
       {(() => {
+        const stat = local.stats?.get(local.node.path)
+        if (!stat) return null
+        const hasAdd = stat.additions > 0
+        const hasDel = stat.deletions > 0
+        if (!hasAdd && !hasDel) return null
+        return (
+          <span class="shrink-0 mr-1 text-[11px] tabular-nums">
+            {hasAdd && <span style="color: var(--icon-diff-add-base)">+{stat.additions}</span>}
+            {hasAdd && hasDel && <span class="mx-1 text-text-weaker"> </span>}
+            {hasDel && <span style="color: var(--icon-diff-delete-base)">-{stat.deletions}</span>}
+          </span>
+        )
+      })()}
+      {(() => {
         const value = kind()
         if (!value) return null
         if (local.node.type === "file") {
@@ -199,6 +216,7 @@ export default function FileTree(props: {
   allowed?: readonly string[]
   modified?: readonly string[]
   kinds?: ReadonlyMap<string, Kind>
+  stats?: ReadonlyMap<string, DiffStats>
   draggable?: boolean
   onFileClick?: (file: FileNode) => void
 
@@ -206,6 +224,7 @@ export default function FileTree(props: {
   _marks?: Set<string>
   _deeps?: Map<string, number>
   _kinds?: ReadonlyMap<string, Kind>
+  _stats?: ReadonlyMap<string, DiffStats>
   _chain?: readonly string[]
 }) {
   const file = useFile()
@@ -253,6 +272,10 @@ export default function FileTree(props: {
   const kinds = createMemo(() => {
     if (props._kinds) return props._kinds
     return props.kinds
+  })
+  const stats = createMemo(() => {
+    if (props._stats) return props._stats
+    return props.stats
   })
 
   const deeps = createMemo(() => {
@@ -411,6 +434,7 @@ export default function FileTree(props: {
                       nodeClass={props.nodeClass}
                       draggable={draggable()}
                       kinds={kinds()}
+                      stats={stats()}
                       marks={marks()}
                     >
                       <div class="size-4 flex items-center justify-center text-icon-weak">
@@ -437,6 +461,7 @@ export default function FileTree(props: {
                         allowed={props.allowed}
                         modified={props.modified}
                         kinds={props.kinds}
+                        stats={props.stats}
                         active={props.active}
                         draggable={props.draggable}
                         onFileClick={props.onFileClick}
@@ -444,6 +469,7 @@ export default function FileTree(props: {
                         _marks={marks()}
                         _deeps={deeps()}
                         _kinds={kinds()}
+                        _stats={stats()}
                         _chain={chain}
                       />
                     </Show>
@@ -458,6 +484,7 @@ export default function FileTree(props: {
                   nodeClass={props.nodeClass}
                   draggable={draggable()}
                   kinds={kinds()}
+                  stats={stats()}
                   marks={marks()}
                   as="button"
                   type="button"

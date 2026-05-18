@@ -488,7 +488,14 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
   }),
   set_project_watch: async ({ path: watchPath }) => setProjectWatch(watchPath),
   list_directory: async ({ path: directoryPath }) => listDirectory(directoryPath),
-  read_text_file: async ({ path: filePath }) => fs.readFile(filePath, "utf8"),
+  read_text_file: async ({ path: filePath }) => {
+    try {
+      return await fs.readFile(filePath, "utf8");
+    } catch (error: any) {
+      if (error?.code === "ENOENT") return "";
+      throw error;
+    }
+  },
   get_git_status: async ({ path: cwd }) => getGitStatus(cwd),
   get_git_branch: async ({ path: cwd }) => {
     const head = (await gitOutput(["branch", "--show-current"], cwd)).trim();

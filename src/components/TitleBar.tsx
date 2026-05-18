@@ -250,6 +250,7 @@ export function TitleBar() {
   const updateSession = useStore((s) => s.updateSession)
   const [isLauncherOpen, setIsLauncherOpen] = createSignal(false)
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
+  const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
   const [branchInfo, setBranchInfo] = createSignal<GitBranchInfo | null>(null)
   let branchRefreshTimeoutRef: number | null = null
@@ -340,6 +341,17 @@ export function TitleBar() {
   })
 
   onMount(() => {
+    const handleReviewState = (event: Event) => {
+      const detail = (event as CustomEvent<{ isReviewVisible: boolean }>).detail
+      if (!detail) return
+      setIsReviewVisible(Boolean(detail.isReviewVisible))
+    }
+
+    window.addEventListener("gg-review-state", handleReviewState as EventListener)
+    onCleanup(() => window.removeEventListener("gg-review-state", handleReviewState as EventListener))
+  })
+
+  onMount(() => {
     const handleFileTreeState = (event: Event) => {
       const detail = (event as CustomEvent<{ isFileTreeVisible: boolean }>).detail
       if (!detail) return
@@ -421,6 +433,10 @@ export function TitleBar() {
 
   const handleToggleSidebar = () => {
     window.dispatchEvent(new Event("gg-toggle-sidebar"))
+  }
+
+  const handleToggleReview = () => {
+    window.dispatchEvent(new Event("gg-toggle-review"))
   }
 
   const handleToggleFileTree = () => {
@@ -509,6 +525,23 @@ export function TitleBar() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        <Button
+          type="button"
+          onClick={handleToggleReview}
+          variant="ghost"
+          size="icon-sm"
+          class={`h-7 w-7 ${
+            isReviewVisible()
+              ? "bg-accent text-foreground"
+              : "text-current/65 hover:bg-white/[0.05] hover:text-current"
+          }`}
+          title={isReviewVisible() ? "Hide review panel" : "Show review panel"}
+          aria-label="Review panel toggle"
+          aria-pressed={isReviewVisible()}
+        >
+          <Icon name={isReviewVisible() ? "review-active" : "review"} size="small" />
+        </Button>
 
         <Button
           type="button"

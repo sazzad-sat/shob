@@ -325,6 +325,46 @@ button {
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
 }
 
+.opencode-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.opencode-resize-handle-start {
+  left: -4px;
+}
+
+.opencode-resize-handle-end {
+  right: -4px;
+}
+
+.opencode-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition:
+    width var(--duration-base) var(--ease-out-expo),
+    background var(--duration-base) ease,
+    box-shadow var(--duration-base) ease;
+}
+
+.opencode-resize-handle:hover::after,
+.opencode-resize-handle:active::after {
+  width: 2px;
+  background: rgba(255, 255, 255, 0.36);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.12);
+}
+
 /* ═══════════════════════════════════════════════════
    CHROME-STYLE TAB BAR
    ═══════════════════════════════════════════════════ */

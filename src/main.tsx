@@ -1,5 +1,7 @@
 import { render } from 'solid-js/web'
 import './index.css'
+import './opencode-ported/styles/session-review.css'
+import './opencode-ported/styles/diff-changes.css'
 import App from './App.tsx'
 
 render(() => <App />, document.getElementById('root')!)

@@ -3,6 +3,7 @@ import { Folder, MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucid
 import { nativeApi } from "../services/native"
 import { useStore } from "../store"
 import type { Project } from "../types"
+import { ResizeHandle } from "@/opencode-ported/resize-handle"
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -163,6 +164,7 @@ export function Sidebar(props: {
   const removeSession = useStore((s) => s.removeSession)
   const deleteProject = useStore((s) => s.deleteProject)
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
+  const [sidebarWidth, setSidebarWidth] = createSignal(320)
 
   createEffect(() => {
     window.dispatchEvent(
@@ -226,10 +228,17 @@ export function Sidebar(props: {
 
   return (
     <aside
-      class={`relative h-full shrink-0 transition-all duration-200 ${
-        isSidebarVisible() ? "w-[320px] border-r border-sidebar-border" : "w-0 border-r-0"
+      class={`relative h-full shrink-0 ${
+        isSidebarVisible() ? "border-r border-sidebar-border" : "w-0 border-r-0"
       }`}
+      style={isSidebarVisible() ? { width: `${sidebarWidth()}px` } : undefined}
     >
+      <Show when={isSidebarVisible()}>
+        <ResizeHandle
+          edge="end"
+          onResize={(clientX) => setSidebarWidth(Math.max(220, Math.min(520, clientX)))}
+        />
+      </Show>
       <div class="relative flex h-full max-h-full flex-col bg-sidebar select-none">
       <div class="sticky top-0 z-10 flex items-center justify-between bg-sidebar px-3 pt-4 pb-2">
         <div class="px-2 text-[13px] font-medium text-muted-foreground">Projects</div>

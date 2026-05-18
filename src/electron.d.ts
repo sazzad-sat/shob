@@ -105,6 +105,7 @@ export interface NativeCommandMap {
   probe_cli_tools: { args: { items: { id: string; commands: string[] }[] }; result: CliProbeResult[] }
   set_project_watch: { args: { path: string | null }; result: void }
   list_directory: { args: { path: string }; result: ElectronFileTreeEntry[] }
+  read_text_file: { args: { path: string }; result: string }
   get_git_status: { args: { path: string }; result: ElectronGitStatusSummary }
   get_git_branch: { args: { path: string }; result: ElectronGitBranchInfo }
   cleanup_runtime: { args: undefined; result: void }
