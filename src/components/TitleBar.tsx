@@ -1,9 +1,10 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { nativeApi } from "../services/native"
-import { ChevronDown, Folder, GitBranch } from "lucide-solid"
+import { ChevronDown, GitBranch } from "lucide-solid"
 import { CliAvatar } from "./CliAvatar"
 import { useStore } from "../store"
 import { Button } from "@/components/ui/button"
+import { Icon } from "@/components/ui/icon"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -445,9 +446,7 @@ export function TitleBar() {
             aria-pressed={isSidebarVisible()}
             title={isSidebarVisible() ? "Hide sidebar" : "Show sidebar"}
           >
-            <span class="flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border border-current">
-              <span class="h-full w-[1px] bg-current opacity-80" />
-            </span>
+            <Icon name={isSidebarVisible() ? "sidebar-active" : "sidebar"} size="small" />
           </Button>
 
           {branchInfo()?.head && (
@@ -524,7 +523,7 @@ export function TitleBar() {
           title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
           aria-pressed={isFileTreeVisible()}
         >
-          <Folder class="h-4 w-4" stroke-width={1.9} />
+          <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
         </Button>
       </div>
 
