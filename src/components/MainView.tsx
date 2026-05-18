@@ -340,6 +340,19 @@ export function MainView() {
                   <TerminalPanel onNewSession={handleCreateSession} />
                 </div>
 
+                {projectSessions().length === 0 && (
+                  <div class="min-h-0 min-w-0 flex-1">
+                    <WelcomeScreen
+                      projects={projects()}
+                      currentProject={currentProject()}
+                      onOpenFolder={handleOpenFolder}
+                      onCreateSession={handleCreateSession}
+                      onSelectProject={appStore.setCurrentProject}
+                      onToggleFileTree={handleToggleFileTree}
+                    />
+                  </div>
+                )}
+
                 <Show when={isReviewVisible()}>
                   <div
                     class="relative min-h-0 shrink-0 overflow-hidden border-l border-border/60"
@@ -358,19 +371,6 @@ export function MainView() {
                     />
                   </div>
                 </Show>
-
-                {projectSessions().length === 0 && (
-                  <div class="min-h-0 min-w-0 flex-1">
-                    <WelcomeScreen
-                      projects={projects()}
-                      currentProject={currentProject()}
-                      onOpenFolder={handleOpenFolder}
-                      onCreateSession={handleCreateSession}
-                      onSelectProject={appStore.setCurrentProject}
-                      onToggleFileTree={handleToggleFileTree}
-                    />
-                  </div>
-                )}
 
                 {(() => {
                   if (!isFileTreeVisible()) return null

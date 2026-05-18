@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, For, Show } from "solid-js"
+import { createMemo, createResource, For, Show } from "solid-js"
 import { diffLines, type Change } from "diff"
 import { FileIcon } from "@/components/ui/file-icon"
 import { nativeApi } from "@/services/native"
@@ -24,20 +24,20 @@ const absolutePath = (root: string, file: string) => {
 
 const tokenClass = (token: string) => {
   if (/^(import|from|export|default|function|return|const|let|var|if|else|for|while|class|type|interface)$/.test(token)) {
-    return "text-[#ff7bff]"
+    return "text-[var(--chart-4)]"
   }
-  if (/^['"`].*['"`]$/.test(token)) return "text-[#00e0c6]"
-  if (/^[A-Z][A-Za-z0-9_]*$/.test(token)) return "text-[#ffdd33]"
-  if (/^[0-9]+$/.test(token)) return "text-[#c6a7ff]"
-  return "text-[#f2f2f2]"
+  if (/^['"`].*['"`]$/.test(token)) return "text-[var(--chart-5)]"
+  if (/^[A-Z][A-Za-z0-9_]*$/.test(token)) return "text-[var(--chart-3)]"
+  if (/^[0-9]+$/.test(token)) return "text-[var(--chart-4)]"
+  return "text-foreground"
 }
 
 function CodeLine(props: { line: string; index: number }) {
   const parts = createMemo(() => props.line.split(/(\s+|[{}()[\];,.<>/=:+*-])/g).filter((part) => part.length > 0))
   return (
     <div class="grid min-h-[24px] grid-cols-[56px_minmax(0,1fr)] gap-4 text-[12px] leading-6 font-mono">
-      <div class="select-none text-right text-[#777]">{props.index + 1}</div>
-      <pre class="m-0 whitespace-pre-wrap break-words text-[#f2f2f2]">
+      <div class="select-none text-right text-muted-foreground">{props.index + 1}</div>
+      <pre class="m-0 whitespace-pre-wrap break-words text-foreground">
         <For each={parts()}>{(part) => <span class={/\s+/.test(part) ? "" : tokenClass(part)}>{part}</span>}</For>
       </pre>
     </div>
@@ -80,19 +80,22 @@ function UnifiedDiff(props: { chunks: Change[] }) {
                 return (
                   <div
                     class="grid min-h-[24px] grid-cols-[44px_44px_24px_minmax(0,1fr)] text-[12px] leading-6 font-mono"
-                    classList={{
-                      "bg-[#12351f] text-[#d8ffe2]": kind === "added",
-                      "bg-[#3a1717] text-[#ffd8d8]": kind === "removed",
+                    style={{
+                      "background-color": kind === "added"
+                        ? "color-mix(in oklch, var(--icon-diff-add-base) 14%, transparent)"
+                        : kind === "removed"
+                          ? "color-mix(in oklch, var(--icon-diff-delete-base) 14%, transparent)"
+                          : "transparent",
                     }}
                   >
-                    <div class="select-none pr-2 text-right text-[#777]">{currentOld}</div>
-                    <div class="select-none pr-2 text-right text-[#777]">{currentNew}</div>
+                    <div class="select-none pr-2 text-right text-muted-foreground">{currentOld}</div>
+                    <div class="select-none pr-2 text-right text-muted-foreground">{currentNew}</div>
                     <div
                       class="select-none text-center"
                       classList={{
-                        "text-[#2ae66f]": kind === "added",
-                        "text-[#ff6464]": kind === "removed",
-                        "text-[#777]": kind === "context",
+                        "text-[var(--icon-diff-add-base)]": kind === "added",
+                        "text-[var(--icon-diff-delete-base)]": kind === "removed",
+                        "text-muted-foreground": kind === "context",
                       }}
                     >
                       {prefix}
@@ -114,12 +117,15 @@ function SplitDiff(props: { before: string; after: string }) {
   const afterLines = createMemo(() => splitChunkLines(props.after))
 
   return (
-    <div class="grid min-h-full grid-cols-2 divide-x divide-[#2a2a2a] text-[12px] leading-6 font-mono">
+    <div class="grid min-h-full grid-cols-2 divide-x divide-border text-[12px] leading-6 font-mono">
       <div class="min-w-0 overflow-auto py-4">
         <For each={beforeLines()}>
           {(line, index) => (
-            <div class="grid min-h-[24px] grid-cols-[48px_minmax(0,1fr)] bg-[#3a1717] text-[#ffd8d8]">
-              <div class="select-none pr-3 text-right text-[#777]">{index() + 1}</div>
+            <div
+              class="grid min-h-[24px] grid-cols-[48px_minmax(0,1fr)]"
+              style={{ "background-color": "color-mix(in oklch, var(--icon-diff-delete-base) 14%, transparent)" }}
+            >
+              <div class="select-none pr-3 text-right text-muted-foreground">{index() + 1}</div>
               <CodeText line={line} />
             </div>
           )}
@@ -128,8 +134,11 @@ function SplitDiff(props: { before: string; after: string }) {
       <div class="min-w-0 overflow-auto py-4">
         <For each={afterLines()}>
           {(line, index) => (
-            <div class="grid min-h-[24px] grid-cols-[48px_minmax(0,1fr)] bg-[#12351f] text-[#d8ffe2]">
-              <div class="select-none pr-3 text-right text-[#777]">{index() + 1}</div>
+            <div
+              class="grid min-h-[24px] grid-cols-[48px_minmax(0,1fr)]"
+              style={{ "background-color": "color-mix(in oklch, var(--icon-diff-add-base) 14%, transparent)" }}
+            >
+              <div class="select-none pr-3 text-right text-muted-foreground">{index() + 1}</div>
               <CodeText line={line} />
             </div>
           )}
@@ -142,7 +151,6 @@ function SplitDiff(props: { before: string; after: string }) {
 export function OpencodeSessionPanel(props: Props) {
   const file = createMemo(() => props.activeFile ?? "")
   const openFiles = createMemo(() => props.openFiles ?? (file() ? [file()] : []))
-  const [diffStyle, setDiffStyle] = createSignal<"unified" | "split">("unified")
   const [preview] = createResource(
     () => (props.projectPath && file() ? { path: absolutePath(props.projectPath, file()), file: file() } : null),
     async (input) => {
@@ -161,10 +169,10 @@ export function OpencodeSessionPanel(props: Props) {
     return Boolean(data && data.before !== data.after)
   })
   return (
-    <section class="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-[#151515] text-[#f2f2f2]">
-      <div class="h-[56px] shrink-0 border-b border-[#282828] bg-[#171717]">
+    <section class="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
+      <div class="h-[56px] shrink-0 border-b border-border bg-background">
         <div class="flex h-full min-w-0 items-center gap-0 px-5">
-          <div class="w-[66px] shrink-0 text-[13px] font-medium text-[#9a9a9a]">Review</div>
+          <div class="w-[66px] shrink-0 text-[13px] font-medium text-muted-foreground">Review</div>
           <div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overflow-y-hidden">
             <For each={openFiles()}>
               {(path) => {
@@ -173,8 +181,8 @@ export function OpencodeSessionPanel(props: Props) {
                   <div
                     class="group relative flex h-[30px] max-w-[190px] shrink-0 items-center gap-2 rounded-[6px] px-2.5 text-left text-[13px] font-medium transition-colors"
                     classList={{
-                      "bg-[#2d2d2d] text-white": active(),
-                      "text-[#858585] hover:bg-white/[0.035] hover:text-[#d8d8d8]": !active(),
+                      "bg-accent text-foreground": active(),
+                      "text-muted-foreground hover:bg-accent/60 hover:text-foreground": !active(),
                     }}
                     title={path}
                   >
@@ -189,13 +197,13 @@ export function OpencodeSessionPanel(props: Props) {
                     <button
                       type="button"
                       onClick={() => props.onCloseFile?.(path)}
-                      class="flex size-4 shrink-0 items-center justify-center rounded text-[#777] opacity-70 hover:bg-white/10 hover:text-white group-hover:opacity-100"
+                      class="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-70 hover:bg-muted hover:text-foreground group-hover:opacity-100"
                       aria-label={`Close ${filename(path)}`}
                     >
                       <Icon name="close-small" size="small" />
                     </button>
                     <span
-                      class="absolute inset-x-0 bottom-[-14px] h-px bg-white transition-opacity"
+                      class="absolute inset-x-0 bottom-[-14px] h-px bg-foreground transition-opacity"
                       classList={{ "opacity-100": active(), "opacity-0": !active() }}
                     />
                   </div>
@@ -204,7 +212,7 @@ export function OpencodeSessionPanel(props: Props) {
             </For>
             <button
               type="button"
-              class="ml-2 flex size-7 shrink-0 items-center justify-center rounded-md text-[#858585] hover:bg-white/[0.035] hover:text-white"
+              class="ml-2 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/60 hover:text-foreground"
               title="Open files from the file tree"
             >
               <Icon name="plus-small" size="small" />
@@ -212,12 +220,12 @@ export function OpencodeSessionPanel(props: Props) {
           </div>
         </div>
       </div>
-      <div class="min-h-0 flex-1 overflow-auto bg-[#151515]">
+      <div class="min-h-0 flex-1 overflow-auto bg-background">
         <Show
           when={file()}
-          fallback={<div class="flex h-full items-center justify-center text-sm text-[#777]">Select a file</div>}
+          fallback={<div class="flex h-full items-center justify-center text-sm text-muted-foreground">Select a file</div>}
         >
-          <Show when={!preview.loading} fallback={<div class="p-6 text-sm text-[#777]">Loading...</div>}>
+          <Show when={!preview.loading} fallback={<div class="p-6 text-sm text-muted-foreground">Loading...</div>}>
             <Show
               when={hasDiff()}
               fallback={
@@ -226,12 +234,7 @@ export function OpencodeSessionPanel(props: Props) {
                 </div>
               }
             >
-              <Show
-                when={diffStyle() === "unified"}
-                fallback={<SplitDiff before={preview()?.before ?? ""} after={preview()?.after ?? ""} />}
-              >
-                <UnifiedDiff chunks={preview()?.chunks ?? []} />
-              </Show>
+              <UnifiedDiff chunks={preview()?.chunks ?? []} />
             </Show>
           </Show>
         </Show>
