@@ -134,7 +134,7 @@ async function detectWindowsBuildNumber() {
   try {
     const { stdout } = await execFileAsync("cmd", ["/C", "ver"]);
     const token = stdout.split(/\s+/).find((part) => /\d+\.\d+\.\d+/.test(part));
-    return token ? Number(token.replace(/[\[\]]/g, "").split(".")[2]) || null : null;
+    return token ? Number(token.replace(/\[|\]/g, "").split(".")[2]) || null : null;
   } catch {
     return null;
   }

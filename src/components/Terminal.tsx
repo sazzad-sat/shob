@@ -1201,7 +1201,7 @@ export function Terminal(props: TerminalProps) {
       data-active={isActive() ? "true" : "false"}
       style={{
         display: isActive() ? "flex" : "none",
-        pointerEvents: isActive() ? "auto" : "none",
+        "pointer-events": isActive() ? "auto" : "none",
       }}
     >
       <div class="absolute right-2 top-2 z-10 flex items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100 terminal-toolbar">

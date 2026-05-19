@@ -112,42 +112,6 @@ function UnifiedDiff(props: { chunks: Change[] }) {
   )
 }
 
-function SplitDiff(props: { before: string; after: string }) {
-  const beforeLines = createMemo(() => splitChunkLines(props.before))
-  const afterLines = createMemo(() => splitChunkLines(props.after))
-
-  return (
-    <div class="grid min-h-full grid-cols-2 divide-x divide-border text-[12px] leading-6 font-mono">
-      <div class="min-w-0 overflow-auto py-4">
-        <For each={beforeLines()}>
-          {(line, index) => (
-            <div
-              class="grid min-h-[24px] grid-cols-[48px_minmax(0,1fr)]"
-              style={{ "background-color": "color-mix(in oklch, var(--icon-diff-delete-base) 14%, transparent)" }}
-            >
-              <div class="select-none pr-3 text-right text-muted-foreground">{index() + 1}</div>
-              <CodeText line={line} />
-            </div>
-          )}
-        </For>
-      </div>
-      <div class="min-w-0 overflow-auto py-4">
-        <For each={afterLines()}>
-          {(line, index) => (
-            <div
-              class="grid min-h-[24px] grid-cols-[48px_minmax(0,1fr)]"
-              style={{ "background-color": "color-mix(in oklch, var(--icon-diff-add-base) 14%, transparent)" }}
-            >
-              <div class="select-none pr-3 text-right text-muted-foreground">{index() + 1}</div>
-              <CodeText line={line} />
-            </div>
-          )}
-        </For>
-      </div>
-    </div>
-  )
-}
-
 export function OpencodeSessionPanel(props: Props) {
   const file = createMemo(() => props.activeFile ?? "")
   const openFiles = createMemo(() => props.openFiles ?? (file() ? [file()] : []))
