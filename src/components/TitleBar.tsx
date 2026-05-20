@@ -435,12 +435,8 @@ export function TitleBar() {
     window.dispatchEvent(new Event("gg-toggle-sidebar"))
   }
 
-  const handleToggleReview = () => {
-    window.dispatchEvent(new Event("gg-toggle-review"))
-  }
-
-  const handleToggleFileTree = () => {
-    window.dispatchEvent(new Event("gg-toggle-file-tree"))
+  const handleToggleReviewWorkspace = () => {
+    window.dispatchEvent(new Event("gg-toggle-review-workspace"))
   }
 
   const headerClass = "border-border bg-background text-foreground"
@@ -528,35 +524,19 @@ export function TitleBar() {
 
         <Button
           type="button"
-          onClick={handleToggleReview}
+          onClick={handleToggleReviewWorkspace}
           variant="ghost"
           size="icon-sm"
           class={`h-7 w-7 ${
-            isReviewVisible()
+            isReviewVisible() || isFileTreeVisible()
               ? "bg-accent text-foreground"
               : "text-current/65 hover:bg-white/[0.05] hover:text-current"
           }`}
-          title={isReviewVisible() ? "Hide review panel" : "Show review panel"}
-          aria-label="Review panel toggle"
-          aria-pressed={isReviewVisible()}
+          title={isReviewVisible() || isFileTreeVisible() ? "Hide file tree and review panel" : "Show file tree and review panel"}
+          aria-label="File tree and review panel toggle"
+          aria-pressed={isReviewVisible() || isFileTreeVisible()}
         >
-          <Icon name={isReviewVisible() ? "review-active" : "review"} size="small" />
-        </Button>
-
-        <Button
-          type="button"
-          onClick={handleToggleFileTree}
-          variant="ghost"
-          size="icon-sm"
-          class={`h-7 w-7 ${
-            isFileTreeVisible()
-              ? "bg-accent text-foreground"
-              : "text-current/65 hover:bg-white/[0.05] hover:text-current"
-          }`}
-          title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
-          aria-pressed={isFileTreeVisible()}
-        >
-          <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
+          <Icon name={isReviewVisible() || isFileTreeVisible() ? "review-active" : "review"} size="small" />
         </Button>
       </div>
 

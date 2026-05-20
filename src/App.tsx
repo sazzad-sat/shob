@@ -10,6 +10,9 @@ function App() {
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
   const [isBooting, setIsBooting] = createSignal(true)
+  const [systemMode, setSystemMode] = createSignal<'light' | 'dark'>(
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+  )
 
   onMount(() => {
     const BOOT_TIMEOUT_MS = 4000
@@ -34,7 +37,7 @@ function App() {
 
   createEffect(() => {
     const scheme = colorScheme()
-    const isDark = scheme === 'dark' || (scheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    const isDark = scheme === 'dark' || (scheme === 'system' && systemMode() === 'dark')
     const mode = isDark ? 'dark' : 'light'
     const theme = getThemeById(themeId())
     const tokens = resolveAppThemeTokens(theme, mode)
@@ -43,6 +46,19 @@ function App() {
     document.documentElement.dataset.colorScheme = mode
     document.documentElement.style.colorScheme = mode
     document.documentElement.classList.toggle('dark', mode === 'dark')
+    const background = tokens['--background-base'] ?? tokens['--background']
+    if (window.shob && background) {
+      void nativeApi.invoke('set_window_background', { color: background }).catch(() => undefined)
+    }
+  })
+
+  onMount(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateSystemMode = () => setSystemMode(mediaQuery.matches ? 'dark' : 'light')
+
+    updateSystemMode()
+    mediaQuery.addEventListener('change', updateSystemMode)
+    onCleanup(() => mediaQuery.removeEventListener('change', updateSystemMode))
   })
 
   onMount(() => {

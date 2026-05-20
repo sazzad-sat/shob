@@ -527,6 +527,10 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
     await setProjectWatch(null);
     killAllPtys();
   },
+  set_window_background: async ({ color }) => {
+    if (typeof color !== "string" || !color.trim()) return;
+    mainWindow?.setBackgroundColor(color);
+  },
   minimize_window: async () => mainWindow?.minimize(),
   toggle_maximize_window: async () => {
     if (!mainWindow) return false;

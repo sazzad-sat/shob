@@ -1,16 +1,9 @@
-export type ThemeScheme = 'system' | 'light' | 'dark'
+import { resolveThemeVariant } from "./resolve"
+import type { DesktopTheme, ResolvedTheme, ThemeVariant } from "./types"
 
-export interface OpenCodeThemeVariant {
-  palette?: Record<string, string>
-  overrides?: Record<string, string>
-}
-
-export interface OpenCodeTheme {
-  id: string
-  name: string
-  light: OpenCodeThemeVariant
-  dark: OpenCodeThemeVariant
-}
+export type ThemeScheme = "system" | "light" | "dark"
+export type OpenCodeThemeVariant = ThemeVariant
+export type OpenCodeTheme = DesktopTheme
 
 const files = import.meta.glob<{ default: OpenCodeTheme }>("./themes/*.json", { eager: true })
 
@@ -22,53 +15,57 @@ export const OPEN_CODE_THEME_LIST = Object.values(OPEN_CODE_THEMES).sort((a, b) 
 
 const FALLBACK_THEME_ID = 'oc-2'
 
-const toHex = (value: string | undefined, fallback: string) => {
-  if (!value) return fallback
-  return value.startsWith('#') ? value : `#${value}`
-}
+const toCssVars = (tokens: ResolvedTheme): Record<string, string> =>
+  Object.fromEntries(Object.entries(tokens).map(([key, value]) => [`--${key}`, value]))
 
-export const resolveAppThemeTokens = (theme: OpenCodeTheme, mode: 'light' | 'dark') => {
-  const variant = mode === 'dark' ? theme.dark : theme.light
-  const palette = variant.palette ?? {}
-  const overrides = variant.overrides ?? {}
-  const neutral = toHex(palette.neutral, mode === 'dark' ? '#1C1C1C' : '#F8F8F8')
-  const ink = toHex(palette.ink, mode === 'dark' ? '#EDEDED' : '#171717')
-  const primary = toHex(palette.primary, mode === 'dark' ? '#fab283' : '#dcde8d')
-  const accent = toHex((palette as Record<string, string>).accent, mode === 'dark' ? '#2A2A2A' : '#EFEFEF')
-  const interactive = toHex((palette as Record<string, string>).interactive ?? palette.info, '#034cff')
-  const borderWeak = toHex(overrides['border-weak-base'], mode === 'dark' ? '#2a2a2a' : '#d9d9d9')
-  const borderWeaker = toHex(overrides['border-weaker-base'], mode === 'dark' ? '#222222' : '#e8e8e8')
-  const raised = toHex(overrides['surface-raised-base'], mode === 'dark' ? '#232323' : '#f3f3f3')
-  const hoverSurface = toHex(overrides['surface-base-hover'], mode === 'dark' ? '#2A2A2A' : '#EFEFEF')
+const pick = (tokens: ResolvedTheme, key: string, fallback: string) => tokens[key] ?? fallback
+
+export const resolveAppThemeTokens = (theme: OpenCodeTheme, mode: 'light' | 'dark'): Record<string, string> => {
+  const isDark = mode === 'dark'
+  const tokens = resolveThemeVariant(isDark ? theme.dark : theme.light, isDark)
+  const background = pick(tokens, "background-base", isDark ? "#101010" : "#f8f8f8")
+  const foreground = pick(tokens, "text-strong", isDark ? "#ededed" : "#171717")
+  const raised = pick(tokens, "surface-raised-base", isDark ? "#232323" : "#f3f3f3")
+  const muted = pick(tokens, "surface-base-hover", isDark ? "#282828" : "#eeeeee")
+  const mutedText = pick(tokens, "text-base", isDark ? "#a0a0a0" : "#6f6f6f")
+  const accent = pick(tokens, "surface-interactive-weak", isDark ? "#0d172b" : "#f5faff")
+  const primary = pick(tokens, "surface-brand-base", isDark ? "#fab283" : "#dcde8d")
+  const interactive = pick(tokens, "border-interactive-active", "#034cff")
+  const border = pick(tokens, "border-weak-base", isDark ? "#282828" : "#dbdbdb")
+  const borderWeaker = pick(tokens, "border-weaker-base", isDark ? "#232323" : "#e8e8e8")
+  const destructive = pick(tokens, "surface-critical-strong", "#fc533a")
 
   return {
-    '--background': toHex(overrides['surface-base'], neutral),
-    '--foreground': toHex(overrides['text-strong'], ink),
+    ...toCssVars(tokens),
+    '--background': background,
+    '--foreground': foreground,
     '--card': raised,
-    '--card-foreground': toHex(overrides['text-strong'], ink),
+    '--card-foreground': foreground,
     '--popover': raised,
-    '--popover-foreground': toHex(overrides['text-strong'], ink),
+    '--popover-foreground': foreground,
     '--primary': primary,
-    '--primary-foreground': neutral,
+    '--primary-foreground': pick(tokens, "text-on-brand-base", background),
     '--secondary': raised,
-    '--secondary-foreground': toHex(overrides['text-strong'], ink),
-    '--muted': hoverSurface,
-    '--muted-foreground': toHex(overrides['text-base'], mode === 'dark' ? '#A0A0A0' : '#6F6F6F'),
-    '--accent': toHex(overrides['surface-interactive-weak'], accent),
-    '--accent-foreground': toHex(overrides['text-strong'], ink),
-    '--destructive': toHex(palette.error, '#fc533a'),
-    '--border': borderWeak,
+    '--secondary-foreground': foreground,
+    '--muted': muted,
+    '--muted-foreground': mutedText,
+    '--accent': accent,
+    '--accent-foreground': foreground,
+    '--destructive': destructive,
+    '--border': border,
     '--input': raised,
     '--ring': interactive,
-    '--sidebar': toHex(overrides['surface-base'], neutral),
-    '--sidebar-foreground': toHex(overrides['text-strong'], ink),
+    '--sidebar': background,
+    '--sidebar-foreground': foreground,
     '--sidebar-primary': primary,
-    '--sidebar-primary-foreground': neutral,
+    '--sidebar-primary-foreground': pick(tokens, "text-on-brand-base", background),
     '--sidebar-accent': raised,
-    '--sidebar-accent-foreground': toHex(overrides['text-strong'], ink),
+    '--sidebar-accent-foreground': foreground,
     '--sidebar-border': borderWeaker,
     '--sidebar-ring': interactive,
-    '--term-bg': toHex(overrides['surface-base'], neutral),
+    '--term-bg': background,
+    '--icon-weaker': pick(tokens, "icon-weak-base", isDark ? "#343434" : "#c7c7c7"),
+    '--icon-strong': pick(tokens, "icon-strong-base", foreground),
   }
 }
 

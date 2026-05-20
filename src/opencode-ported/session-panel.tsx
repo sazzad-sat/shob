@@ -1,5 +1,6 @@
 import { createMemo, createResource, createSignal, For, Show, onCleanup, createEffect, Suspense } from "solid-js"
 import { diffLines, type Change } from "diff"
+import { ChevronDown, ChevronRight } from "lucide-solid"
 import { FileIcon } from "@/components/ui/file-icon"
 import { nativeApi } from "@/services/native"
 import { Icon } from "@/components/ui/icon"
@@ -8,6 +9,12 @@ import { ResizeHandle } from "@/opencode-ported/resize-handle"
 
 type DiffKind = "add" | "del" | "mix"
 type DiffStats = { additions: number; deletions: number }
+type DiffLine = {
+  type: "info" | "add" | "del" | "normal"
+  content: string
+  oldLine: string
+  newLine: string
+}
 
 type Props = {
   projectPath: string
@@ -71,6 +78,64 @@ const splitChunkLines = (value: string) => {
   const lines = value.split(/\r?\n/)
   if (value.endsWith("\n") || value.endsWith("\r\n")) lines.pop()
   return lines
+}
+
+const OVERVIEW_CONTEXT_LINES = 3
+const lockfilePattern = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lock)$/
+
+const buildOverviewDiffLines = (chunks: Change[]): DiffLine[] => {
+  let oldLine = 1
+  let newLine = 1
+  const rows: DiffLine[] = []
+
+  for (const chunk of chunks) {
+    for (const line of splitChunkLines(chunk.value)) {
+      if (chunk.added) {
+        rows.push({ type: "add", content: line, oldLine: "", newLine: String(newLine++) })
+      } else if (chunk.removed) {
+        rows.push({ type: "del", content: line, oldLine: String(oldLine++), newLine: "" })
+      } else {
+        rows.push({ type: "normal", content: line, oldLine: String(oldLine++), newLine: String(newLine++) })
+      }
+    }
+  }
+
+  const changedIndexes = rows
+    .map((row, index) => row.type === "add" || row.type === "del" ? index : -1)
+    .filter((index) => index >= 0)
+  if (changedIndexes.length === 0) return []
+
+  const segments: Array<{ start: number; end: number }> = []
+  for (const index of changedIndexes) {
+    const start = Math.max(0, index - OVERVIEW_CONTEXT_LINES)
+    const end = Math.min(rows.length - 1, index + OVERVIEW_CONTEXT_LINES)
+    const last = segments.at(-1)
+    if (last && start <= last.end + 1) {
+      last.end = Math.max(last.end, end)
+    } else {
+      segments.push({ start, end })
+    }
+  }
+
+  return segments.flatMap((segment) => {
+    const segmentRows = rows.slice(segment.start, segment.end + 1)
+    const oldLines = segmentRows.map((row) => Number(row.oldLine)).filter((line) => Number.isFinite(line) && line > 0)
+    const newLines = segmentRows.map((row) => Number(row.newLine)).filter((line) => Number.isFinite(line) && line > 0)
+    const oldStart = oldLines[0] ?? 0
+    const newStart = newLines[0] ?? 0
+    const oldCount = oldLines.length
+    const newCount = newLines.length
+
+    return [
+      {
+        type: "info" as const,
+        oldLine: "",
+        newLine: "",
+        content: `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`,
+      },
+      ...segmentRows,
+    ]
+  })
 }
 
 function UnifiedDiff(props: { chunks: Change[] }) {
@@ -247,10 +312,20 @@ export function OpencodeSessionPanel(props: Props) {
   const file = createMemo(() => props.activeFile ?? "")
   const openFiles = createMemo(() => props.openFiles ?? (file() ? [file()] : []))
   
-  const [activeTreeTab, setActiveTreeTab] = createSignal<"changes" | "all">("all")
+  const [activeTreeTab, setActiveTreeTab] = createSignal<"changes" | "all">("changes")
   const [dropdownOpen, setDropdownOpen] = createSignal(false)
   const [diffStyle, setDiffStyle] = createSignal<"unified" | "split">("unified")
   const [treeWidth, setTreeWidth] = createSignal(280)
+  const [showOverview, setShowOverview] = createSignal(true)
+  const [expandedDiffs, setExpandedDiffs] = createSignal<Record<string, boolean>>({})
+
+  const overviewFiles = createMemo(() => {
+    const changed = props.gitChangedFiles()
+    if (changed.length > 0) return changed
+
+    const fallback = [file(), ...openFiles()].filter((value): value is string => Boolean(value))
+    return [...new Set(fallback)]
+  })
 
   const [preview] = createResource(
     () => (props.projectPath && file() ? { path: absolutePath(props.projectPath, file()), file: file() } : null),
@@ -270,6 +345,36 @@ export function OpencodeSessionPanel(props: Props) {
     const data = preview()
     return Boolean(data && data.before !== data.after)
   })
+
+  const [overviewDiffs] = createResource(
+    () => ({ projectPath: props.projectPath, files: overviewFiles() }),
+    async (input) => {
+      const entries = await Promise.all(
+        input.files.map(async (relativePath) => {
+          const abs = absolutePath(input.projectPath, relativePath)
+          const [before, after] = await Promise.all([
+            nativeApi.invoke("get_git_file_base", { path: abs }).catch(() => "") as Promise<string>,
+            nativeApi.invoke("read_text_file", { path: abs }).catch(() => "") as Promise<string>,
+          ])
+          return [relativePath, buildOverviewDiffLines(diffLines(before ?? "", after ?? ""))] as const
+        }),
+      )
+      return new Map(entries)
+    },
+  )
+
+  createEffect(() => {
+    const expanded = expandedDiffs()
+    if (Object.keys(expanded).length > 0) return
+    const files = overviewFiles()
+    const first = files.find((path) => !lockfilePattern.test(path)) ?? files[0]
+    if (!first) return
+    setExpandedDiffs({ [first]: true })
+  })
+
+  const toggleOverviewDiff = (filePath: string) => {
+    setExpandedDiffs((current) => ({ ...current, [filePath]: !current[filePath] }))
+  }
 
   // Document listener to close custom dropdown
   createEffect(() => {
@@ -291,15 +396,15 @@ export function OpencodeSessionPanel(props: Props) {
           {/* Permanent Changes Tab */}
           <button
             type="button"
-            onClick={() => props.onSelectFile?.("")}
+            onClick={() => setShowOverview(true)}
             class="flex h-[28px] items-center gap-2 rounded-md border px-2.5 text-[11px] font-bold transition-all shadow-none"
             classList={{
-              "bg-background border-border/80 text-foreground shadow-sm": !file(),
-              "border-transparent bg-transparent text-muted-foreground hover:bg-accent/40 hover:text-foreground": Boolean(file()),
+              "bg-background border-border/80 text-foreground shadow-sm": showOverview(),
+              "border-transparent bg-transparent text-muted-foreground hover:bg-accent/40 hover:text-foreground": !showOverview(),
             }}
           >
-            <Icon name="review" size="small" class="size-3.5" classList={{ "text-primary/95": !file(), "text-muted-foreground": Boolean(file()) }} />
-            <span>{props.gitChangedFiles().length} {props.gitChangedFiles().length === 1 ? "Change" : "Changes"}</span>
+            <Icon name="review" size="small" class="size-3.5" classList={{ "text-primary/95": showOverview(), "text-muted-foreground": !showOverview() }} />
+            <span>{overviewFiles().length} {overviewFiles().length === 1 ? "Change" : "Changes"}</span>
           </button>
 
           {/* Opened File Tabs */}
@@ -317,7 +422,10 @@ export function OpencodeSessionPanel(props: Props) {
                 >
                   <button
                     type="button"
-                    onClick={() => props.onSelectFile?.(path)}
+                    onClick={() => {
+                      setShowOverview(false)
+                      props.onSelectFile?.(path)
+                    }}
                     class="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                   >
                     <FileIcon node={{ path, type: "file" }} class="size-3.5 shrink-0" />
@@ -419,7 +527,10 @@ export function OpencodeSessionPanel(props: Props) {
                       stats={props.gitStats()}
                       draggable={false}
                       active={file() ?? undefined}
-                      onFileClick={(fileNode) => props.onSelectFile?.(fileNode?.path ?? "")}
+                      onFileClick={(fileNode) => {
+                        setShowOverview(false)
+                        props.onSelectFile?.(fileNode?.path ?? "")
+                      }}
                     />
                   </Show>
                 </Show>
@@ -432,7 +543,10 @@ export function OpencodeSessionPanel(props: Props) {
                     kinds={props.gitKinds()}
                     stats={props.gitStats()}
                     active={file() ?? undefined}
-                    onFileClick={(fileNode) => props.onSelectFile?.(fileNode?.path ?? "")}
+                    onFileClick={(fileNode) => {
+                      setShowOverview(false)
+                      props.onSelectFile?.(fileNode?.path ?? "")
+                    }}
                   />
                 </Show>
               </Suspense>
@@ -454,7 +568,7 @@ export function OpencodeSessionPanel(props: Props) {
           <div class="h-[40px] shrink-0 border-b border-border/60 bg-background flex items-center justify-between px-4 select-none">
             {/* Left Side: Title */}
             <div class="text-xs font-bold text-foreground flex items-center gap-2 truncate">
-              <Show when={file()} fallback="Changes Overview">
+              <Show when={!showOverview() && file()} fallback="Changes Overview">
                 <span class="text-muted-foreground/60 font-medium">Preview:</span>
                 <span class="truncate">{filename(file())}</span>
               </Show>
@@ -492,10 +606,10 @@ export function OpencodeSessionPanel(props: Props) {
           {/* Core Content Area */}
           <div class="min-h-0 flex-1 overflow-auto bg-background/40">
             <Show
-              when={file()}
+              when={!showOverview() && file()}
               fallback={
                 <Show
-                  when={props.gitChangedFiles().length > 0}
+                  when={overviewFiles().length > 0}
                   fallback={
                     <div class="flex h-full flex-col items-center justify-center p-8 text-center">
                       <Icon name="circle-check" size="large" class="text-muted-foreground/60 mb-2" />
@@ -505,65 +619,124 @@ export function OpencodeSessionPanel(props: Props) {
                   }
                 >
                   {/* Changed Files Grid Overview */}
-                  <div class="p-6 h-full overflow-y-auto">
-                    <h2 class="text-sm font-semibold mb-4 text-foreground flex items-center gap-2">
-                      <span>Modified files</span>
-                      <span class="text-[11px] font-semibold text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full">
-                        {props.gitChangedFiles().length} modified
-                      </span>
-                    </h2>
-                    
-                    <div class="flex flex-col gap-2 max-w-4xl">
-                      <For each={props.gitChangedFiles()}>
+                  <div class="h-full overflow-y-auto p-5 thin-scrollbar">
+                    <div class="max-w-[760px] overflow-hidden rounded-lg border border-border/80 bg-background shadow-sm">
+                      <For each={overviewFiles()}>
                         {(filePath) => {
                           const kind = () => props.gitKinds().get(filePath) ?? "mix"
                           const stat = () => props.gitStats().get(filePath) ?? { additions: 0, deletions: 0 }
+                          const isExpanded = createMemo(() => Boolean(expandedDiffs()[filePath]))
+                          const diffRows = createMemo(() => overviewDiffs()?.get(filePath) ?? [])
+                          const shownStat = createMemo(() => {
+                            const rows = diffRows()
+                            const additions = rows.filter((row) => row.type === "add").length
+                            const deletions = rows.filter((row) => row.type === "del").length
+                            return {
+                              additions: stat().additions || additions,
+                              deletions: stat().deletions || deletions,
+                            }
+                          })
+                          const status = createMemo(() => kind() === "add" ? "A" : kind() === "del" ? "D" : "M")
                           
                           const parts = filePath.split("/")
                           const fname = parts.at(-1) ?? filePath
                           const folderPath = parts.slice(0, -1).join("/") + "/"
                           
                           return (
-                            <div
-                              onClick={() => props.onSelectFile?.(filePath)}
-                              class="group flex items-center justify-between p-3 rounded-xl border border-border/80 bg-background hover:bg-accent/40 hover:border-border-strong cursor-pointer transition-all duration-200"
-                            >
-                              <div class="flex items-center gap-3 min-w-0">
-                                <FileIcon node={{ path: filePath, type: "file" }} class="size-4.5 shrink-0" />
-                                <div class="flex flex-col min-w-0 text-left">
-                                  <span class="text-xs font-semibold text-foreground truncate">{fname}</span>
-                                  <span class="text-[10px] text-muted-foreground truncate">{folderPath}</span>
-                                </div>
-                              </div>
-                              
-                              <div class="flex items-center gap-4 shrink-0">
-                                <div class="text-[10px] font-mono tabular-nums flex items-center gap-2 select-none">
-                                  <Show when={stat().additions > 0}>
-                                    <span class="text-[var(--icon-diff-add-base)] font-bold">+{stat().additions}</span>
-                                  </Show>
-                                  <Show when={stat().deletions > 0}>
-                                    <span class="text-[var(--icon-diff-delete-base)] font-bold">-{stat().deletions}</span>
-                                  </Show>
+                            <div class="border-b border-border/60 last:border-b-0">
+                              <div
+                                onClick={() => toggleOverviewDiff(filePath)}
+                                class="group flex min-h-[48px] cursor-pointer items-center justify-between px-4 py-2 transition-colors hover:bg-accent/30"
+                                classList={{
+                                  "bg-[color-mix(in_oklch,var(--chart-4)_20%,transparent)]": isExpanded(),
+                                }}
+                              >
+                                <div class="flex min-w-0 items-center gap-2.5">
+                                  <span class="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground/70 transition-colors group-hover:text-foreground">
+                                    <Show when={isExpanded()} fallback={<ChevronRight class="size-3.5" />}>
+                                      <ChevronDown class="size-3.5" />
+                                    </Show>
+                                  </span>
+                                  <FileIcon node={{ path: filePath, type: "file" }} class="size-4 shrink-0" />
+                                  <span class="truncate text-[13px] font-semibold text-foreground">{fname}</span>
+                                  <span class="truncate text-[11.5px] text-muted-foreground/75">{folderPath}</span>
+                                  <span
+                                    class="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border px-1 text-[10px] font-bold font-mono"
+                                    classList={{
+                                      "border-[color-mix(in_oklch,var(--icon-diff-modified-base)_28%,transparent)] bg-[color-mix(in_oklch,var(--icon-diff-modified-base)_12%,transparent)] text-[var(--icon-diff-modified-base)]": status() === "M",
+                                      "border-[color-mix(in_oklch,var(--icon-diff-add-base)_28%,transparent)] bg-[color-mix(in_oklch,var(--icon-diff-add-base)_12%,transparent)] text-[var(--icon-diff-add-base)]": status() === "A",
+                                      "border-[color-mix(in_oklch,var(--icon-diff-delete-base)_28%,transparent)] bg-[color-mix(in_oklch,var(--icon-diff-delete-base)_12%,transparent)] text-[var(--icon-diff-delete-base)]": status() === "D",
+                                    }}
+                                  >
+                                    {status()}
+                                  </span>
                                 </div>
                                 
-                                <span
-                                  class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider select-none"
-                                  style={{
-                                    "background-color": kind() === "add"
-                                      ? "color-mix(in oklch, var(--icon-diff-add-base) 14%, transparent)"
-                                      : kind() === "del"
-                                        ? "color-mix(in oklch, var(--icon-diff-delete-base) 14%, transparent)"
-                                        : "color-mix(in oklch, var(--icon-diff-modified-base) 14%, transparent)",
-                                    "color": kind() === "add"
-                                      ? "var(--icon-diff-add-base)"
-                                      : kind() === "del"
-                                        ? "var(--icon-diff-delete-base)"
-                                        : "var(--icon-diff-modified-base)",
-                                  }}
-                                >
-                                  {kind() === "add" ? "Added" : kind() === "del" ? "Deleted" : "Modified"}
-                                </span>
+                                <div class="flex shrink-0 items-center gap-3 pl-4 text-[11.5px] font-semibold font-mono tracking-tight">
+                                    <Show when={shownStat().additions > 0}>
+                                      <span class="text-[var(--icon-diff-add-base)]">+{shownStat().additions}</span>
+                                    </Show>
+                                    <Show when={shownStat().deletions > 0}>
+                                      <span class="text-[var(--icon-diff-delete-base)]">-{shownStat().deletions}</span>
+                                    </Show>
+                                </div>
                               </div>
+
+                              <Show when={isExpanded()}>
+                                <div class="border-t border-border/60 overflow-x-auto">
+                                  <Show
+                                    when={!overviewDiffs.loading}
+                                    fallback={<div class="px-4 py-3 text-[11px] text-muted-foreground">Loading diff...</div>}
+                                  >
+                                    <table class="min-w-full border-collapse font-mono text-[11.5px] leading-relaxed">
+                                      <tbody>
+                                        <For each={diffRows()}>
+                                        {(line) => {
+                                          const type = () => line.type
+                                          const sign = () => type() === "add" ? "+" : type() === "del" ? "-" : ""
+
+                                          return (
+                                            <tr
+                                              class="transition-colors"
+                                              classList={{
+                                                "bg-background hover:bg-accent/10": type() === "normal",
+                                                "bg-[color-mix(in_oklch,var(--icon-diff-add-base)_13%,transparent)]": type() === "add",
+                                                "bg-[color-mix(in_oklch,var(--icon-diff-delete-base)_13%,transparent)]": type() === "del",
+                                                "bg-primary/10": type() === "info",
+                                              }}
+                                            >
+                                              <td class="w-10 border-r border-border/40 py-1 pr-3 text-right text-[10px] text-muted-foreground/50 select-none">{line.oldLine}</td>
+                                              <td class="w-10 border-r border-border/40 py-1 pr-3 text-right text-[10px] text-muted-foreground/50 select-none">{line.newLine}</td>
+                                              <td
+                                                class="w-6 py-1 text-center text-[11px] font-bold select-none"
+                                                classList={{
+                                                  "text-[var(--icon-diff-add-base)]": type() === "add",
+                                                  "text-[var(--icon-diff-delete-base)]": type() === "del",
+                                                  "text-muted-foreground/50": type() !== "add" && type() !== "del",
+                                                }}
+                                              >
+                                                {sign()}
+                                              </td>
+                                              <td
+                                                class="py-1 pl-2 pr-4 whitespace-pre"
+                                                classList={{
+                                                  "text-[var(--icon-diff-add-base)]": type() === "add",
+                                                  "text-[var(--icon-diff-delete-base)]": type() === "del",
+                                                  "text-primary font-semibold": type() === "info",
+                                                  "text-foreground": type() === "normal",
+                                                }}
+                                              >
+                                                {line.content}
+                                              </td>
+                                            </tr>
+                                          )
+                                        }}
+                                        </For>
+                                      </tbody>
+                                    </table>
+                                  </Show>
+                                </div>
+                              </Show>
                             </div>
                           )
                         }}

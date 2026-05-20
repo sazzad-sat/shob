@@ -20,6 +20,7 @@ const allowedCommands = new Set([
   "get_git_file_state",
   "switch_git_branch",
   "cleanup_runtime",
+  "set_window_background",
   "minimize_window",
   "toggle_maximize_window",
   "is_window_maximized",

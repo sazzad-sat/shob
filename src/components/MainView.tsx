@@ -220,6 +220,17 @@ export function MainView() {
   })
 
   createEffect(() => {
+    const handleReviewWorkspaceToggleRequest = () => {
+      const nextVisible = !(isReviewVisible() || isFileTreeVisible())
+      setIsReviewVisible(nextVisible)
+      setIsFileTreeVisible(nextVisible)
+    }
+
+    window.addEventListener('gg-toggle-review-workspace', handleReviewWorkspaceToggleRequest)
+    return () => window.removeEventListener('gg-toggle-review-workspace', handleReviewWorkspaceToggleRequest)
+  })
+
+  createEffect(() => {
     const visible = isFileTreeVisible()
     window.dispatchEvent(
       new CustomEvent('gg-file-tree-state', {
