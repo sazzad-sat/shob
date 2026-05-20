@@ -1,21 +1,16 @@
-import { createEffect, createMemo, createSignal, lazy, on, Show, Suspense } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, Show, Suspense } from 'solid-js'
 import { nativeApi } from '../services/native'
 import { Sidebar } from './Sidebar'
-import { TabBar } from './TabBar'
+
 import { TerminalPanel } from './TerminalPanel'
 import { WelcomeScreen } from './WelcomeScreen'
 import { SettingsPage } from './SettingsPage'
 import { useStore } from '../store'
 import { createFileContext } from '@/context/file'
 import type { FileNode } from '@/types/file-node'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { OpencodeSessionPanel } from '@/opencode-ported/session-panel'
 import { ResizeHandle } from '@/opencode-ported/resize-handle'
 
-const FileTree = lazy(async () => {
-  const mod = await import('@/opencode-ported/file-tree')
-  return { default: mod.default }
-})
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -61,9 +56,7 @@ export function MainView() {
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
-  const [fileTreeTab, setFileTreeTab] = createSignal<"changes" | "all">("all")
-  const [reviewWidth, setReviewWidth] = createSignal(560)
-  const [fileTreeWidth, setFileTreeWidth] = createSignal(332)
+  const [reviewWidth, setReviewWidth] = createSignal(840)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
   const [gitKinds, setGitKinds] = createSignal<ReadonlyMap<string, DiffKind>>(new Map())
   const [gitStats, setGitStats] = createSignal<ReadonlyMap<string, DiffStats>>(new Map())
@@ -303,26 +296,13 @@ export function MainView() {
     const rightEdge = rect?.right ?? window.innerWidth
     const leftEdge = rect?.left ?? 0
     const available = Math.max(0, rightEdge - leftEdge)
-    const reservedFileTree = isFileTreeVisible() ? fileTreeWidth() : 0
     const minMainContent = projectSessions().length > 0 ? 420 : 300
-    const maxReviewWidth = Math.max(360, available - reservedFileTree - minMainContent)
-    const next = rightEdge - clientX - reservedFileTree
-
-    setReviewWidth(clampPanelWidth(next, 360, Math.min(860, maxReviewWidth)))
-  }
-
-  const resizeFileTreePanel = (clientX: number) => {
-    const rect = workspaceSplitRect()
-    const rightEdge = rect?.right ?? window.innerWidth
-    const leftEdge = rect?.left ?? 0
-    const available = Math.max(0, rightEdge - leftEdge)
-    const reservedReview = isReviewVisible() ? reviewWidth() : 0
-    const minMainContent = projectSessions().length > 0 ? 420 : 300
-    const maxFileTreeWidth = Math.max(240, available - reservedReview - minMainContent)
+    const maxReviewWidth = Math.max(360, available - minMainContent)
     const next = rightEdge - clientX
 
-    setFileTreeWidth(clampPanelWidth(next, 240, Math.min(520, maxFileTreeWidth)))
+    setReviewWidth(clampPanelWidth(next, 360, Math.min(1080, maxReviewWidth)))
   }
+
 
   return (
     <div class="flex min-h-0 flex-1 bg-background text-foreground">
@@ -333,7 +313,7 @@ export function MainView() {
       <div class="min-w-0 flex-1 flex flex-col bg-background">
         {activePage() === 'workspace' ? (
           <>
-            <TabBar />
+
             <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
               <div ref={workspaceSplitRef} class="flex h-full w-full min-h-0 min-w-0">
                 <div class="min-h-0 min-w-0 flex-1 overflow-hidden" style={{ display: projectSessions().length > 0 ? 'flex' : 'none' }}>
@@ -353,7 +333,7 @@ export function MainView() {
                   </div>
                 )}
 
-                <Show when={isReviewVisible()}>
+                <Show when={isReviewVisible() || isFileTreeVisible()}>
                   <div
                     class="relative min-h-0 shrink-0 overflow-hidden border-l border-border/60"
                     style={{ width: `${reviewWidth()}px` }}
@@ -362,84 +342,26 @@ export function MainView() {
                       edge="start"
                       onResize={resizeReviewPanel}
                     />
-                    <OpencodeSessionPanel
-                      projectPath={projectPath()}
-                      activeFile={activeFilePath()}
-                      openFiles={reviewFiles()}
-                      onSelectFile={setActiveFilePath}
-                      onCloseFile={handleCloseReviewFile}
-                    />
+                    <Suspense fallback={null}>
+                      <fileCtx.FileProvider>
+                        <OpencodeSessionPanel
+                          projectPath={projectPath()}
+                          activeFile={activeFilePath()}
+                          openFiles={reviewFiles()}
+                          onSelectFile={handleFileSelect}
+                          onCloseFile={handleCloseReviewFile}
+                          gitChangedFiles={gitChangedFiles}
+                          gitKinds={gitKinds}
+                          gitStats={gitStats}
+                          gitUnavailable={gitUnavailable}
+                          gitDiffLoading={gitDiffLoading}
+                          gitDiffError={gitDiffError}
+                          isFileTreeVisible={isFileTreeVisible}
+                        />
+                      </fileCtx.FileProvider>
+                    </Suspense>
                   </div>
                 </Show>
-
-                {(() => {
-                  if (!isFileTreeVisible()) return null
-                  return (
-                      <div
-                        class="relative flex h-full shrink-0 flex-col overflow-hidden border-l bg-muted/40 text-foreground"
-                        style={{ width: `${fileTreeWidth()}px` }}
-                      >
-                        <ResizeHandle
-                          edge="start"
-                          onResize={resizeFileTreePanel}
-                        />
-                        <Suspense fallback={null}>
-                          <fileCtx.FileProvider>
-                            <Tabs key={currentProjectId() ?? "no-project"} value={fileTreeTab()} onValueChange={(value: string) => setFileTreeTab(value === "changes" ? "changes" : "all")} class="h-full">
-                              <div class="px-3 py-2 border-b border-border/60">
-                                <TabsList class="w-full">
-                                  <TabsTrigger value="changes" class="flex-1">
-                                    {gitChangedFiles().length} {gitChangedFiles().length === 1 ? "Change" : "Changes"}
-                                  </TabsTrigger>
-                                  <TabsTrigger value="all" class="flex-1">All files</TabsTrigger>
-                                </TabsList>
-                              </div>
-                              <Show when={gitUnavailable()}>
-                                <div class="px-3 py-2 border-b border-border/60 text-xs text-amber-300 bg-amber-500/10">
-                                  Git is not initialized for this project.
-                                </div>
-                              </Show>
-                              <TabsContent value="changes" class="h-full min-h-0 overflow-hidden px-3 py-2">
-                                <div class="h-full min-h-0 overflow-y-auto overflow-x-hidden">
-                                  {gitDiffLoading() ? (
-                                    <div class="px-2 py-2 text-sm text-muted-foreground">Loading changes...</div>
-                                  ) : gitDiffError() ? (
-                                    <div class="px-2 py-2 text-sm text-destructive/90">Failed to load git changes</div>
-                                  ) : gitChangedFiles().length === 0 ? (
-                                    <div class="px-2 py-2 text-sm text-muted-foreground">No changes</div>
-                                  ) : (
-                                    <FileTree
-                                      path=""
-                                      class="group/filetree"
-                                      allowed={gitChangedFiles()}
-                                      kinds={gitKinds()}
-                                      stats={gitStats()}
-                                      draggable={false}
-                                      active={activeFilePath() ?? undefined}
-                                      onFileClick={(file) => handleFileSelect(file?.path ?? null)}
-                                    />
-                                  )}
-                                </div>
-                              </TabsContent>
-                              <TabsContent value="all" class="h-full min-h-0 overflow-hidden px-3 py-2">
-                                <div class="h-full min-h-0 overflow-y-auto overflow-x-hidden">
-                                  <FileTree
-                                    path=""
-                                    class="group/filetree"
-                                    modified={gitChangedFiles()}
-                                    kinds={gitKinds()}
-                                    stats={gitStats()}
-                                    active={activeFilePath() ?? undefined}
-                                    onFileClick={(file) => handleFileSelect(file?.path ?? null)}
-                                  />
-                                </div>
-                              </TabsContent>
-                            </Tabs>
-                          </fileCtx.FileProvider>
-                        </Suspense>
-                      </div>
-                  )
-                })()}
               </div>
             </div>
           </>
