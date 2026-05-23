@@ -6,6 +6,7 @@ import { Collapsible } from "./collapsible"
 import { Icon, type IconProps } from "./icon"
 import { Spinner } from "./spinner"
 import { TextShimmer } from "./text-shimmer"
+import { FileIcon } from "./file-icon"
 
 export type TriggerTitle = {
   title: string
@@ -23,11 +24,17 @@ const isTriggerTitle = (val: any): val is TriggerTitle => {
   )
 }
 
+export function formatDuration(ms: number) {
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
 export interface BasicToolProps {
   icon: IconProps["name"]
   trigger: TriggerTitle | JSX.Element
   children?: JSX.Element
   status?: string
+  durationMs?: number
   hideDetails?: boolean
   defaultOpen?: boolean
   forceOpen?: boolean
@@ -38,6 +45,9 @@ export interface BasicToolProps {
   onTriggerClick?: JSX.EventHandlerUnion<HTMLElement, MouseEvent>
   triggerHref?: string
   clickable?: boolean
+  filePath?: string
+  additions?: number
+  deletions?: number
 }
 
 const SPRING = { type: "spring" as const, visualDuration: 0.35, bounce: 0 }
@@ -70,16 +80,11 @@ export function BasicTool(props: BasicToolProps) {
   createEffect(
     on(
       pending,
-      (active, previous) => {
+      (active) => {
         if (active) {
           if (!seen()) setState("seen", true)
           if (!open()) setState("open", true)
-          return
         }
-
-        if (!seen() && !previous) return
-        if (props.forceOpen || props.locked) return
-        if (open()) setState("open", false)
       },
       { defer: true },
     ),
@@ -175,38 +180,53 @@ export function BasicTool(props: BasicToolProps) {
                     >
                       <TextShimmer text={title().title} active={pending()} />
                     </span>
-                    <Show when={!pending()}>
-                      <Show when={title().subtitle}>
-                        <span
-                          data-slot="basic-tool-tool-subtitle"
-                          classList={{
-                            [title().subtitleClass ?? ""]: !!title().subtitleClass,
-                            clickable: !!props.onSubtitleClick,
-                          }}
-                          onClick={(e) => {
-                            if (props.onSubtitleClick) {
-                              e.stopPropagation()
-                              props.onSubtitleClick()
-                            }
-                          }}
-                        >
-                          {title().subtitle}
-                        </span>
-                      </Show>
-                      <Show when={title().args?.length}>
-                        <For each={title().args}>
-                          {(arg) => (
-                            <span
-                              data-slot="basic-tool-tool-arg"
-                              classList={{
-                                [title().argsClass ?? ""]: !!title().argsClass,
-                              }}
-                            >
-                              {arg}
-                            </span>
-                          )}
-                        </For>
-                      </Show>
+                    <Show when={title().subtitle}>
+                      <span
+                        data-slot="basic-tool-tool-subtitle"
+                        classList={{
+                          [title().subtitleClass ?? ""]: !!title().subtitleClass,
+                          clickable: !!props.onSubtitleClick,
+                          "opacity-60": pending(),
+                        }}
+                        onClick={(e) => {
+                          if (props.onSubtitleClick) {
+                            e.stopPropagation()
+                            props.onSubtitleClick()
+                          }
+                        }}
+                      >
+                        <Show when={props.filePath}>
+                          <span style="display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-right: 2px; flex-shrink: 0;">
+                            <FileIcon node={{ path: props.filePath!, type: "file" }} />
+                          </span>
+                        </Show>
+                        {title().subtitle}
+                      </span>
+                    </Show>
+                    <Show when={props.additions !== undefined || props.deletions !== undefined}>
+                      <span style="display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-family: var(--font-family-mono); font-size: 12px; font-weight: 500;">
+                        <Show when={props.additions !== undefined && props.additions > 0}>
+                          <span style="color: var(--text-diff-add-base, #10b981)">+{props.additions}</span>
+                        </Show>
+                        <Show when={props.deletions !== undefined && props.deletions > 0}>
+                          <span style="color: var(--text-diff-delete-base, #ef4444)">-{props.deletions}</span>
+                        </Show>
+                      </span>
+                    </Show>
+                    <Show when={title().args?.length}>
+                      <For each={title().args}>
+                        {(arg) => (
+                          <span
+                            data-slot="basic-tool-tool-arg"
+                            classList={{
+                              [title().argsClass ?? ""]: !!title().argsClass,
+                              "opacity-60": pending(),
+                            }}
+                          >
+                            {arg}
+                          </span>
+                        )}
+                      </For>
                     </Show>
                   </div>
                   <Show when={!pending() && title().action}>
@@ -219,8 +239,16 @@ export function BasicTool(props: BasicToolProps) {
           </Switch>
         </div>
       </div>
+      <Show when={props.durationMs !== undefined && props.durationMs > 0}>
+        <span data-slot="basic-tool-duration">
+          {formatDuration(props.durationMs!)}
+        </span>
+      </Show>
       <Show when={props.children && !props.hideDetails && !props.locked}>
         <Collapsible.Arrow />
+      </Show>
+      <Show when={pending()}>
+        <span data-slot="basic-tool-running-progress" />
       </Show>
     </div>
   )

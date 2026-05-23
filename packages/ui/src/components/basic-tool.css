@@ -5,6 +5,7 @@
   align-self: stretch;
   gap: 0px;
   justify-content: flex-start;
+  position: relative;
 
   &[data-clickable="true"] {
     cursor: pointer;
@@ -255,4 +256,32 @@
       opacity: 1;
     }
   }
+}
+
+[data-slot="basic-tool-duration"] {
+  font-family: var(--font-family-mono);
+  font-feature-settings: var(--font-family-mono--font-feature-settings);
+  font-size: 11px;
+  color: var(--text-weak);
+  opacity: 0.6;
+  margin-left: auto;
+  margin-right: 6px;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slot="basic-tool-running-progress"] {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: linear-gradient(to right, transparent, var(--tool-accent-color, var(--syntax-warning, #f97316)), transparent);
+  background-size: 200% 100%;
+  animation: shimmerProgress 1.5s infinite linear;
+}
+
+@keyframes shimmerProgress {
+  0% { background-position: -100% 0; }
+  100% { background-position: 100% 0; }
 }

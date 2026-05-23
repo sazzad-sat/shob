@@ -375,7 +375,7 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
     case "bash":
       return {
         icon: "console",
-        title: i18n.t("ui.tool.shell"),
+        title: "Execute",
         subtitle: input.description,
       }
     case "edit":
@@ -661,18 +661,25 @@ function statsOf(parts: ToolPart[]) {
 }
 
 function formatElapsed(ms: number) {
-  const total = Math.max(0, Math.floor(ms / 1000))
+  if (ms < 1000) return `${ms}ms`
+  const totalSeconds = ms / 1000
+  if (totalSeconds < 60) {
+    return `${totalSeconds.toFixed(1)}s`
+  }
+  const total = Math.max(0, Math.floor(totalSeconds))
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
   if (h > 0) return `${h}h ${m}m ${s}s`
-  if (m > 0) return `${m}m ${s}s`
-  return `${s}s`
+  return `${m}m ${s}s`
 }
 
 function ContextTools(props: {
   running: () => boolean
+  generating?: () => boolean
   span: () => { start: number; end: number } | undefined
+  count: number
+  tools: ToolPart[]
   children: JSX.Element
 }) {
   const [open, setOpen] = createSignal(false)
@@ -681,7 +688,7 @@ function ContextTools(props: {
   let settle: ReturnType<typeof setTimeout> | undefined
 
   createEffect(() => {
-    const active = props.running()
+    const active = props.running() || !!props.generating?.()
     if (active) {
       if (settle) {
         clearTimeout(settle)
@@ -712,14 +719,13 @@ function ContextTools(props: {
 
   createEffect(() => {
     if (!busy()) return
-    const timer = setInterval(() => setNow(Date.now()), 1000)
+    const timer = setInterval(() => setNow(Date.now()), 100)
     onCleanup(() => clearInterval(timer))
   })
 
   createEffect((prev?: boolean) => {
     const active = busy()
     if (active && !prev && !open()) setOpen(true)
-    if (!active && prev && open()) setOpen(false)
     return active
   })
 
@@ -727,6 +733,16 @@ function ContextTools(props: {
     if (busy() && !next) return
     setOpen(next)
   }
+
+  const counts = createMemo(() => {
+    const summary: Record<string, number> = {}
+    for (const t of props.tools) {
+      if (t && t.tool) {
+        summary[t.tool] = (summary[t.tool] || 0) + 1
+      }
+    }
+    return summary
+  })
 
   return (
     <Collapsible
@@ -738,7 +754,25 @@ function ContextTools(props: {
       <Collapsible.Trigger>
         <div data-slot="context-tool-group-trigger">
           <div data-slot="context-tool-group-main">
-            <span data-slot="context-tool-group-title">Worked for {elapsed()}</span>
+            <span data-slot="context-tool-group-title">
+              <Show when={props.running()}>
+                <span data-slot="context-tool-group-glow" />
+              </Show>
+              Worked for {elapsed()}
+              <span class="flex items-center gap-1 ml-2 pointer-events-none">
+                <For each={Object.entries(counts())}>
+                  {([tool, count]) => {
+                    const info = getToolInfo(tool)
+                    return (
+                      <span data-slot="context-tool-badge">
+                        <Icon name={info.icon} size="small" />
+                        <span>{count}</span>
+                      </span>
+                    )
+                  }}
+                </For>
+              </span>
+            </span>
             <Collapsible.Arrow />
           </div>
           <span data-slot="context-tool-group-line" />
@@ -802,14 +836,22 @@ export function AssistantParts(props: {
                 return (
                   <Show when={refs().length > 0}>
                     {(() => {
-                      const stats = createMemo(() => {
-                        const tools = refs()
+                      const toolsList = createMemo(() => {
+                        return refs()
                           .map((ref) => part().get(ref.messageID)?.get(ref.partID))
                           .filter((item): item is ToolPart => item?.type === "tool")
-                        return statsOf(tools)
+                      })
+                      const stats = createMemo(() => {
+                        return statsOf(toolsList())
                       })
                       return (
-                        <ContextTools running={() => stats().running} span={() => stats().span}>
+                        <ContextTools
+                          running={() => stats().running}
+                          generating={() => !!props.working}
+                          span={() => stats().span}
+                          count={toolsList().length}
+                          tools={toolsList()}
+                        >
                           <div data-component="context-tool-batch">
                             <For each={refs()}>
                               {(ref) => {
@@ -875,8 +917,8 @@ export function AssistantParts(props: {
   )
 }
 
-function isContextGroupTool(part: PartType): part is ToolPart {
-  return part.type === "tool" && CONTEXT_GROUP_TOOLS.has(part.tool)
+function isContextGroupTool(part: PartType): part is (ToolPart | ReasoningPart) {
+  return (part.type === "tool" && CONTEXT_GROUP_TOOLS.has(part.tool)) || part.type === "reasoning"
 }
 
 function ExaOutput(props: { output?: string }) {
@@ -970,14 +1012,22 @@ export function AssistantMessageDisplay(props: {
                 return (
                   <Show when={refs().length > 0}>
                     {(() => {
-                      const stats = createMemo(() => {
-                        const tools = refs()
+                      const toolsList = createMemo(() => {
+                        return refs()
                           .map((ref) => part().get(ref.partID))
                           .filter((item): item is ToolPart => item?.type === "tool")
-                        return statsOf(tools)
+                      })
+                      const stats = createMemo(() => {
+                        return statsOf(toolsList())
                       })
                       return (
-                        <ContextTools running={() => stats().running} span={() => stats().span}>
+                        <ContextTools
+                          running={() => stats().running}
+                          generating={() => typeof props.message.time.completed !== "number"}
+                          span={() => stats().span}
+                          count={toolsList().length}
+                          tools={toolsList()}
+                        >
                           <div data-component="context-tool-batch">
                             <For each={refs()}>
                               {(ref) => {
@@ -1266,6 +1316,7 @@ export interface ToolProps {
   tool: string
   output?: string
   status?: string
+  durationMs?: number
   hideDetails?: boolean
   defaultOpen?: boolean
   forceOpen?: boolean
@@ -1365,6 +1416,17 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   })
 
   const render = createMemo(() => ToolRegistry.render(part().tool) ?? GenericTool)
+  const durationMs = createMemo(() => {
+    const state = part().state
+    if (state.status === "completed" || state.status === "error") {
+      const start = state.time.start
+      const end = "end" in state.time && typeof state.time.end === "number" ? state.time.end : start
+      if (typeof start === "number" && typeof end === "number") {
+        return end - start
+      }
+    }
+    return undefined
+  })
 
   return (
     <Show when={!hideQuestion()}>
@@ -1406,6 +1468,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               // @ts-expect-error
               output={part().state.output}
               status={part().state.status}
+              durationMs={durationMs()}
               hideDetails={props.hideDetails}
               defaultOpen={props.defaultOpen}
             />
@@ -1576,8 +1639,7 @@ ToolRegistry.register({
     const pathLine = createMemo(() => {
       const fp = props.input.filePath
       if (typeof fp !== "string" || !fp) return ""
-      const display = relativizeProjectPath(fp, data.directory) || fp
-      return "(" + display + ")"
+      return relativizeProjectPath(fp, data.directory) || fp
     })
     const loaded = createMemo(() => {
       if (props.status !== "completed") return []
@@ -1590,6 +1652,7 @@ ToolRegistry.register({
         <BasicTool
           {...props}
           icon="glasses"
+          filePath={props.input.filePath}
           trigger={{
             title: i18n.t("ui.tool.read"),
             subtitle: pathLine(),
@@ -1794,7 +1857,12 @@ ToolRegistry.register({
   render(props) {
     const data = useData()
     const i18n = useI18n()
-    const location = useLocation()
+    let location: any
+    try {
+      location = useLocation()
+    } catch {
+      location = { pathname: "" }
+    }
     const childSessionId = createMemo(() => {
       const value = props.metadata.sessionId
       if (typeof value === "string" && value) return value
@@ -1875,10 +1943,10 @@ ToolRegistry.register({
     const i18n = useI18n()
     const pending = () => props.status === "pending" || props.status === "running"
     const sawPending = pending()
+    const cmd = createMemo(() => props.input.command ?? props.metadata.command ?? "")
     const text = createMemo(() => {
-      const cmd = props.input.command ?? props.metadata.command ?? ""
       const out = stripAnsi(props.output || props.metadata.output || "")
-      return `$ ${cmd}${out ? "\n\n" + out : ""}`
+      return `$ ${cmd()}${out ? "\n\n" + out : ""}`
     })
     const [copied, setCopied] = createSignal(false)
 
@@ -1894,18 +1962,10 @@ ToolRegistry.register({
       <BasicTool
         {...props}
         icon="console"
-        trigger={
-          <div data-slot="basic-tool-tool-info-structured">
-            <div data-slot="basic-tool-tool-info-main">
-              <span data-slot="basic-tool-tool-title">
-                <TextShimmer text={i18n.t("ui.tool.shell")} active={pending()} />
-              </span>
-              <Show when={!pending() && props.input.description}>
-                <ShellSubmessage text={props.input.description} animate={sawPending} />
-              </Show>
-            </div>
-          </div>
-        }
+        trigger={{
+          title: "Execute",
+          subtitle: cmd() ? `(${cmd()})` : undefined,
+        }}
       >
         <div data-component="bash-output">
           <div data-slot="bash-copy">
@@ -1943,43 +2003,27 @@ ToolRegistry.register({
     const diagnostics = createMemo(() => getDiagnostics(props.metadata.diagnostics, props.input.filePath))
     const path = createMemo(() => props.metadata?.filediff?.file || props.input.filePath || "")
     const filename = () => getFilename(props.input.filePath ?? "")
-    const pending = () => props.status === "pending" || props.status === "running"
+    const additions = () => props.metadata.filediff?.additions
+    const deletions = () => props.metadata.filediff?.deletions
     return (
       <div data-component="edit-tool">
         <BasicTool
           {...props}
           icon="code-lines"
           defer
-          trigger={
-            <div data-component="edit-trigger">
-              <div data-slot="message-part-title-area">
-                <div data-slot="message-part-title">
-                  <span data-slot="message-part-title-text">
-                    <TextShimmer text={i18n.t("ui.messagePart.title.edit")} active={pending()} />
-                  </span>
-                  <Show when={!pending()}>
-                    <span data-slot="message-part-title-filename">{filename()}</span>
-                  </Show>
-                </div>
-                <Show when={!pending() && props.input.filePath?.includes("/")}>
-                  <div data-slot="message-part-path">
-                    <span data-slot="message-part-directory">{getDirectory(props.input.filePath!)}</span>
-                  </div>
-                </Show>
-              </div>
-              <div data-slot="message-part-actions">
-                <Show when={!pending() && props.metadata.filediff}>
-                  <DiffChanges changes={props.metadata.filediff} />
-                </Show>
-              </div>
-            </div>
-          }
+          filePath={props.input.filePath}
+          additions={additions()}
+          deletions={deletions()}
+          trigger={{
+            title: i18n.t("ui.messagePart.title.edit"),
+            subtitle: filename(),
+          }}
         >
           <Show when={path()}>
             <ToolFileAccordion
               path={path()}
               actions={
-                <Show when={!pending() && props.metadata.filediff}>
+                <Show when={props.status !== "pending" && props.status !== "running" && props.metadata.filediff}>
                   <DiffChanges changes={props.metadata.filediff!} />
                 </Show>
               }
@@ -2015,33 +2059,17 @@ ToolRegistry.register({
     const diagnostics = createMemo(() => getDiagnostics(props.metadata.diagnostics, props.input.filePath))
     const path = createMemo(() => props.input.filePath || "")
     const filename = () => getFilename(props.input.filePath ?? "")
-    const pending = () => props.status === "pending" || props.status === "running"
     return (
       <div data-component="write-tool">
         <BasicTool
           {...props}
           icon="code-lines"
           defer
-          trigger={
-            <div data-component="write-trigger">
-              <div data-slot="message-part-title-area">
-                <div data-slot="message-part-title">
-                  <span data-slot="message-part-title-text">
-                    <TextShimmer text={i18n.t("ui.messagePart.title.write")} active={pending()} />
-                  </span>
-                  <Show when={!pending()}>
-                    <span data-slot="message-part-title-filename">{filename()}</span>
-                  </Show>
-                </div>
-                <Show when={!pending() && props.input.filePath?.includes("/")}>
-                  <div data-slot="message-part-path">
-                    <span data-slot="message-part-directory">{getDirectory(props.input.filePath!)}</span>
-                  </div>
-                </Show>
-              </div>
-              <div data-slot="message-part-actions">{/* <DiffChanges diff={diff} /> */}</div>
-            </div>
-          }
+          filePath={props.input.filePath}
+          trigger={{
+            title: i18n.t("ui.messagePart.title.write"),
+            subtitle: filename(),
+          }}
         >
           <Show when={props.input.content && path()}>
             <ToolFileAccordion path={path()}>
@@ -2196,30 +2224,13 @@ ToolRegistry.register({
             {...props}
             icon="code-lines"
             defer
-            trigger={
-              <div data-component="edit-trigger">
-                <div data-slot="message-part-title-area">
-                  <div data-slot="message-part-title">
-                    <span data-slot="message-part-title-text">
-                      <TextShimmer text={i18n.t("ui.tool.patch")} active={pending()} />
-                    </span>
-                    <Show when={!pending()}>
-                      <span data-slot="message-part-title-filename">{getFilename(single()!.relativePath)}</span>
-                    </Show>
-                  </div>
-                  <Show when={!pending() && single()!.relativePath.includes("/")}>
-                    <div data-slot="message-part-path">
-                      <span data-slot="message-part-directory">{getDirectory(single()!.relativePath)}</span>
-                    </div>
-                  </Show>
-                </div>
-                <div data-slot="message-part-actions">
-                  <Show when={!pending()}>
-                    <DiffChanges changes={{ additions: single()!.additions, deletions: single()!.deletions }} />
-                  </Show>
-                </div>
-              </div>
-            }
+            filePath={single()!.relativePath}
+            additions={single()!.additions}
+            deletions={single()!.deletions}
+            trigger={{
+              title: i18n.t("ui.tool.patch"),
+              subtitle: getFilename(single()!.relativePath),
+            }}
           >
             <ToolFileAccordion
               path={single()!.relativePath}
