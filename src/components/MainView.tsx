@@ -10,6 +10,8 @@ import { createFileContext } from '@/context/file'
 import type { FileNode } from '@/types/file-node'
 import { OpencodeSessionPanel } from '@/opencode-ported/session-panel'
 import { ResizeHandle } from '@/opencode-ported/resize-handle'
+import { useGlobalSDK } from '@/context/global-sdk'
+import { useGlobalSync } from '@/context/global-sync'
 
 
 const folderNameFromPath = (path: string) => {
@@ -46,6 +48,8 @@ type GitStatusSummary = {
 
 export function MainView() {
   const appStore = useStore()
+  const globalSDK = useGlobalSDK()
+  const globalSync = useGlobalSync()
   const projects = useStore((s) => s.projects)
   const currentProject = useStore((s) =>
     s.projects.find((project) => project.id === s.currentProjectId) ?? null,
@@ -287,10 +291,16 @@ export function MainView() {
   const handleCreateSession = async () => {
     const cpid = currentProjectId() ?? projects()[0]?.id ?? null
     if (!cpid) return
-    if (currentProjectId() !== cpid) {
-      appStore.setCurrentProject(cpid)
-    }
-    await appStore.launchCliSession(cpid)
+    const project = projects().find((item) => item.id === cpid)
+    if (!project) return
+    const client = globalSDK.createClient({ directory: project.path, throwOnError: true })
+    const created = await client.session.create().then((response) => response.data)
+    if (!created) return
+    const [projectStore] = globalSync.child(project.path)
+    await appStore.syncOpenCodeSessions(cpid, [created, ...projectStore.session])
+    if (currentProjectId() !== cpid) appStore.setCurrentProject(cpid)
+    appStore.setActiveSession(created.id)
+    void globalSync.project.loadSessions(project.path)
   }
 
   const handleToggleFileTree = () => {

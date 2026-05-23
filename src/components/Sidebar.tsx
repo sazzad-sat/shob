@@ -1,9 +1,12 @@
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { Folder, MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucide-solid"
 import { nativeApi } from "../services/native"
 import { useStore } from "../store"
 import type { Project } from "../types"
 import { ResizeHandle } from "@/opencode-ported/resize-handle"
+import { useGlobalSDK } from "@/context/global-sdk"
+import { useGlobalSync } from "@/context/global-sync"
+import type { Session as OpenCodeSession } from "@opencode-ai/sdk/v2/client"
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -28,11 +31,24 @@ function FolderSection(props: {
   onCreateSession: (projectId: string) => void
   onDeleteSession: (projectId: string, sessionId: string) => void
   onDeleteProject: (projectId: string) => void
+  onSyncOpenCodeSessions: (projectId: string, sessions: OpenCodeSession[]) => void
   onOpenWorkspacePage?: () => void
 }) {
+  const globalSync = useGlobalSync()
   const [isOpen, setIsOpen] = createSignal(true)
   const [showMenu, setShowMenu] = createSignal(false)
   let menuRef: HTMLDivElement | undefined
+  const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
+
+  createEffect(() => {
+    void globalSync.project.loadSessions(props.project.path)
+  })
+
+  createEffect(() => {
+    const store = projectStore()
+    if (store.status === "loading" && store.session.length === 0) return
+    props.onSyncOpenCodeSessions(props.project.id, store.session)
+  })
 
   const handleMenuClick = (e: MouseEvent) => {
     if (menuRef && !menuRef.contains(e.target as Node)) {
@@ -160,9 +176,11 @@ export function Sidebar(props: {
   const setCurrentProject = useStore((s) => s.setCurrentProject)
   const setActiveSession = useStore((s) => s.setActiveSession)
   const addProject = useStore((s) => s.addProject)
-  const launchCliSession = useStore((s) => s.launchCliSession)
   const removeSession = useStore((s) => s.removeSession)
+  const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
   const deleteProject = useStore((s) => s.deleteProject)
+  const globalSDK = useGlobalSDK()
+  const globalSync = useGlobalSync()
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
   const [sidebarWidth, setSidebarWidth] = createSignal(320)
 
@@ -208,12 +226,32 @@ export function Sidebar(props: {
 
   const handleCreateSession = async (projectId: string) => {
     props.onOpenWorkspacePage?.()
+    const project = projects().find((item) => item.id === projectId)
+    if (!project) return
+    const client = globalSDK.createClient({ directory: project.path, throwOnError: true })
+    const created = await client.session.create().then((response) => response.data)
+    if (!created) return
+    const [projectStore] = globalSync.child(project.path)
+    await syncOpenCodeSessions(projectId, [created, ...projectStore.session])
     setCurrentProject(projectId)
-    await launchCliSession(projectId)
+    setActiveSession(created.id)
+    void globalSync.project.loadSessions(project.path)
   }
 
   const handleDeleteSession = async (projectId: string, sessionId: string) => {
+    const project = projects().find((item) => item.id === projectId)
+    if (project && sessionId.startsWith("ses")) {
+      await globalSDK
+        .createClient({ directory: project.path, throwOnError: true })
+        .session.delete({ sessionID: sessionId })
+        .catch(() => undefined)
+      void globalSync.project.loadSessions(project.path)
+    }
     await removeSession(projectId, sessionId)
+  }
+
+  const handleSyncOpenCodeSessions = (projectId: string, sessions: OpenCodeSession[]) => {
+    void syncOpenCodeSessions(projectId, sessions)
   }
 
   const handleDeleteProject = async (projectId: string) => {
@@ -265,6 +303,7 @@ export function Sidebar(props: {
                 onCreateSession={handleCreateSession}
                 onDeleteSession={handleDeleteSession}
                 onDeleteProject={handleDeleteProject}
+                onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
                 onOpenWorkspacePage={props.onOpenWorkspacePage}
               />
             )}

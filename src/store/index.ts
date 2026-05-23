@@ -13,12 +13,20 @@ import {
 } from '../utils';
 import { CLI_CATALOG, DEFAULT_CLI_ID, type CliProbeResult } from '../config/check';
 import type { Project, Session, CliTool } from '../types';
+import { sessionTitle } from '@/utils/session-title';
 
-const SESSION_CLEANUP_IDLE_MS = 1000 * 60 * 60 * 24 * 30;
-const SESSION_CLEANUP_MAX_PER_PROJECT = 40;
-const SESSION_CLEANUP_ALWAYS_KEEP = 5;
 const SESSION_ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 let launchSessionQueue: Promise<unknown> = Promise.resolve();
+
+type OpenCodeSession = {
+  id: string;
+  title?: string;
+  time?: {
+    created?: number;
+    updated?: number;
+    archived?: number;
+  };
+};
 
 const buildCatalogCliTools = (probeResults: CliProbeResult[] = []): CliTool[] => {
   const resultById = new Map(probeResults.map((result) => [result.id, result]));
@@ -102,6 +110,7 @@ interface AppActions {
   renameSession: (projectId: string, sessionId: string, name: string) => Promise<void>;
   updateSession: (projectId: string, sessionId: string, updates: Partial<Session>) => Promise<void>;
   removeSession: (projectId: string, sessionId: string) => Promise<void>;
+  syncOpenCodeSessions: (projectId: string, sessions: OpenCodeSession[]) => Promise<void>;
   setActiveSession: (sessionId: string | null) => void;
   recordSessionActivity: (projectId: string, sessionId: string, at?: number) => Promise<void>;
   recordSessionCommand: (projectId: string, sessionId: string, at?: number) => Promise<void>;
@@ -138,54 +147,7 @@ export const actions: AppActions = {
       const normalizedProjects = normalizeProjects(await api.getProjects());
       const storedProjectId = getStoredValue(STORAGE_KEYS.currentProjectId);
       const storedSessionId = getStoredValue(STORAGE_KEYS.activeSessionId);
-      const now = Date.now();
-      const projects = normalizedProjects.map((project) => {
-        if (project.sessions.length <= SESSION_CLEANUP_ALWAYS_KEEP) {
-          return project;
-        }
-
-        const sortedSessions = [...project.sessions].sort((left, right) => {
-          const leftActive = left.lastActiveAt ?? left.createdAt ?? 0;
-          const rightActive = right.lastActiveAt ?? right.createdAt ?? 0;
-          return rightActive - leftActive;
-        });
-
-        const sessionIdsToKeep = new Set<string>();
-        for (const session of sortedSessions.slice(0, SESSION_CLEANUP_ALWAYS_KEEP)) {
-          sessionIdsToKeep.add(session.id);
-        }
-        if (storedSessionId) {
-          sessionIdsToKeep.add(storedSessionId);
-        }
-
-        const sessionIdsToRetain = new Set<string>(sessionIdsToKeep);
-        sortedSessions.forEach((session, index) => {
-          if (sessionIdsToKeep.has(session.id)) return;
-          if (index >= SESSION_CLEANUP_MAX_PER_PROJECT) return;
-
-          const activityAt = session.lastActiveAt ?? session.createdAt ?? 0;
-          if (activityAt <= 0 || now - activityAt <= SESSION_CLEANUP_IDLE_MS) {
-            sessionIdsToRetain.add(session.id);
-          }
-        });
-
-        const cleanedSessions = project.sessions.filter((session) => sessionIdsToRetain.has(session.id));
-
-        return cleanedSessions.length === project.sessions.length
-          ? project
-          : {
-              ...project,
-              sessions: cleanedSessions,
-            };
-      });
-
-      const cleanupTargets = projects.filter((project, index) => {
-        const original = normalizedProjects[index];
-        return original ? project.sessions.length !== original.sessions.length : false;
-      });
-      if (cleanupTargets.length > 0) {
-        await Promise.all(cleanupTargets.map((project) => api.saveProject(project)));
-      }
+      const projects = normalizedProjects;
 
       const resolvedProjectId =
         storedProjectId && projects.some((project) => project.id === storedProjectId)
@@ -491,6 +453,62 @@ export const actions: AppActions = {
         p.id === projectId ? updatedProject : p
       ),
       activeSessionId,
+    });
+  },
+
+  syncOpenCodeSessions: async (projectId: string, sessions: OpenCodeSession[]) => {
+    const project = store.projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const normalized = sessions
+      .filter((session) => session.id?.startsWith('ses'))
+      .filter((session) => !session.time?.archived)
+      .map((session): Session => {
+        const createdAt = session.time?.created ?? Date.now();
+        const lastActiveAt = session.time?.updated ?? createdAt;
+        const title = sessionTitle(session.title) || 'New session';
+
+        return {
+          id: session.id,
+          name: title,
+          shell: 'opencode',
+          cliTool: 'opencode',
+          pendingLaunchCommand: null,
+          createdAt,
+          lastActiveAt,
+          commandCount: 0,
+          startupDurationMs: null,
+        };
+      })
+      .sort((left, right) => (right.lastActiveAt ?? 0) - (left.lastActiveAt ?? 0));
+
+    const same =
+      project.sessions.length === normalized.length &&
+      project.sessions.every((session, index) => {
+        const next = normalized[index];
+        return (
+          session.id === next.id &&
+          session.name === next.name &&
+          session.createdAt === next.createdAt &&
+          session.lastActiveAt === next.lastActiveAt
+        );
+      });
+    if (same) return;
+
+    const updatedProject = {
+      ...project,
+      sessions: normalized,
+    };
+
+    const activeSessionStillExists = normalized.some((session) => session.id === store.activeSessionId);
+    const nextActiveSessionId = activeSessionStillExists ? store.activeSessionId : normalized[0]?.id ?? null;
+
+    await api.saveProject(updatedProject);
+    setStoredValue(STORAGE_KEYS.activeSessionId, nextActiveSessionId);
+
+    setStore({
+      projects: store.projects.map((item) => (item.id === projectId ? updatedProject : item)),
+      activeSessionId: nextActiveSessionId,
     });
   },
 
