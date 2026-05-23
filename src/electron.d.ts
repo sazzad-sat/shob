@@ -106,6 +106,7 @@ declare global {
 }
 
 export interface NativeCommandMap {
+  opencode_server_start: { args: undefined; result: string }
   get_projects: { args: undefined; result: Project[] }
   save_project: { args: { project: Project }; result: Project }
   delete_project: { args: { projectId: string }; result: void }

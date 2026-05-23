@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 const allowedCommands = new Set([
+  "opencode_server_start",
   "get_projects",
   "save_project",
   "delete_project",
@@ -81,6 +82,7 @@ function subscribe<T>(map: Map<string, Set<(value: T) => void>>, key: string, ca
 
 contextBridge.exposeInMainWorld("shob", {
   platform: process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : process.platform,
+  getServerUrl: () => ipcRenderer.sendSync("shob:get-opencode-server-url"),
   invoke(command: string, payload: unknown) {
     if (!allowedCommands.has(command)) {
       return Promise.reject(new Error(`IPC command is not allowed: ${command}`));

@@ -1,5 +1,5 @@
 import { For, Show, createMemo } from "solid-js"
-import { Terminal } from "./Terminal"
+import { AgentView } from "./AgentView"
 import { useStore } from "../store"
 
 interface TerminalPanelProps {
@@ -21,14 +21,14 @@ export function TerminalPanel(_props: TerminalPanelProps) {
       <For each={projectSessions()}>
         {(session) => (
           <Show when={session.id === activeSessionId()}>
-            <Terminal sessionId={session.id} />
+            <AgentView sessionId={session.id} projectPath={currentProject()?.path} />
           </Show>
         )}
       </For>
 
       <Show when={!activeSession()}>
         <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-          No terminal active
+          No agent session active
         </div>
       </Show>
     </div>

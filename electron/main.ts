@@ -19,6 +19,7 @@ import {
   saveProject as savePersistedProject,
   saveSessionOutput as savePersistedSessionOutput,
 } from "./session-db.js";
+import { startServer, type ServerInstance } from "./server.js";
 
 const execFileAsync = promisify(execFile);
 const isDev = !app.isPackaged;
@@ -40,6 +41,7 @@ type PtyRuntime = {
 let mainWindow: BrowserWindow | null = null;
 let projectWatcher: ProjectWatcher = null;
 let lastWatcherOperationAt = 0;
+let serverInstance: ServerInstance | null = null;
 const ptySessions = new Map<string, PtyRuntime>();
 const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
@@ -452,6 +454,10 @@ async function getGitFileState(filePath: string) {
 }
 
 const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
+  opencode_server_start: async () => {
+    if (!serverInstance) throw new Error("Server not started");
+    return serverInstance.url;
+  },
   get_projects: async () => loadPersistedProjects(),
   save_project: async ({ project }) => {
     return savePersistedProject(project);
@@ -565,6 +571,10 @@ function registerIpc() {
     return handler(payload);
   });
 
+  ipcMain.on("shob:get-opencode-server-url", (event) => {
+    event.returnValue = serverInstance?.url ?? "http://localhost:4096"
+  });
+
   ipcMain.handle("shob:terminal-spawn", async (_event, options) => {
     const id = options.id || crypto.randomUUID();
     const existing = ptySessions.get(id);
@@ -675,8 +685,13 @@ async function createWindow() {
 }
 
 app.setName("shob");
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerIpc();
+  try {
+    serverInstance = await startServer();
+  } catch (err) {
+    console.error("[shob] failed to start server:", err);
+  }
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -685,6 +700,10 @@ app.whenReady().then(() => {
 
 app.on("before-quit", async () => {
   await handlers.cleanup_runtime();
+  if (serverInstance) {
+    await serverInstance.stop();
+    serverInstance = null;
+  }
   closeSessionDatabase();
 });
 

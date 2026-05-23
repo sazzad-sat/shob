@@ -46,3 +46,6 @@ export function useFile() {
   if (!ctx) throw new Error("useFile must be used within FileProvider")
   return ctx
 }
+
+export * from "./types"
+

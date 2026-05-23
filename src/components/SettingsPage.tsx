@@ -1,11 +1,13 @@
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { Boxes, SlidersHorizontal, Terminal } from "lucide-solid"
+import { Boxes, SlidersHorizontal, Terminal, Box } from "lucide-solid"
+import { SettingsProviders } from "./opencode-settings/settings-providers"
+import { SettingsModels } from "./opencode-settings/settings-models"
 import { useStore } from "../store"
 import { OPEN_CODE_THEME_LIST } from "../theme"
 import { CliAvatar } from "./CliAvatar"
 import { Button } from "@/components/ui/button"
 
-type SettingsSection = "general" | "providers" | "cli-tools"
+type SettingsSection = "general" | "providers" | "models" | "cli-tools"
 
 const getShellLabel = (shell: string) => shell.split(/[\\/]/).pop() || shell
 
@@ -37,6 +39,9 @@ export function SettingsPage() {
             </Button>
             <Button type="button" variant={section() === "providers" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("providers")}>
               <Boxes class="mr-2 h-4 w-4" /> Providers
+            </Button>
+            <Button type="button" variant={section() === "models" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("models")}>
+              <Box class="mr-2 h-4 w-4" /> Models
             </Button>
             <Button type="button" variant={section() === "cli-tools" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("cli-tools")}>
               <Terminal class="mr-2 h-4 w-4" /> CLI Tools
@@ -107,20 +112,11 @@ export function SettingsPage() {
           </Show>
 
           <Show when={section() === "providers"}>
-            <div class="space-y-6">
-              <h2 class="text-lg font-semibold">Providers</h2>
-              <div class="rounded-lg border border-border bg-card p-4">
-                <label class="mb-2 block text-sm text-muted-foreground">Provider Switch Mode</label>
-                <select
-                  value={cliLaunchMode()}
-                  onChange={(event) => setCliLaunchMode(event.currentTarget.value === "replace-current" ? "replace-current" : "new-tab")}
-                  class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="new-tab">Open in new tab</option>
-                  <option value="replace-current">Replace current tab</option>
-                </select>
-              </div>
-            </div>
+            <SettingsProviders />
+          </Show>
+
+          <Show when={section() === "models"}>
+            <SettingsModels />
           </Show>
 
           <Show when={section() === "cli-tools"}>

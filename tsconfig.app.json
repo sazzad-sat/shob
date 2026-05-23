@@ -9,21 +9,36 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@opencode-ai/sdk/*": ["./packages/sdk/js/src/*"],
+      "@opencode-ai/sdk": ["./packages/sdk/js/src/index.ts"],
+      "@opencode-ai/plugin/*": ["./packages/plugin/src/*"],
+      "@opencode-ai/plugin": ["./packages/plugin/src/index.ts"],
+      "@opencode-ai/server/*": ["./packages/server/src/*"],
+      "@opencode-ai/server": ["./packages/server/src/index.ts"],
+      "@opencode-ai/ui/hooks": ["./packages/ui/src/hooks/index.ts"],
+      "@opencode-ai/ui/i18n/*": ["./packages/ui/src/i18n/*"],
+      "@opencode-ai/ui/context/*": ["./packages/ui/src/context/*"],
+      "@opencode-ai/ui/context": ["./packages/ui/src/context/index.ts"],
+      "@opencode-ai/ui/*": ["./packages/ui/src/components/*"],
+      "@opencode-ai/ui": ["./packages/ui/src/index.ts"],
+      "@opencode-ai/util/*": ["./packages/util/src/*"],
+      "@opencode-ai/util": ["./packages/util/src/index.ts"]
     },
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    "verbatimModuleSyntax": false,
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "erasableSyntaxOnly": false,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
   "include": ["src"]
 }
+

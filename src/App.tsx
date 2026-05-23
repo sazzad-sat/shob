@@ -105,6 +105,8 @@ function App() {
     })
   })
 
+
+
   const fallback = (
     <div class="flex flex-1 items-center justify-center bg-black text-sm text-zinc-300">
       Startup failed to render. Please restart the app.

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@opencode-ai/plugin",
+  "version": "1.15.5",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "build": "tsc"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./tool": "./src/tool.ts",
+    "./tui": "./src/tui.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@opencode-ai/sdk": "file:../sdk/js",
+    "effect": "4.0.0-beta.65",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@opentui/core": ">=0.2.14",
+    "@opentui/keymap": ">=0.2.14",
+    "@opentui/solid": ">=0.2.14"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/keymap": {
+      "optional": true
+    },
+    "@opentui/solid": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@opentui/core": "0.1.97",
+    "@opentui/keymap": "0.2.14",
+    "@opentui/solid": "0.1.97",
+    "@tsconfig/node22": "22.0.2",
+    "@types/node": "24.12.0",
+    "typescript": "5.9.3",
+    "@typescript/native-preview": "7.0.0-dev.20251207.1"
+  }
+}
