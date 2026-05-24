@@ -91,17 +91,35 @@
 }
 
 [data-component="select-content"] {
-  min-width: 104px;
+  min-width: 120px;
   max-width: 23rem;
   overflow: hidden;
-  border-radius: var(--radius-md);
-  background-color: var(--surface-raised-stronger-non-alpha);
-  padding: 4px;
-  box-shadow: var(--shadow-xs-border);
+  border-radius: 10px;
+  background-color: rgba(16, 16, 18, 0.85) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 5px;
+  box-shadow: 
+    0 10px 30px -10px rgba(0, 0, 0, 0.5), 
+    0 1px 0 rgba(255, 255, 255, 0.05) inset;
   z-index: 60;
 
   &[data-expanded] {
-    animation: select-open 0.15s ease-out;
+    animation: select-open 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-slot="select-section"] {
+    font-family: var(--font-family-sans);
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-weak);
+    padding: 6px 10px 4px 10px;
+    user-select: none;
+    pointer-events: none;
+    opacity: 0.5;
   }
 
   [data-slot="select-select-content-list"] {
@@ -125,9 +143,9 @@
     position: relative;
     display: flex;
     align-items: center;
-    padding: 2px 8px;
+    padding: 5px 10px;
     gap: 12px;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: default;
 
     /* text-12-medium */
@@ -138,20 +156,23 @@
     line-height: var(--line-height-large); /* 166.667% */
     letter-spacing: var(--letter-spacing-normal);
 
-    color: var(--text-strong);
+    color: var(--text-base);
 
     transition:
-      background-color 0.2s ease-in-out,
-      color 0.2s ease-in-out;
+      background-color 150ms var(--ease-snappy),
+      color 150ms var(--ease-snappy),
+      transform 100ms ease;
     outline: none;
     user-select: none;
 
     &[data-highlighted] {
-      background: var(--surface-raised-base-hover);
+      background-color: rgba(255, 255, 255, 0.06) !important;
+      color: var(--text-strong) !important;
     }
     &[data-disabled] {
       background-color: var(--surface-raised-base);
       pointer-events: none;
+      opacity: 0.4;
     }
     [data-slot="select-select-item-indicator"] {
       display: flex;
@@ -160,12 +181,15 @@
       margin-left: auto;
       width: 16px;
       height: 16px;
+      color: #ffffff !important;
+      animation: select-open 0.15s ease-out;
     }
     &:focus {
       outline: none;
     }
     &:hover {
-      background: var(--surface-raised-base-hover);
+      background-color: rgba(255, 255, 255, 0.06);
+      color: var(--text-strong);
     }
   }
 }

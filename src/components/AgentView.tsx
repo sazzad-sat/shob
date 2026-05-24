@@ -16,6 +16,8 @@ import { useLanguage } from "@/context/language"
 import { File as OpenCodeFile } from "@opencode-ai/ui/file"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import type { Message as ChatMessage, Part } from "@opencode-ai/sdk/v2/client"
+import { useLocal } from "@/context/local"
+import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 
 interface AgentViewProps {
   sessionId: string
@@ -26,6 +28,7 @@ function AgentViewInner(props: AgentViewProps) {
   const sync = useSync()
   const params = useParams()
   const language = useLanguage()
+  const local = useLocal()
   const [showJump, setShowJump] = createSignal(false)
   const [todoCollapsed, setTodoCollapsed] = createSignal(false)
   let scrollRef: HTMLDivElement | undefined
@@ -182,7 +185,7 @@ function AgentViewInner(props: AgentViewProps) {
             <div
               ref={setScrollRef}
               data-slot="session-turn-content"
-              class="h-full min-w-0 overflow-y-auto"
+              class="h-full min-w-0 overflow-y-auto thin-scrollbar"
               style={{
                 "--session-title-height": "40px",
                 "--sticky-accordion-top": "48px",
@@ -232,77 +235,111 @@ function AgentViewInner(props: AgentViewProps) {
                 </div>
 
                 <div ref={autoScroll.contentRef} class="min-h-full pb-12 pt-2">
-                <For each={userMessages()}>
-                  {(message, index) => {
-                    const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
-                    const latestTurn = createMemo(() => index() === userMessages().length - 1)
+                  <For each={userMessages()}>
+                    {(message, index) => {
+                      const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
+                      const latestTurn = createMemo(() => index() === userMessages().length - 1)
 
-                    return (
-                      <div
-                        id={`message-${message.id}`}
-                        data-message-id={message.id}
-                        data-timeline-row="UserMessage"
-                        class="min-w-0 w-full max-w-full md:mx-auto md:max-w-200 2xl:max-w-[1000px]"
-                        classList={{ "pt-6": index() > 0 }}
-                      >
+                      return (
+                        <div
+                          id={`message-${message.id}`}
+                          data-message-id={message.id}
+                          data-timeline-row="UserMessage"
+                          class="min-w-0 w-full max-w-full md:mx-auto md:max-w-200 2xl:max-w-[1000px]"
+                          classList={{ "pt-6": index() > 0 }}
+                        >
+                          <div data-component="session-turn" class="relative min-w-0 w-full">
+                            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+                              <div data-slot="session-turn-message-content" aria-live="off">
+                                <Message message={message} parts={getParts(message.id)} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <Show when={assistants().length > 0}>
+                            <div
+                              data-message-id={message.id}
+                              data-timeline-row="AssistantPart"
+                              class="min-w-0 w-full max-w-full pt-3"
+                            >
+                              <div data-component="session-turn" class="relative min-w-0 w-full">
+                                <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+                                  <div
+                                    data-slot="session-turn-assistant-content"
+                                    aria-hidden={working() && latestTurn()}
+                                  >
+                                    <AssistantParts
+                                      messages={assistants() as any}
+                                      showReasoningSummaries
+                                      working={working() && latestTurn()}
+                                      turnDurationMs={turnDurationMs(message, assistants())}
+                                      showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
+                                      shellToolDefaultOpen={false}
+                                      editToolDefaultOpen={false}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Show>
+                        </div>
+                      )
+                    }}
+                  </For>
+
+                  <For each={orphanMessages()}>
+                    {(message) => (
+                      <div class="min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
                         <div data-component="session-turn" class="relative min-w-0 w-full">
                           <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
-                            <div data-slot="session-turn-message-content" aria-live="off">
+                            <div data-slot="session-turn-assistant-content">
                               <Message message={message} parts={getParts(message.id)} />
                             </div>
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </For>
 
-                        <Show when={assistants().length > 0}>
-                          <div
-                            data-message-id={message.id}
-                            data-timeline-row="AssistantPart"
-                            class="min-w-0 w-full max-w-full pt-3"
-                          >
-                            <div data-component="session-turn" class="relative min-w-0 w-full">
-                              <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
-                                <div
-                                  data-slot="session-turn-assistant-content"
-                                  aria-hidden={working() && latestTurn()}
-                                >
-                                  <AssistantParts
-                                    messages={assistants() as any}
-                                    showReasoningSummaries
-                                    working={working() && latestTurn()}
-                                    turnDurationMs={turnDurationMs(message, assistants())}
-                                    showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
-                                    shellToolDefaultOpen={false}
-                                    editToolDefaultOpen={false}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                  <Show when={messages().length === 0}>
+                    <div class="flex h-[50vh] flex-col items-center justify-center px-6 text-center">
+                      {/* Floating Glow Brand Icon */}
+                      <div class="relative mb-5 flex size-14 items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800/80 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
+                        <Show when={local.model.current()?.provider?.id} fallback={<Icon name="models" class="size-6 text-indigo-400" />}>
+                          <ProviderIcon id={local.model.current()?.provider?.id ?? ""} class="size-6 opacity-90" />
                         </Show>
                       </div>
-                    )
-                  }}
-                </For>
 
-                <For each={orphanMessages()}>
-                  {(message) => (
-                    <div class="min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
-                      <div data-component="session-turn" class="relative min-w-0 w-full">
-                        <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
-                          <div data-slot="session-turn-assistant-content">
-                            <Message message={message} parts={getParts(message.id)} />
-                          </div>
+                      {/* Welcoming Text */}
+                      <h2 class="text-18-semibold text-text-strong tracking-tight mb-1.5">
+                        {language.t("agent.welcome") || "How can I help you today?"}
+                      </h2>
+                      <p class="text-13-regular text-text-weak max-w-sm mb-5">
+                        Start a conversation with the agent. You are currently connected to:
+                      </p>
+
+                      {/* Status Pill capsules */}
+                      <div class="flex items-center gap-2 flex-wrap justify-center">
+                        {/* Model Capsule */}
+                        <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 text-11-medium text-text-strong font-mono">
+                          <Show when={local.model.current()?.provider?.id} fallback={<Icon name="models" class="size-3 text-indigo-400" />}>
+                            <ProviderIcon id={local.model.current()?.provider?.id ?? ""} class="size-3" />
+                          </Show>
+                          <span>{local.model.current()?.name || "No Model"}</span>
                         </div>
+
+                        {/* Agent Capsule */}
+                        <Show when={local.agent.current()?.name}>
+                          {(agentName) => (
+                            <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 text-11-medium text-text-strong font-mono capitalize">
+                              <Icon name="brain" class="size-3 text-purple-400" />
+                              <span>{agentName()} Agent</span>
+                            </div>
+                          )}
+                        </Show>
                       </div>
                     </div>
-                  )}
-                </For>
-
-                <Show when={messages().length === 0}>
-                  <div class="flex h-[42vh] items-center justify-center px-6 text-center text-14-regular text-text-weak">
-                    Start a conversation with the agent
-                  </div>
-                </Show>
+                  </Show>
                 </div>
               </div>
             </div>

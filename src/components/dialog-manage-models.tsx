@@ -9,6 +9,7 @@ import { popularProviders } from "@/hooks/use-providers"
 import { useLanguage } from "@/context/language"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectProvider } from "./dialog-select-provider"
+import { IconButton } from "@opencode-ai/ui/icon-button"
 
 export const DialogManageModels: Component = () => {
   const local = useLocal()
@@ -30,7 +31,22 @@ export const DialogManageModels: Component = () => {
 
   return (
     <Dialog
-      title={language.t("dialog.model.manage")}
+      title={
+        <div class="flex items-center gap-1.5">
+          <IconButton
+            icon="arrow-left"
+            variant="ghost"
+            class="-ml-2 h-7 w-7"
+            onClick={() => {
+              void import("./dialog-select-model").then((x) => {
+                dialog.show(() => <x.DialogSelectModel />)
+              })
+            }}
+            aria-label="Back"
+          />
+          <span>{language.t("dialog.model.manage")}</span>
+        </div>
+      }
       description={language.t("dialog.model.manage.description")}
       action={
         <Button class="h-7 -my-1 text-14-medium" icon="plus-small" tabIndex={-1} onClick={handleConnectProvider}>

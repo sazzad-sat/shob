@@ -463,8 +463,8 @@ button {
 }
 
 .thin-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 3px;
+  height: 3px;
 }
 
 .thin-scrollbar::-webkit-scrollbar-track {
@@ -491,7 +491,7 @@ button {
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -1160,3 +1160,20 @@ button {
   font-size: 0.875rem;
   color: var(--muted-foreground);
 }
+
+/* ═══════════════════════════════════════════════════
+   SELECT POPUP SECTION HEADERS
+   ═══════════════════════════════════════════════════ */
+[data-slot="select-section"] {
+  font-family: var(--font-family-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-weak);
+  padding: 6px 8px 4px 8px;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.6;
+}
+

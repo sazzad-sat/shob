@@ -9,7 +9,7 @@ export type SelectProps<T> = Omit<ComponentProps<typeof Kobalte<T>>, "value" | "
   options: T[]
   current?: T
   value?: (x: T) => string
-  label?: (x: T) => string
+  label?: (x: T) => JSX.Element | string
   groupBy?: (x: T) => string
   valueClass?: ComponentProps<"div">["class"]
   onSelect?: (value: T | undefined) => void
@@ -95,7 +95,10 @@ export function Select<T>(props: SelectProps<T> & Omit<ButtonProps, "children">)
       value={local.current}
       options={grouped()}
       optionValue={(x) => (local.value ? local.value(x) : (x as string))}
-      optionTextValue={(x) => (local.label ? local.label(x) : (x as string))}
+      optionTextValue={(x) => {
+        const val = local.value ? local.value(x) : (x as string);
+        return typeof val === "string" ? val : String(x);
+      }}
       optionGroupChildren="options"
       placeholder={local.placeholder}
       sectionComponent={(local) => (
@@ -105,10 +108,6 @@ export function Select<T>(props: SelectProps<T> & Omit<ButtonProps, "children">)
         <Kobalte.Item
           {...itemProps}
           data-slot="select-select-item"
-          classList={{
-            ...(local.classList ?? {}),
-            [local.class ?? ""]: !!local.class,
-          }}
           onPointerEnter={() => move(itemProps.item.rawValue)}
           onPointerMove={() => move(itemProps.item.rawValue)}
           onFocus={() => move(itemProps.item.rawValue)}
@@ -161,10 +160,6 @@ export function Select<T>(props: SelectProps<T> & Omit<ButtonProps, "children">)
       </Kobalte.Trigger>
       <Kobalte.Portal>
         <Kobalte.Content
-          classList={{
-            ...(local.classList ?? {}),
-            [local.class ?? ""]: !!local.class,
-          }}
           data-component="select-content"
           data-trigger-style={local.triggerVariant}
         >
