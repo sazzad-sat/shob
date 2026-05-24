@@ -31,7 +31,7 @@ const PROVIDER_NOTES = [
 const Section: Component<{ title: string; children: JSX.Element }> = (props) => (
   <div class="flex flex-col gap-3">
     <h2 class="text-13-semibold text-text-strong px-1">{props.title}</h2>
-    <div class="rounded-xl border border-border-weak-base bg-surface-panel p-5">{props.children}</div>
+    <div>{props.children}</div>
   </div>
 )
 
@@ -41,25 +41,24 @@ const ConnectedRow: Component<{
   canDisconnect: boolean
   onDisconnect: () => void
   disconnectHint: string
+  disconnectLabel: string
 }> = (props) => (
-  <div class="group flex items-center justify-between gap-4 py-3 border-b border-border-weak-base last:border-0">
+  <div class="rounded-lg border border-border-weak-base bg-surface-base p-3 h-full">
     <div class="flex items-center gap-3 min-w-0">
       <ProviderIcon id={props.item.id} class="size-5 shrink-0 icon-strong-base" />
-      <span class="text-13-medium text-text-strong truncate">{props.item.name}</span>
+      <span class="text-13-medium text-text-strong truncate flex-1">{props.item.name}</span>
       <Tag>{props.type}</Tag>
     </div>
-    <Show
-      when={props.canDisconnect}
-      fallback={
-        <span class="text-13-regular text-text-base opacity-0 group-hover:opacity-100 transition-opacity duration-200 pr-3 cursor-default">
-          {props.disconnectHint}
-        </span>
-      }
-    >
-      <Button size="small" variant="ghost" onClick={props.onDisconnect}>
-        {props.item.name}
-      </Button>
-    </Show>
+    <div class="mt-2.5 flex items-center justify-end">
+      <Show
+        when={props.canDisconnect}
+        fallback={<span class="text-12-regular text-text-weak">{props.disconnectHint}</span>}
+      >
+        <Button size="small" variant="ghost" onClick={props.onDisconnect}>
+          {props.disconnectLabel}
+        </Button>
+      </Show>
+    </div>
   </div>
 )
 
@@ -69,23 +68,47 @@ const PopularRow: Component<{
   showRecommended?: boolean
   onConnect: () => void
   connectLabel: string
+  recommendedLabel: string
 }> = (props) => (
-  <div class="flex items-center justify-between gap-4 py-3 border-b border-border-weak-base last:border-0">
-    <div class="flex flex-col min-w-0">
-      <div class="flex items-center gap-x-3">
+  <div class="rounded-lg border border-border-weak-base bg-surface-base p-3 h-full min-h-[96px]">
+    <div class="flex items-start justify-between gap-3 min-w-0">
+      <div class="flex items-center gap-x-2.5 min-w-0 flex-1">
         <ProviderIcon id={props.item.id} class="size-5 shrink-0 icon-strong-base" />
-        <span class="text-13-medium text-text-strong">{props.item.name}</span>
+        <span class="text-13-medium text-text-strong truncate min-w-0">{props.item.name}</span>
         <Show when={props.showRecommended}>
-          <Tag>{props.connectLabel}</Tag>
+          <Tag class="hidden sm:inline-flex shrink-0">{props.recommendedLabel}</Tag>
         </Show>
       </div>
-      <Show when={props.note}>
-        <span class="text-12-regular text-text-weak pl-8">{props.note}</span>
-      </Show>
+      <Button size="small" variant="secondary" icon="plus-small" class="shrink-0" onClick={props.onConnect}>
+        {props.connectLabel}
+      </Button>
     </div>
-    <Button size="small" variant="secondary" icon="plus-small" onClick={props.onConnect}>
-      {props.connectLabel}
-    </Button>
+    <Show when={props.note}>
+      <span class="text-12-regular text-text-weak mt-2 line-clamp-2 block">{props.note}</span>
+    </Show>
+  </div>
+)
+
+const SimpleTopActionCard: Component<{
+  iconId: string
+  title: string
+  tag: string
+  description: string
+  onConnect: () => void
+  connectLabel: string
+}> = (props) => (
+  <div class="rounded-lg border border-border-weak-base bg-surface-base p-3 h-full min-h-[96px]">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex items-center gap-x-2.5 min-w-0 flex-1">
+        <ProviderIcon id={props.iconId} class="size-5 shrink-0 icon-strong-base" />
+        <span class="text-13-medium text-text-strong truncate min-w-0">{props.title}</span>
+        <Tag class="hidden sm:inline-flex shrink-0">{props.tag}</Tag>
+      </div>
+      <Button size="small" variant="secondary" icon="plus-small" class="shrink-0" onClick={props.onConnect}>
+        {props.connectLabel}
+      </Button>
+    </div>
+    <span class="text-12-regular text-text-weak mt-2 line-clamp-2 block">{props.description}</span>
   </div>
 )
 
@@ -189,8 +212,8 @@ export const SettingsProviders: Component = () => {
   }
 
   return (
-    <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-6 py-6">
-      <div class="flex flex-col gap-5 max-w-2xl">
+    <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 sm:px-6 py-5 sm:py-6">
+      <div class="flex flex-col gap-5 max-w-7xl w-full">
         {/* Connected */}
         <Section title={language.t("settings.providers.section.connected")}>
           <Show
@@ -201,7 +224,7 @@ export const SettingsProviders: Component = () => {
               </div>
             }
           >
-            <div class="flex flex-col">
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               <For each={connected()}>
                 {(item) => (
                   <ConnectedRow
@@ -210,6 +233,7 @@ export const SettingsProviders: Component = () => {
                     canDisconnect={canDisconnect(item)}
                     onDisconnect={() => void disconnect(item.id, item.name)}
                     disconnectHint={language.t("settings.providers.connected.environmentDescription")}
+                    disconnectLabel={language.t("common.disconnect")}
                   />
                 )}
               </For>
@@ -219,7 +243,7 @@ export const SettingsProviders: Component = () => {
 
         {/* Popular */}
         <Section title={language.t("settings.providers.section.popular")}>
-          <div class="flex flex-col">
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             <For each={popular()}>
               {(item) => (
                 <PopularRow
@@ -228,58 +252,33 @@ export const SettingsProviders: Component = () => {
                   showRecommended={item.id === "opencode" || item.id === "opencode-go"}
                   onConnect={() => dialog.show(() => <DialogConnectProvider provider={item.id} />)}
                   connectLabel={language.t("common.connect")}
+                  recommendedLabel={language.t("dialog.provider.tag.recommended")}
                 />
               )}
             </For>
 
             {/* OpenAI Compatible API */}
-            <div
-              class="flex items-center justify-between gap-4 py-3 border-b border-border-weak-base last:border-0"
-              data-component="openai-compatible-section"
-            >
-              <div class="flex flex-col min-w-0">
-                <div class="flex items-center gap-x-3">
-                  <ProviderIcon id="openai" class="size-5 shrink-0 icon-strong-base" />
-                  <span class="text-13-medium text-text-strong">{language.t("provider.openaiCompatible.title")}</span>
-                  <Tag>{language.t("settings.providers.tag.custom")}</Tag>
-                </div>
-                <span class="text-12-regular text-text-weak pl-8">
-                  {language.t("provider.openaiCompatible.description")}
-                </span>
-              </div>
-              <Button
-                size="small"
-                variant="secondary"
-                icon="plus-small"
-                onClick={() => dialog.show(() => <DialogOpenAICompatible />)}
-              >
-                {language.t("common.connect")}
-              </Button>
+            <div data-component="openai-compatible-section">
+              <SimpleTopActionCard
+                iconId="openai"
+                title={language.t("provider.openaiCompatible.title")}
+                tag={language.t("settings.providers.tag.custom")}
+                description={language.t("provider.openaiCompatible.description")}
+                connectLabel={language.t("common.connect")}
+                onConnect={() => dialog.show(() => <DialogOpenAICompatible />)}
+              />
             </div>
 
             {/* Custom Provider */}
-            <div
-              class="flex items-center justify-between gap-4 py-3 border-b border-border-weak-base last:border-0"
-              data-component="custom-provider-section"
-            >
-              <div class="flex flex-col min-w-0">
-                <div class="flex items-center gap-x-3">
-                  <ProviderIcon id="synthetic" class="size-5 shrink-0 icon-strong-base" />
-                  <span class="text-13-medium text-text-strong">{language.t("provider.custom.title")}</span>
-                  <Tag>{language.t("settings.providers.tag.custom")}</Tag>
-                </div>
-                <span class="text-12-regular text-text-weak pl-8">
-                  {language.t("settings.providers.custom.description")}
-                </span>
-              </div>
-              <Button
-                size="small"
-                variant="secondary"
-                icon="plus-small"
-                onClick={() => dialog.show(() => <DialogCustomProvider back="close" />)}
-              >
-                {language.t("common.connect")}
-              </Button>
+            <div data-component="custom-provider-section">
+              <SimpleTopActionCard
+                iconId="synthetic"
+                title={language.t("provider.custom.title")}
+                tag={language.t("settings.providers.tag.custom")}
+                description={language.t("settings.providers.custom.description")}
+                connectLabel={language.t("common.connect")}
+                onConnect={() => dialog.show(() => <DialogCustomProvider back="close" />)}
+              />
             </div>
           </div>
         </Section>
