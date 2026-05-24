@@ -22,6 +22,7 @@ const PROVIDER_NOTES = [
   { match: (id: string) => id === "anthropic", key: "dialog.provider.anthropic.note" },
   { match: (id: string) => id.startsWith("github-copilot"), key: "dialog.provider.copilot.note" },
   { match: (id: string) => id === "openai", key: "dialog.provider.openai.note" },
+  { match: (id: string) => id === "xai", key: "dialog.provider.xai.note" },
   { match: (id: string) => id === "google", key: "dialog.provider.google.note" },
   { match: (id: string) => id === "antigravity", key: "dialog.provider.google.note" },
   { match: (id: string) => id === "openrouter", key: "dialog.provider.openrouter.note" },
@@ -35,6 +36,8 @@ const Section: Component<{ title: string; children: JSX.Element }> = (props) => 
   </div>
 )
 
+const providerName = (item: { id: string; name: string }) => (item.id === "xai" ? "xAI (Grok)" : item.name)
+
 const ConnectedRow: Component<{
   item: ProviderItem
   type: string
@@ -46,7 +49,7 @@ const ConnectedRow: Component<{
   <div class="rounded-lg border border-border-weak-base bg-surface-base p-3 h-full">
     <div class="flex items-center gap-3 min-w-0">
       <ProviderIcon id={props.item.id} class="size-5 shrink-0 icon-strong-base" />
-      <span class="text-13-medium text-text-strong truncate flex-1">{props.item.name}</span>
+      <span class="text-13-medium text-text-strong truncate flex-1">{providerName(props.item)}</span>
       <Tag>{props.type}</Tag>
     </div>
     <div class="mt-2.5 flex items-center justify-end">
@@ -74,7 +77,7 @@ const PopularRow: Component<{
     <div class="flex items-start justify-between gap-3 min-w-0">
       <div class="flex items-center gap-x-2.5 min-w-0 flex-1">
         <ProviderIcon id={props.item.id} class="size-5 shrink-0 icon-strong-base" />
-        <span class="text-13-medium text-text-strong truncate min-w-0">{props.item.name}</span>
+        <span class="text-13-medium text-text-strong truncate min-w-0">{providerName(props.item)}</span>
         <Show when={props.showRecommended}>
           <Tag class="hidden sm:inline-flex shrink-0">{props.recommendedLabel}</Tag>
         </Show>
@@ -243,7 +246,7 @@ export const SettingsProviders: Component = () => {
 
         {/* Popular */}
         <Section title={language.t("settings.providers.section.popular")}>
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             <For each={popular()}>
               {(item) => (
                 <PopularRow

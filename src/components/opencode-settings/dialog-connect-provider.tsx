@@ -41,9 +41,13 @@ export function DialogConnectProvider(props: { provider: string }) {
   })
 
   const provider = createMemo(
-    () =>
-      providers.all().find((x) => x.id === props.provider) ??
-      globalSync.data.provider.all.find((x) => x.id === props.provider)!,
+    () => {
+      const item =
+        providers.all().find((x) => x.id === props.provider) ??
+        globalSync.data.provider.all.find((x) => x.id === props.provider)!
+      if (item.id === "xai") return { ...item, name: "xAI (Grok)" }
+      return item
+    },
   )
   const kilo = createMemo(() => props.provider === "kilo")
   const fallback = createMemo<ProviderAuthMethod[]>(() => [
@@ -127,6 +131,7 @@ export function DialogConnectProvider(props: { provider: string }) {
 
   const methodLabel = (value?: { type?: string; label?: string }) => {
     if (!value) return ""
+    if (props.provider === "xai" && value.type === "api" && value.label) return value.label
     if (value.type === "api") return language.t("provider.connect.method.apiKey")
     return value.label ?? ""
   }

@@ -10,6 +10,7 @@ import { NamedError } from "@opencode-ai/util/error"
 import { CopilotAuthPlugin } from "./github-copilot/copilot"
 import { KiloAuthPlugin } from "./kilo"
 import { AntigravityAuthPlugin } from "./antigravity"
+import { XaiAuthPlugin } from "./xai"
 import { gitlabAuthPlugin as GitlabAuthPlugin } from "opencode-gitlab-auth"
 import { PoeAuthPlugin } from "opencode-poe-auth"
 import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cloudflare"
@@ -51,9 +52,10 @@ export namespace Plugin {
 
   // Built-in plugins that are directly imported (not installed from npm)
   const INTERNAL_PLUGINS: PluginInstance[] = [
-  CodexAuthPlugin,
-  AntigravityAuthPlugin,
-  KiloAuthPlugin,
+    CodexAuthPlugin,
+    AntigravityAuthPlugin,
+    XaiAuthPlugin,
+    KiloAuthPlugin,
     CopilotAuthPlugin,
     GitlabAuthPlugin,
     PoeAuthPlugin,
