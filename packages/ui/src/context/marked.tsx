@@ -480,7 +480,7 @@ export const { use: useMarked, provider: MarkedProvider } = createSimpleContext(
       markedKatex({
         throwOnError: false,
         nonStandard: true,
-      }),
+      }) as any,
       markedShiki({
         async highlight(code, lang) {
           const highlighter = await getSharedHighlighter({

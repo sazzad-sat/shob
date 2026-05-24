@@ -11,7 +11,11 @@
         "@effect/platform-node-shared": "^0.59.0",
         "@kobalte/core": "^0.13.7",
         "@lydell/node-pty": "^1.2.0-beta.12",
+        "@solid-primitives/i18n": "^2.2.1",
+        "@solid-primitives/storage": "^4.3.4",
         "@solidjs/router": "^0.15.3",
+        "@tanstack/solid-query": "^5.100.14",
+        "@thisbeyond/solid-dnd": "^0.7.5",
         "@xterm/addon-clipboard": "0.3.0-beta.213",
         "@xterm/addon-fit": "^0.11.0",
         "@xterm/addon-image": "0.10.0-beta.213",
@@ -1166,6 +1170,8 @@
 
     "@solid-primitives/event-listener": ["@solid-primitives/event-listener@2.4.5", "", { "dependencies": { "@solid-primitives/utils": "^6.4.0" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-nwRV558mIabl4yVAhZKY8cb6G+O1F0M6Z75ttTu5hk+SxdOnKSGj+eetDIu7Oax1P138ZdUU01qnBPR8rnxaEA=="],
 
+    "@solid-primitives/i18n": ["@solid-primitives/i18n@2.2.1", "", { "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-TnTnE2Ku11MGYZ1JzhJ8pYscwg1fr9MteoYxPwsfxWfh9Jp5K7RRJncJn9BhOHvNLwROjqOHZ46PT7sPHqbcXw=="],
+
     "@solid-primitives/keyed": ["@solid-primitives/keyed@1.5.3", "", { "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-zNadtyYBhJSOjXtogkGHmRxjGdz9KHc8sGGVAGlUABkE8BED2tbIZoxkwSqzOwde8OcUEH0bb5DLZUWIMvyBSA=="],
 
     "@solid-primitives/map": ["@solid-primitives/map@0.4.13", "", { "dependencies": { "@solid-primitives/trigger": "^1.1.0" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-B1zyFbsiTQvqPr+cuPCXO72sRuczG9Swncqk5P74NCGw1VE8qa/Ry9GlfI1e/VdeQYHjan+XkbE3rO2GW/qKew=="],
@@ -1183,6 +1189,8 @@
     "@solid-primitives/scheduled": ["@solid-primitives/scheduled@1.5.2", "", { "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-/j2igE0xyNaHhj6kMfcUQn5rAVSTLbAX+CDEBm25hSNBmNiHLu2lM7Usj2kJJ5j36D67bE8wR1hBNA8hjtvsQA=="],
 
     "@solid-primitives/static-store": ["@solid-primitives/static-store@0.1.3", "", { "dependencies": { "@solid-primitives/utils": "^6.4.0" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-uxez7SXnr5GiRnzqO2IEDjOJRIXaG+0LZLBizmUA1FwSi+hrpuMzVBwyk70m4prcl8X6FDDXUl9O8hSq8wHbBQ=="],
+
+    "@solid-primitives/storage": ["@solid-primitives/storage@4.3.4", "", { "dependencies": { "@solid-primitives/utils": "^6.4.0" }, "peerDependencies": { "@tauri-apps/plugin-store": "*", "solid-js": "^1.6.12", "solid-start": "*" }, "optionalPeers": ["@tauri-apps/plugin-store", "solid-start"] }, "sha512-GSxPAIuyxhJWOcv7n10iv3aid5oHN3KUgyA9IV0GYWlPpgyGs43aS9E85b0VXDLoH+D4ThNK8+2WEJ8B/S6Ccg=="],
 
     "@solid-primitives/trigger": ["@solid-primitives/trigger@1.2.3", "", { "dependencies": { "@solid-primitives/utils": "^6.4.0" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-Za2JebEiDyfamjmDwRaESYqBBYOlgYGzB8kHYH0QrkXyLf2qNADlKdGN+z3vWSLCTDcKxChS43Kssjuc0OZhng=="],
 
@@ -1232,7 +1240,13 @@
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.2.2", "", { "dependencies": { "@tailwindcss/node": "4.2.2", "@tailwindcss/oxide": "4.2.2", "tailwindcss": "4.2.2" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7 || ^8" } }, "sha512-mEiF5HO1QqCLXoNEfXVA1Tzo+cYsrqV7w9Juj2wdUFyW07JRenqMG225MvPwr3ZD9N1bFQj46X7r33iHxLUW0w=="],
 
+    "@tanstack/query-core": ["@tanstack/query-core@5.100.14", "", {}, "sha512-5X41dGpxgeaHISCRW2oYwcSycZeULZzAunaudXT9ov1KOTj9xwt0CH6hbwqP1/z74ZWF7rYFnDpyYH07XFcZew=="],
+
+    "@tanstack/solid-query": ["@tanstack/solid-query@5.100.14", "", { "dependencies": { "@tanstack/query-core": "5.100.14" }, "peerDependencies": { "solid-js": "^1.6.0" } }, "sha512-eKW5fPWuNjGBjK9To/DNNS2b3HwTvD58T6CZbN6H0HyCjDrBOlH8q4qyJQS9gR9EXflSiivgQK+DUzg3KIHNDw=="],
+
     "@tediousjs/connection-string": ["@tediousjs/connection-string@0.5.0", "", {}, "sha512-7qSgZbincDDDFyRweCIEvZULFAw5iz/DeunhvuxpL31nfntX3P4Yd4HkHBRg9H8CdqY1e5WFN1PZIz/REL9MVQ=="],
+
+    "@thisbeyond/solid-dnd": ["@thisbeyond/solid-dnd@0.7.5", "", { "peerDependencies": { "solid-js": "^1.5" } }, "sha512-DfI5ff+yYGpK9M21LhYwIPlbP2msKxN2ARwuu6GF8tT1GgNVDTI8VCQvH4TJFoVApP9d44izmAcTh/iTCH2UUw=="],
 
     "@tokenizer/token": ["@tokenizer/token@0.3.0", "", {}, "sha512-OvjF+z51L3ov0OyAU0duzsYuvO01PH7x4t6DJx+guahgTnBHkhJdG7soQeTSFLWN3efnHyibZ4Z8l2EuWwJN3A=="],
 
