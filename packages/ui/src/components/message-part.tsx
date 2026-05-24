@@ -758,20 +758,11 @@ function ContextTools(props: {
               <Show when={props.running()}>
                 <span data-slot="context-tool-group-glow" />
               </Show>
-              Worked for <span class="tabular-nums min-w-[3rem] inline-block">{elapsed()}</span>
-              <span class="flex items-center gap-1 ml-2 pointer-events-none">
-                <For each={Object.entries(counts())}>
-                  {([tool, count]) => {
-                    const info = getToolInfo(tool)
-                    return (
-                      <span data-slot="context-tool-badge">
-                        <Icon name={info.icon} size="small" />
-                        <span>{count}</span>
-                      </span>
-                    )
-                  }}
-                </For>
-              </span>
+              Worked for <span class="tabular-nums ml-1 inline-block">{elapsed()}</span>
+              <Show when={props.count > 0}>
+                <span style="opacity: 0.4; margin: 0 6px;">·</span>
+                <span style="opacity: 0.6;">{props.count} step{props.count === 1 ? "" : "s"}</span>
+              </Show>
             </span>
             <Collapsible.Arrow />
           </div>

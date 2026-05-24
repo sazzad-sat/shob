@@ -244,12 +244,11 @@ export function BasicTool(props: BasicToolProps) {
           </Switch>
         </div>
       </div>
-      <Show when={props.durationMs !== undefined && props.durationMs > 0}>
-        <span data-slot="basic-tool-duration">
-          {formatDuration(props.durationMs!)}
-        </span>
-      </Show>
-      <Show when={props.children && !props.hideDetails && !props.locked}>
+
+      <Show 
+        when={props.children && !props.hideDetails && !props.locked}
+        fallback={<div style={{ width: "24px", height: "24px", "flex-shrink": 0 }} />}
+      >
         <Collapsible.Arrow />
       </Show>
       <Show when={pending()}>
