@@ -4,6 +4,7 @@ import { TitleBar } from './components/TitleBar'
 import { MainView } from './components/MainView'
 import { useStore } from './store'
 import { getThemeById, resolveAppThemeTokens } from './theme'
+import { ErrorPage } from './pages/error'
 
 function App() {
   const { loadProjects, loadCliTools, loadAvailableShells } = useStore()
@@ -107,22 +108,16 @@ function App() {
 
 
 
-  const fallback = (
-    <div class="flex flex-1 items-center justify-center bg-black text-sm text-zinc-300">
-      Startup failed to render. Please restart the app.
-    </div>
-  )
-
   return (
     <>
       <div class="flex h-full min-h-0 flex-col overflow-hidden">
-        <ErrorBoundary fallback={fallback}>
+        <ErrorBoundary fallback={(error) => <ErrorPage error={error} />}>
           <TitleBar />
         </ErrorBoundary>
         {isBooting() ? (
           <div class="flex-1 bg-black" />
         ) : (
-          <ErrorBoundary fallback={fallback}>
+          <ErrorBoundary fallback={(error) => <ErrorPage error={error} />}>
             <MainView />
           </ErrorBoundary>
         )}

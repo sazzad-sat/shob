@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show } from "solid-js"
 import { PromptInput } from "../opencode-ported/prompt-input"
 import { MockSessionProviders } from "../opencode-ported/mock-session-layout"
 import { useSync } from "@/context/sync"
@@ -18,10 +18,46 @@ import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import type { Message as ChatMessage, Part } from "@opencode-ai/sdk/v2/client"
 import { useLocal } from "@/context/local"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
+import { TextField } from "@opencode-ai/ui/text-field"
+import { Button } from "@opencode-ai/ui/button"
+import { formatError } from "@/pages/error"
 
 interface AgentViewProps {
   sessionId: string
   projectPath?: string
+}
+
+function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
+  const language = useLanguage()
+  const detail = createMemo(() => formatError(props.error, language.t))
+
+  return (
+    <div class="flex h-full min-h-0 w-full flex-col items-center justify-center bg-background-stronger px-6 py-8 text-foreground">
+      <div class="flex w-full max-w-2xl flex-col items-center gap-5 text-center">
+        <div class="flex size-11 items-center justify-center rounded-xl border border-border-danger-base bg-surface-base text-text-danger-base">
+          <Icon name="warning" class="size-5" />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <h2 class="text-16-semibold text-text-strong">{language.t("error.page.title")}</h2>
+          <p class="text-13-regular text-text-weak">
+            {language.t("error.page.description")}
+          </p>
+        </div>
+        <TextField
+          value={detail()}
+          readOnly
+          copyable
+          multiline
+          class="max-h-80 w-full text-left font-mono text-xs no-scrollbar"
+          label={language.t("error.page.details.label")}
+          hideLabel
+        />
+        <Button size="large" variant="ghost" onClick={props.reset}>
+          Try again
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function AgentViewInner(props: AgentViewProps) {
@@ -392,7 +428,9 @@ export function AgentView(props: AgentViewProps) {
   return (
     <Show when={props.projectPath}>
       <MockSessionProviders directory={props.projectPath!} sessionId={props.sessionId}>
-        <AgentViewInner {...props} />
+        <ErrorBoundary fallback={(error, reset) => <AgentErrorFallback error={error} reset={reset} />}>
+          <AgentViewInner {...props} />
+        </ErrorBoundary>
       </MockSessionProviders>
     </Show>
   )
