@@ -253,19 +253,9 @@ export const actions: AppActions = {
     const project = store.projects.find((p) => p.id === projectId);
     if (!project) throw new Error('Project not found');
 
-    let sessionName = 'Terminal';
-    try {
-      const branchInfo = await api.getGitBranch(project.path);
-      if (branchInfo?.head) {
-        sessionName = branchInfo.head;
-      }
-    } catch {
-      sessionName = 'Terminal';
-    }
-
     const session: Session = {
       id: crypto.randomUUID(),
-      name: sessionName,
+      name: 'Terminal',
       shell,
       cliTool: null,
       pendingLaunchCommand: null,
@@ -280,7 +270,6 @@ export const actions: AppActions = {
       sessions: [...project.sessions, session],
     };
 
-    await api.saveProject(updatedProject);
     setStoredValue(STORAGE_KEYS.currentProjectId, projectId);
     setStoredValue(STORAGE_KEYS.activeSessionId, session.id);
 
@@ -290,6 +279,24 @@ export const actions: AppActions = {
       ),
       currentProjectId: projectId,
       activeSessionId: session.id,
+    });
+
+    api.getGitBranch(project.path).then((branchInfo) => {
+      const finalSessionName = branchInfo?.head || 'Terminal';
+      const currentProject = store.projects.find(p => p.id === projectId);
+      if (currentProject) {
+        const finalProject = {
+          ...currentProject,
+          sessions: currentProject.sessions.map(s => 
+            s.id === session.id ? { ...s, name: finalSessionName } : s
+          ),
+        };
+        api.saveProject(finalProject).catch(() => {});
+        setStore('projects', prev => prev.map(p => p.id === projectId ? finalProject : p));
+      }
+    }).catch(() => {
+      const currentProject = store.projects.find(p => p.id === projectId);
+      if (currentProject) api.saveProject(currentProject).catch(() => {});
     });
 
     return session;
@@ -311,25 +318,12 @@ export const actions: AppActions = {
         installedCliTools[0] ??
         null;
 
-      const latestProjects = normalizeProjects(await api.getProjects());
-      const project =
-        latestProjects.find((p) => p.id === projectId) ??
-        store.projects.find((p) => p.id === projectId);
+      const project = store.projects.find((p) => p.id === projectId);
       if (!project) throw new Error('Project not found');
-
-      let sessionName = 'Terminal';
-      try {
-        const branchInfo = await api.getGitBranch(project.path);
-        if (branchInfo?.head) {
-          sessionName = branchInfo.head;
-        }
-      } catch {
-        sessionName = 'Terminal';
-      }
 
       const session: Session = {
         id: crypto.randomUUID(),
-        name: sessionName,
+        name: 'Terminal',
         shell,
         cliTool: selectedCli?.id ?? null,
         pendingLaunchCommand: selectedCli?.matchedCommand ?? null,
@@ -344,20 +338,33 @@ export const actions: AppActions = {
         sessions: [...project.sessions, session],
       };
 
-      await api.saveProject(updatedProject);
       setStoredValue(STORAGE_KEYS.currentProjectId, projectId);
       setStoredValue(STORAGE_KEYS.activeSessionId, session.id);
       setStoredValue(STORAGE_KEYS.preferredCliId, selectedCli?.id ?? null);
 
-      const nextProjects = latestProjects.length > 0
-        ? latestProjects.map((p) => (p.id === projectId ? updatedProject : p))
-        : store.projects.map((p) => (p.id === projectId ? updatedProject : p));
-
       setStore({
-        projects: nextProjects,
+        projects: store.projects.map((p) => p.id === projectId ? updatedProject : p),
         currentProjectId: projectId,
         activeSessionId: session.id,
         preferredCliId: selectedCli?.id ?? store.preferredCliId,
+      });
+
+      api.getGitBranch(project.path).then((branchInfo) => {
+        const finalSessionName = branchInfo?.head || 'Terminal';
+        const currentProject = store.projects.find(p => p.id === projectId);
+        if (currentProject) {
+          const finalProject = {
+            ...currentProject,
+            sessions: currentProject.sessions.map(s => 
+              s.id === session.id ? { ...s, name: finalSessionName } : s
+            ),
+          };
+          api.saveProject(finalProject).catch(() => {});
+          setStore('projects', prev => prev.map(p => p.id === projectId ? finalProject : p));
+        }
+      }).catch(() => {
+        const currentProject = store.projects.find(p => p.id === projectId);
+        if (currentProject) api.saveProject(currentProject).catch(() => {});
       });
 
       return session;
@@ -386,13 +393,13 @@ export const actions: AppActions = {
       ),
     };
 
-    await api.saveProject(updatedProject);
-
     setStore('projects', (prev) =>
       prev.map((project) =>
         project.id === projectId ? updatedProject : project
       ),
     );
+
+    api.saveProject(updatedProject).catch(() => undefined);
   },
 
   updateSession: async (projectId: string, sessionId: string, updates: Partial<Session>) => {
@@ -418,13 +425,13 @@ export const actions: AppActions = {
       ),
     };
 
-    await api.saveProject(updatedProject);
-
     setStore('projects', (prev) =>
       prev.map((project) =>
         project.id === projectId ? updatedProject : project
       ),
     );
+
+    api.saveProject(updatedProject).catch(() => undefined);
   },
 
   removeSession: async (projectId: string, sessionId: string) => {
@@ -432,14 +439,10 @@ export const actions: AppActions = {
     if (!project) return;
     if (!project.sessions.some((session) => session.id === sessionId)) return;
 
-    await nativeApi.terminal().kill(sessionId).catch(() => undefined);
-
     const updatedProject = {
       ...project,
       sessions: project.sessions.filter((s) => s.id !== sessionId),
     };
-
-    await api.saveProject(updatedProject);
 
     const activeSessionId =
       store.activeSessionId === sessionId
@@ -454,6 +457,9 @@ export const actions: AppActions = {
       ),
       activeSessionId,
     });
+
+    nativeApi.terminal().kill(sessionId).catch(() => undefined);
+    api.saveProject(updatedProject).catch(() => undefined);
   },
 
   syncOpenCodeSessions: async (projectId: string, sessions: OpenCodeSession[]) => {
@@ -503,13 +509,14 @@ export const actions: AppActions = {
     const activeSessionStillExists = normalized.some((session) => session.id === store.activeSessionId);
     const nextActiveSessionId = activeSessionStillExists ? store.activeSessionId : normalized[0]?.id ?? null;
 
-    await api.saveProject(updatedProject);
     setStoredValue(STORAGE_KEYS.activeSessionId, nextActiveSessionId);
 
     setStore({
       projects: store.projects.map((item) => (item.id === projectId ? updatedProject : item)),
       activeSessionId: nextActiveSessionId,
     });
+
+    api.saveProject(updatedProject).catch(() => undefined);
   },
 
   setActiveSession: (sessionId: string | null) => {

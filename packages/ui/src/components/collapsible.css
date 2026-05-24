@@ -31,9 +31,7 @@
     color: var(--text-base);
 
     [data-slot="collapsible-arrow"] {
-      opacity: 0;
-      transition: opacity 0.15s ease;
-      will-change: opacity;
+      opacity: 1;
       transform: translateZ(0);
     }
 
@@ -43,10 +41,6 @@
       transform: translateZ(0) rotate(-90deg);
       transition: transform 0.15s ease;
       will-change: transform;
-    }
-
-    &:hover [data-slot="collapsible-arrow"] {
-      opacity: 1;
     }
 
     /* text-12-medium */

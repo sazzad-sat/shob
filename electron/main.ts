@@ -334,7 +334,12 @@ async function revealInFinder(targetPath: string) {
 }
 
 async function getGitStatus(cwd: string) {
-  const repoRoot = (await gitOutput(["rev-parse", "--show-toplevel"], cwd)).trim();
+  let repoRoot = "";
+  try {
+    repoRoot = (await gitOutput(["rev-parse", "--show-toplevel"], cwd)).trim();
+  } catch {
+    return { repoRoot: null, changedFiles: [] };
+  }
   const statusOutput = await gitOutput(["status", "--porcelain"], cwd);
   let numstatOutput = "";
   try {
@@ -504,17 +509,26 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
   },
   get_git_status: async ({ path: cwd }) => getGitStatus(cwd),
   get_git_branch: async ({ path: cwd }) => {
-    const head = (await gitOutput(["branch", "--show-current"], cwd)).trim();
-    const upstream = (await gitOutput(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd).catch(() => ""))
-      .trim() || null;
-    const remoteName = (await gitOutput(["config", "--get", `branch.${head}.remote`], cwd).catch(() => ""))
-      .trim() || upstream?.split("/")[0] || (await gitOutput(["remote"], cwd).catch(() => "")).split(/\r?\n/).find(Boolean) || null;
-    const remoteUrl = remoteName ? await gitOutput(["remote", "get-url", remoteName], cwd).catch(() => "") : "";
-    return { repoName: parseRepoNameFromRemoteUrl(remoteUrl), head, upstream };
+    try {
+      const head = (await gitOutput(["branch", "--show-current"], cwd)).trim();
+      if (!head) throw new Error("No branch");
+      const upstream = (await gitOutput(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd).catch(() => ""))
+        .trim() || null;
+      const remoteName = (await gitOutput(["config", "--get", `branch.${head}.remote`], cwd).catch(() => ""))
+        .trim() || upstream?.split("/")[0] || (await gitOutput(["remote"], cwd).catch(() => "")).split(/\r?\n/).find(Boolean) || null;
+      const remoteUrl = remoteName ? await gitOutput(["remote", "get-url", remoteName], cwd).catch(() => "") : "";
+      return { repoName: parseRepoNameFromRemoteUrl(remoteUrl), head, upstream };
+    } catch {
+      return { repoName: null, head: null, upstream: null };
+    }
   },
   get_git_branches: async ({ path: cwd }) => {
-    const output = await gitOutput(["for-each-ref", "--format=%(refname:short)", "refs/heads"], cwd);
-    return { branches: output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).sort() };
+    try {
+      const output = await gitOutput(["for-each-ref", "--format=%(refname:short)", "refs/heads"], cwd);
+      return { branches: output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).sort() };
+    } catch {
+      return { branches: [] };
+    }
   },
   switch_git_branch: async ({ path: cwd, branch }) => {
     try {
@@ -562,6 +576,7 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
     if (result.canceled) return options?.multiple ? [] : null;
     return options?.multiple ? result.filePaths : result.filePaths[0] || null;
   },
+  open_external: async ({ url }) => shell.openExternal(url),
 };
 
 function registerIpc() {

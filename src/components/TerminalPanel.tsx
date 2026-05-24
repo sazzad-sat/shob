@@ -21,14 +21,17 @@ export function TerminalPanel(_props: TerminalPanelProps) {
     <div class="relative h-full w-full min-h-0 min-w-0 overflow-hidden bg-background">
       <For each={projectSessions()}>
         {(session) => (
-          <Show when={session.id === activeSessionId()}>
+          <div
+            class="h-full w-full"
+            classList={{ hidden: session.id !== activeSessionId() }}
+          >
             <Show
               when={session.cliTool}
               fallback={<Terminal sessionId={session.id} />}
             >
               <AgentView sessionId={session.id} projectPath={currentProject()?.path} />
             </Show>
-          </Show>
+          </div>
         )}
       </For>
 

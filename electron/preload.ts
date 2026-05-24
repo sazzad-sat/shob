@@ -28,6 +28,7 @@ const allowedCommands = new Set([
   "close_window",
   "reveal_in_finder",
   "show_open_dialog",
+  "open_external",
 ]);
 
 const eventSubscriptions = new Map<string, Set<(data: any) => void>>();

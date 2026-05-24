@@ -583,6 +583,7 @@ function renderable(part: PartType, showReasoningSummaries = true) {
 function toolDefaultOpen(tool: string, shell = false, edit = false) {
   if (tool === "bash") return shell
   if (tool === "edit" || tool === "write" || tool === "apply_patch") return edit
+  if (tool === "task") return true
 }
 
 function partDefaultOpen(part: PartType, shell = false, edit = false) {
@@ -661,7 +662,6 @@ function statsOf(parts: ToolPart[]) {
 }
 
 function formatElapsed(ms: number) {
-  if (ms < 1000) return `${ms}ms`
   const totalSeconds = ms / 1000
   if (totalSeconds < 60) {
     return `${totalSeconds.toFixed(1)}s`
@@ -682,7 +682,7 @@ function ContextTools(props: {
   tools: ToolPart[]
   children: JSX.Element
 }) {
-  const [open, setOpen] = createSignal(false)
+  const [open, setOpen] = createSignal(true)
   const [busy, setBusy] = createSignal(props.running())
   const [now, setNow] = createSignal(Date.now())
   let settle: ReturnType<typeof setTimeout> | undefined
@@ -758,7 +758,7 @@ function ContextTools(props: {
               <Show when={props.running()}>
                 <span data-slot="context-tool-group-glow" />
               </Show>
-              Worked for {elapsed()}
+              Worked for <span class="tabular-nums min-w-[3rem] inline-block">{elapsed()}</span>
               <span class="flex items-center gap-1 ml-2 pointer-events-none">
                 <For each={Object.entries(counts())}>
                   {([tool, count]) => {
@@ -1406,7 +1406,13 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   })
   const taskHref = createMemo(() => {
     if (part().tool !== "task") return
-    return sessionLink(taskId(), useLocation().pathname, data.sessionHref)
+    let pathname = ""
+    try {
+      pathname = useLocation().pathname
+    } catch {
+      pathname = ""
+    }
+    return sessionLink(taskId(), pathname, data.sessionHref)
   })
   const taskSubtitle = createMemo(() => {
     if (part().tool !== "task") return undefined
@@ -1611,19 +1617,52 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
 }
 
 PART_MAPPING["reasoning"] = function ReasoningPartDisplay(props) {
+  const i18n = useI18n()
   const part = () => props.part as ReasoningPart
   const streaming = createMemo(
     () => props.message.role === "assistant" && typeof (props.message as AssistantMessage).time.completed !== "number",
   )
   const text = () => part().text.trim()
 
+  const durationMs = createMemo(() => {
+    if (streaming()) return undefined
+    const start = part().time?.start
+    const end = part().time?.end
+    if (typeof start === "number" && typeof end === "number") return end - start
+    if (props.turnDurationMs !== undefined) return props.turnDurationMs
+    return undefined
+  })
+
+  const seconds = createMemo(() => {
+    const ms = durationMs()
+    if (ms === undefined) return undefined
+    return Math.max(1, Math.round(ms / 1000))
+  })
+
+  const title = createMemo(() => {
+    if (streaming()) return i18n.t("ui.sessionTurn.status.thinking")
+    const s = seconds()
+    return s ? `Thought for ${s} second${s === 1 ? "" : "s"}` : "Thought process"
+  })
+
   return (
     <Show when={text()}>
-      <div data-component="reasoning-part">
-        <Show when={streaming()} fallback={<Markdown text={text()} cacheKey={part().id} streaming={false} />}>
-          <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
-        </Show>
-      </div>
+      <BasicTool
+        icon="brain"
+        status={streaming() ? "running" : "completed"}
+        defaultOpen={streaming()}
+        hideDetails={!text()}
+        animated
+        trigger={{
+          title: title(),
+        }}
+      >
+        <div data-component="tool-output" data-scrollable>
+          <Show when={streaming()} fallback={<Markdown text={text()} cacheKey={part().id} streaming={false} />}>
+            <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
+          </Show>
+        </div>
+      </BasicTool>
     </Show>
   )
 }

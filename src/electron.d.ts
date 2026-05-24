@@ -129,4 +129,5 @@ export interface NativeCommandMap {
   set_window_background: { args: { color: string }; result: void }
   reveal_in_finder: { args: { path: string }; result: void }
   show_open_dialog: { args: ElectronOpenDialogOptions; result: string | string[] | null }
+  open_external: { args: { url: string }; result: void }
 }

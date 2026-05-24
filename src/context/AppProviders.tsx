@@ -20,7 +20,7 @@ function UiI18nBridge(props: ParentProps) {
 const platform: Platform = {
   platform: "desktop",
   os: "windows",
-  openLink: (url) => nativeApi.open(url as any),
+  openLink: (url) => nativeApi.invoke("open_external", { url }),
   restart: async () => {},
   back: () => window.history.back(),
   forward: () => window.history.forward(),

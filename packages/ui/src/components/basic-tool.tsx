@@ -124,6 +124,7 @@ export function BasicTool(props: BasicToolProps) {
         if (!props.animated || !contentRef) return
         heightAnim?.stop()
         if (isOpen) {
+          contentRef.style.display = "block"
           contentRef.style.overflow = "hidden"
           heightAnim = animate(contentRef, { height: "auto" }, SPRING)
           heightAnim.finished.then(() => {
@@ -134,6 +135,10 @@ export function BasicTool(props: BasicToolProps) {
         } else {
           contentRef.style.overflow = "hidden"
           heightAnim = animate(contentRef, { height: "0px" }, SPRING)
+          heightAnim.finished.then(() => {
+            if (!contentRef || open()) return
+            contentRef.style.display = "none"
+          })
         }
       },
       { defer: true },
@@ -290,6 +295,7 @@ export function BasicTool(props: BasicToolProps) {
           style={{
             height: initialOpen ? "auto" : "0px",
             overflow: initialOpen ? "visible" : "hidden",
+            display: initialOpen ? "block" : "none",
           }}
         >
           {props.children}
