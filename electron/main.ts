@@ -47,7 +47,6 @@ let serverStartPromise: Promise<ServerInstance> | null = null;
 const ptySessions = new Map<string, PtyRuntime>();
 const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
-const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 function userDataPath(...parts: string[]) {
   return path.join(app.getPath("userData"), ...parts);
@@ -91,18 +90,29 @@ function setupAutoUpdater() {
   autoUpdater.on("update-available", (info) => {
     console.log("[shob] update available:", info.version);
   });
-  autoUpdater.on("update-downloaded", (info) => {
-    console.log("[shob] update downloaded and will install on quit:", info.version);
+  autoUpdater.on("update-downloaded", async (info) => {
+    console.log("[shob] update downloaded:", info.version);
+    const result = await dialog.showMessageBox({
+      type: "info",
+      title: "Update Ready",
+      message: `A new version of Shob (${info.version}) has been downloaded!`,
+      detail: "Would you like to restart and install the update now?",
+      buttons: ["Restart & Install", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall(false, true);
+    }
   });
 
-  const checkForUpdates = () => {
+  // Delay the initial update check by 15 seconds so startup is fast and unblocked
+  setTimeout(() => {
     autoUpdater.checkForUpdates().catch((error) => {
-      console.warn("[shob] update check failed:", error);
+      console.warn("[shob] initial update check failed:", error);
     });
-  };
-
-  checkForUpdates();
-  setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL_MS).unref();
+  }, 15000);
 }
 
 function getImageMimeType(filePath: string) {
@@ -502,6 +512,43 @@ async function getGitFileState(filePath: string) {
 }
 
 const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
+  check_for_updates: async ({ manual } = {}) => {
+    if (!app.isPackaged) {
+      if (manual) {
+        await dialog.showMessageBox({
+          type: "info",
+          title: "Update",
+          message: "You are running in development mode. Auto-updates are disabled.",
+        });
+      }
+      return { status: "dev" };
+    }
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      if (manual && result && !result.isUpdateAvailable) {
+        await dialog.showMessageBox({
+          type: "info",
+          title: "Up to Date",
+          message: "You are already running the latest version of Shob.",
+        });
+      }
+      return {
+        status: "success",
+        updateAvailable: result?.isUpdateAvailable,
+        version: result?.updateInfo?.version,
+      };
+    } catch (error) {
+      console.warn("[shob] update check failed:", error);
+      if (manual) {
+        await dialog.showMessageBox({
+          type: "error",
+          title: "Update Error",
+          message: "Could not check for updates. Please check your internet connection.",
+        });
+      }
+      return { status: "error" };
+    }
+  },
   opencode_server_start: async () => {
     return (await ensureServerStarted()).url;
   },
