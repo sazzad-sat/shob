@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on, Show, Suspense } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, on, Show, Suspense } from 'solid-js'
 import { nativeApi } from '../services/native'
 import { Sidebar } from './Sidebar'
 
@@ -8,10 +8,16 @@ import { SettingsPage } from './SettingsPage'
 import { useStore } from '../store'
 import { createFileContext } from '@/context/file'
 import type { FileNode } from '@/types/file-node'
-import { OpencodeSessionPanel } from '@/opencode-ported/session-panel'
 import { ResizeHandle } from '@/opencode-ported/resize-handle'
 import { useGlobalSDK } from '@/context/global-sdk'
 import { useGlobalSync } from '@/context/global-sync'
+import { SDKProvider } from '@/context/sdk'
+import { LayoutProvider, useLayout } from '@/context/layout'
+import type { VcsFileDiff } from '@opencode-ai/sdk/v2'
+import { SessionReviewTab } from '@/pages/session/review-tab'
+import { FileComponentProvider } from '@opencode-ai/ui/context'
+import { File as OpenCodeFile } from '@opencode-ai/ui/file'
+import { SessionSidePanel } from '@/pages/session/session-side-panel'
 
 
 const folderNameFromPath = (path: string) => {
@@ -46,6 +52,92 @@ type GitStatusSummary = {
   }>
 }
 
+function OpenCodeReviewContent(props: {
+  projectPath: () => string
+  reviewDiffs: () => VcsFileDiff[]
+  activeFilePath: () => string | null
+  onSelectFile: (file: string | null) => void
+  gitDiffLoading: () => boolean
+  isReviewVisible: () => boolean
+  isFileTreeVisible: () => boolean
+}) {
+  const layout = useLayout()
+  const sessionViewKey = createMemo(() => `${props.projectPath()}::workspace`)
+  const view = createMemo(() => layout.view(sessionViewKey()))
+  const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
+  const normalizeReviewPath = (path: string) => toPosix(path).replace(/^\/+/, "").toLowerCase()
+  const activeDiffPath = createMemo(() => {
+    const active = props.activeFilePath()
+    if (!active) return
+    const target = normalizeReviewPath(active)
+    return props.reviewDiffs().find((diff) => normalizeReviewPath(diff.file) === target)?.file
+  })
+  const selectedPlainFile = createMemo(() => {
+    const active = props.activeFilePath()
+    if (!active) return
+    if (activeDiffPath()) return
+    return active
+  })
+  const [plainFileContent] = createResource(selectedPlainFile, async (filePath) => {
+    const root = props.projectPath()
+    const absolute = toPosix(`${root}/${filePath}`)
+    const contents = await nativeApi.invoke("read_text_file", { path: absolute })
+    return {
+      name: filePath,
+      contents,
+      cacheKey: `${filePath}:${contents.length}:${contents.slice(0, 64)}`,
+    }
+  })
+
+  const openReviewPath = (path: string) => {
+    const target = normalizeReviewPath(path)
+    const reviewPath = props.reviewDiffs().find((diff) => normalizeReviewPath(diff.file) === target)?.file ?? path
+    props.onSelectFile(reviewPath)
+    view().review.openPath(reviewPath)
+  }
+
+  createEffect(() => {
+    const path = activeDiffPath()
+    if (!path || !props.isReviewVisible()) return
+    view().review.openPath(path)
+  })
+
+  return (
+    <SessionSidePanel
+      reviewOpen={props.isReviewVisible}
+      fileTreeOpen={props.isFileTreeVisible}
+      diffs={props.reviewDiffs}
+      diffsReady={() => !props.gitDiffLoading()}
+      activeDiff={props.activeFilePath() ?? undefined}
+      focusReviewDiff={openReviewPath}
+      openFile={openReviewPath}
+      reviewPanel={() => (
+        <FileComponentProvider component={FilePreview}>
+          <Show
+            when={selectedPlainFile() && plainFileContent()}
+            fallback={
+              <SessionReviewTab
+                diffs={props.reviewDiffs}
+                view={view}
+                diffStyle={layout.review.diffStyle()}
+                onDiffStyleChange={layout.review.setDiffStyle}
+                onViewFile={openReviewPath}
+                focusedFile={activeDiffPath() ?? props.activeFilePath() ?? undefined}
+              />
+            }
+          >
+            {(file) => (
+              <div class="h-full min-h-0 overflow-hidden bg-background-base">
+                <OpenCodeFile mode="text" file={file()} class="h-full" />
+              </div>
+            )}
+          </Show>
+        </FileComponentProvider>
+      )}
+    />
+  )
+}
+
 export function MainView() {
   const appStore = useStore()
   const globalSDK = useGlobalSDK()
@@ -67,6 +159,7 @@ export function MainView() {
   const [gitDiffLoading, setGitDiffLoading] = createSignal(false)
   const [gitDiffError, setGitDiffError] = createSignal<string | null>(null)
   const [gitUnavailable, setGitUnavailable] = createSignal(false)
+  const [reviewDiffs, setReviewDiffs] = createSignal<VcsFileDiff[]>([])
   const projectSessions = createMemo(() => currentProject()?.sessions ?? [])
   let workspaceSplitRef: HTMLDivElement | undefined
 
@@ -166,6 +259,9 @@ export function MainView() {
       setGitStats(stats)
       setGitDiffLoading(false)
       setGitUnavailable(false)
+      const client = globalSDK.createClient({ directory: path, throwOnError: true })
+      const diffs = await client.vcs.diff({ mode: "git", directory: path }).then((response) => response.data)
+      setReviewDiffs(Array.isArray(diffs) ? diffs : [])
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error ?? "")
       const noGitRepo =
@@ -178,6 +274,7 @@ export function MainView() {
       setGitDiffLoading(false)
       setGitUnavailable(noGitRepo)
       setGitDiffError(noGitRepo ? null : (error instanceof Error ? error.message : "Unable to load git changes"))
+      setReviewDiffs([])
     }
   }
 
@@ -320,10 +417,8 @@ export function MainView() {
     const minMainContent = projectSessions().length > 0 ? 420 : 300
     const maxReviewWidth = Math.max(360, available - minMainContent)
     const next = rightEdge - clientX
-
     setReviewWidth(clampPanelWidth(next, 360, Math.min(1080, maxReviewWidth)))
   }
-
 
   return (
     <div class="flex min-h-0 flex-1 bg-background text-foreground">
@@ -364,22 +459,21 @@ export function MainView() {
                       onResize={resizeReviewPanel}
                     />
                     <Suspense fallback={null}>
-                      <fileCtx.FileProvider>
-                        <OpencodeSessionPanel
-                          projectPath={projectPath()}
-                          activeFile={activeFilePath()}
-                          openFiles={reviewFiles()}
-                          onSelectFile={handleFileSelect}
-                          onCloseFile={handleCloseReviewFile}
-                          gitChangedFiles={gitChangedFiles}
-                          gitKinds={gitKinds}
-                          gitStats={gitStats}
-                          gitUnavailable={gitUnavailable}
-                          gitDiffLoading={gitDiffLoading}
-                          gitDiffError={gitDiffError}
-                          isFileTreeVisible={isFileTreeVisible}
-                        />
-                      </fileCtx.FileProvider>
+                      <LayoutProvider>
+                        <SDKProvider directory={projectPath}>
+                          <fileCtx.FileProvider>
+                            <OpenCodeReviewContent
+                              projectPath={projectPath}
+                              reviewDiffs={reviewDiffs}
+                              activeFilePath={activeFilePath}
+                              onSelectFile={handleFileSelect}
+                              gitDiffLoading={gitDiffLoading}
+                              isReviewVisible={isReviewVisible}
+                              isFileTreeVisible={isFileTreeVisible}
+                            />
+                          </fileCtx.FileProvider>
+                        </SDKProvider>
+                      </LayoutProvider>
                     </Suspense>
                   </div>
                 </Show>

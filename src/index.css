@@ -1177,3 +1177,37 @@ button {
   opacity: 0.6;
 }
 
+/* ═══════════════════════════════════════════════════
+   OPENCODE PREMIUM TITLEBAR ICON STYLING
+   ═══════════════════════════════════════════════════ */
+.titlebar-icon {
+  width: 32px !important;
+  height: 24px !important;
+  aspect-ratio: auto !important;
+  padding: 0 !important;
+  border-radius: var(--radius-md, 6px) !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background var(--duration-fast, 120ms) ease, color var(--duration-fast, 120ms) ease !important;
+}
+
+.titlebar-icon[data-variant="ghost"] {
+  background-color: transparent !important;
+  color: var(--muted-foreground) !important;
+}
+
+.titlebar-icon[data-variant="ghost"]:hover:not(:disabled) {
+  background-color: var(--surface-base-hover, var(--muted)) !important;
+  color: var(--foreground) !important;
+}
+
+.titlebar-icon[data-variant="ghost"][aria-expanded="true"],
+.titlebar-icon[data-variant="ghost"][aria-pressed="true"],
+.titlebar-icon[data-variant="ghost"][data-active="true"] {
+  background-color: var(--surface-base-active, var(--accent)) !important;
+  color: var(--foreground) !important;
+}
+
+

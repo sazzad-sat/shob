@@ -5,7 +5,12 @@ import type { FileNode } from "@/types/file-node"
 
 type FileContextValue = {
   normalize: (input: string) => string
-  tree: ReturnType<typeof createFileTreeStore>
+  tree: ReturnType<typeof createFileTreeStore> & {
+    list: ReturnType<typeof createFileTreeStore>["listDir"]
+    expand: ReturnType<typeof createFileTreeStore>["expandDir"]
+    collapse: ReturnType<typeof createFileTreeStore>["collapseDir"]
+    state: ReturnType<typeof createFileTreeStore>["dirState"]
+  }
 }
 
 const FileContext = createContext<FileContextValue>()
@@ -24,7 +29,15 @@ export function createFileContext(options: {
     onError: options.onError,
   })
 
-  const value = { normalize: pathHelpers.normalize, tree }
+  const treeCompat = {
+    ...tree,
+    list: tree.listDir,
+    expand: tree.expandDir,
+    collapse: tree.collapseDir,
+    state: tree.dirState,
+  }
+
+  const value = { normalize: pathHelpers.normalize, tree: treeCompat }
 
   function FileProvider(props: ParentProps) {
     return (
@@ -36,7 +49,7 @@ export function createFileContext(options: {
 
   return {
     normalize: pathHelpers.normalize,
-    tree,
+    tree: treeCompat,
     FileProvider,
   }
 }

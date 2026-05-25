@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron";
 import pkg from "electron-updater";
 const { autoUpdater } = pkg;
 import path from "node:path";
@@ -48,6 +48,24 @@ let serverStartPromise: Promise<ServerInstance> | null = null;
 const ptySessions = new Map<string, PtyRuntime>();
 const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
+const TITLEBAR_HEIGHT = 40;
+
+function titlebarTone() {
+  return nativeTheme.shouldUseDarkColors ? "dark" : "light";
+}
+
+function titlebarOverlay(mode: "light" | "dark" = titlebarTone(), zoom = 1) {
+  return {
+    color: "#00000000",
+    symbolColor: mode === "dark" ? "white" : "black",
+    height: Math.max(TITLEBAR_HEIGHT, Math.round(TITLEBAR_HEIGHT * zoom)),
+  };
+}
+
+function updateWindowTitlebarOverlay(win: BrowserWindow, mode: "light" | "dark" = titlebarTone()) {
+  if (process.platform !== "win32") return;
+  win.setTitleBarOverlay(titlebarOverlay(mode, win.webContents.getZoomFactor()));
+}
 
 function userDataPath(...parts: string[]) {
   return path.join(app.getPath("userData"), ...parts);
@@ -641,6 +659,11 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
     if (typeof color !== "string" || !color.trim()) return;
     mainWindow?.setBackgroundColor(color);
   },
+  set_titlebar_theme: async ({ mode }) => {
+    if (mode !== "light" && mode !== "dark") return;
+    if (!mainWindow) return;
+    updateWindowTitlebarOverlay(mainWindow, mode);
+  },
   minimize_window: async () => mainWindow?.minimize(),
   toggle_maximize_window: async () => {
     if (!mainWindow) return false;
@@ -762,9 +785,23 @@ async function createWindow() {
     height: 820,
     minWidth: 920,
     minHeight: 600,
-    frame: false,
-    titleBarStyle: "hidden",
     backgroundColor: "#09090b",
+    ...(process.platform === "darwin"
+      ? {
+          titleBarStyle: "hidden" as const,
+          trafficLightPosition: { x: 12, y: 14 },
+        }
+      : {}),
+    ...(process.platform === "win32"
+      ? {
+          frame: false,
+          titleBarStyle: "hidden" as const,
+          titleBarOverlay: titlebarOverlay(),
+        }
+      : {
+          frame: false,
+          titleBarStyle: "hidden" as const,
+        }),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -775,6 +812,16 @@ async function createWindow() {
 
   mainWindow.on("maximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: true }));
   mainWindow.on("unmaximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: false }));
+  mainWindow.webContents.on("zoom-changed", () => {
+    if (!mainWindow) return;
+    updateWindowTitlebarOverlay(mainWindow);
+  });
+  if (process.platform === "win32") {
+    nativeTheme.on("updated", () => {
+      if (!mainWindow) return;
+      updateWindowTitlebarOverlay(mainWindow);
+    });
+  }
   mainWindow.on("closed", () => {
     mainWindow = null;
   });

@@ -50,6 +50,7 @@ function App() {
     const background = tokens['--background-base'] ?? tokens['--background']
     if (window.shob && background) {
       void nativeApi.invoke('set_window_background', { color: background }).catch(() => undefined)
+      void nativeApi.invoke('set_titlebar_theme', { mode }).catch(() => undefined)
     }
   })
 
