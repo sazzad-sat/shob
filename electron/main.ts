@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { autoUpdater } from "electron-updater";
 import path from "node:path";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
@@ -46,6 +47,7 @@ let serverStartPromise: Promise<ServerInstance> | null = null;
 const ptySessions = new Map<string, PtyRuntime>();
 const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 function userDataPath(...parts: string[]) {
   return path.join(app.getPath("userData"), ...parts);
@@ -75,6 +77,32 @@ function normalizeOs() {
   if (process.platform === "darwin") return "macos";
   if (process.platform === "linux") return "linux";
   return process.platform;
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("error", (error) => {
+    console.warn("[shob] auto update failed:", error);
+  });
+  autoUpdater.on("update-available", (info) => {
+    console.log("[shob] update available:", info.version);
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    console.log("[shob] update downloaded and will install on quit:", info.version);
+  });
+
+  const checkForUpdates = () => {
+    autoUpdater.checkForUpdates().catch((error) => {
+      console.warn("[shob] update check failed:", error);
+    });
+  };
+
+  checkForUpdates();
+  setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL_MS).unref();
 }
 
 function getImageMimeType(filePath: string) {
@@ -721,7 +749,8 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.error("[shob] failed to start server:", err);
   }
-  createWindow();
+  await createWindow();
+  setupAutoUpdater();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
