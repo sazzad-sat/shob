@@ -42,6 +42,7 @@ let mainWindow: BrowserWindow | null = null;
 let projectWatcher: ProjectWatcher = null;
 let lastWatcherOperationAt = 0;
 let serverInstance: ServerInstance | null = null;
+let serverStartPromise: Promise<ServerInstance> | null = null;
 const ptySessions = new Map<string, PtyRuntime>();
 const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
@@ -53,6 +54,20 @@ function userDataPath(...parts: string[]) {
 async function ensureDataDirs() {
   await fs.mkdir(userDataPath("sessions"), { recursive: true });
   initSessionDatabase();
+}
+
+async function ensureServerStarted() {
+  if (serverInstance) return serverInstance;
+  serverStartPromise ??= startServer({ packaged: app.isPackaged })
+    .then((instance) => {
+      serverInstance = instance;
+      return instance;
+    })
+    .catch((error) => {
+      serverStartPromise = null;
+      throw error;
+    });
+  return serverStartPromise;
 }
 
 function normalizeOs() {
@@ -460,8 +475,7 @@ async function getGitFileState(filePath: string) {
 
 const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
   opencode_server_start: async () => {
-    if (!serverInstance) throw new Error("Server not started");
-    return serverInstance.url;
+    return (await ensureServerStarted()).url;
   },
   get_projects: async () => loadPersistedProjects(),
   save_project: async ({ project }) => {
@@ -587,7 +601,7 @@ function registerIpc() {
   });
 
   ipcMain.on("shob:get-opencode-server-url", (event) => {
-    event.returnValue = serverInstance?.url ?? "http://localhost:4096"
+    event.returnValue = serverInstance?.url ?? null;
   });
 
   ipcMain.handle("shob:terminal-spawn", async (_event, options) => {
@@ -703,7 +717,7 @@ app.setName("shob");
 app.whenReady().then(async () => {
   registerIpc();
   try {
-    serverInstance = await startServer();
+    await ensureServerStarted();
   } catch (err) {
     console.error("[shob] failed to start server:", err);
   }

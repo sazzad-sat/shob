@@ -7,21 +7,34 @@ import fs from "node:fs"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const projectRoot = path.resolve(__dirname, "..")
-const isPackaged = projectRoot.endsWith('app.asar')
+const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
+const defaultPackagedServerEntry = path.resolve(
+  resourcesPath ?? path.resolve(projectRoot, ".."),
+  "dist-server",
+  process.platform === "win32" ? "server.exe" : "server",
+)
 
-const SERVER_ENTRY = isPackaged
-  ? path.resolve(projectRoot, "..", "dist-server", process.platform === "win32" ? "server.exe" : "server")
-  : path.resolve(projectRoot, "packages", "server", "src", "index.ts")
 const START_TIMEOUT_MS = 120000
 const HEALTH_POLL_INTERVAL_MS = 100
 const HEALTH_TIMEOUT_MS = 30000
 const HEALTH_FETCH_TIMEOUT_MS = 3000
+
+type StartServerOptions = {
+  packaged?: boolean
+  serverEntry?: string
+}
 
 export interface ServerInstance {
   url: string
   port: number
   hostname: string
   stop: () => Promise<void>
+}
+
+function getServerEntry(packaged: boolean, override?: string): string {
+  if (override) return override
+  if (packaged) return defaultPackagedServerEntry
+  return path.resolve(projectRoot, "packages", "server", "src", "index.ts")
 }
 
 function resolveBun(): string {
@@ -37,7 +50,9 @@ function resolveBun(): string {
           if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
             return candidate
           }
-        } catch {}
+        } catch {
+          // Ignore inaccessible PATH entries and keep scanning.
+        }
       }
     }
   }
@@ -72,24 +87,32 @@ async function waitForHealth(url: string, timeoutMs = HEALTH_TIMEOUT_MS): Promis
       const res = await fetch(`${url}/global/health`, { signal: controller.signal })
       clearTimeout(timer)
       if (res.ok) return
-    } catch {}
+    } catch {
+      // Retry until the sidecar is healthy or the startup timeout expires.
+    }
     await new Promise((r) => setTimeout(r, HEALTH_POLL_INTERVAL_MS))
   }
   throw new Error(`Server health check timed out after ${timeoutMs}ms`)
 }
 
-export async function startServer(): Promise<ServerInstance> {
+export async function startServer(options: StartServerOptions = {}): Promise<ServerInstance> {
   const hostname = "127.0.0.1"
   const port = await findFreePort(hostname)
+  const packaged = options.packaged ?? projectRoot.endsWith("app.asar")
+  const serverEntry = getServerEntry(packaged, options.serverEntry)
   let proc;
-  if (isPackaged) {
-    console.log(`[shob] starting packaged server on ${hostname}:${port} at ${SERVER_ENTRY}`)
-    proc = spawn(SERVER_ENTRY, [
+  if (packaged) {
+    if (!fs.existsSync(serverEntry)) {
+      throw new Error(`Packaged server executable was not found at ${serverEntry}`)
+    }
+
+    console.log(`[shob] starting packaged server on ${hostname}:${port} at ${serverEntry}`)
+    proc = spawn(serverEntry, [
       "serve",
       `--hostname=${hostname}`,
       `--port=${port}`,
     ], {
-      cwd: path.dirname(SERVER_ENTRY),
+      cwd: path.dirname(serverEntry),
       env: {
         ...process.env,
         OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
@@ -102,7 +125,7 @@ export async function startServer(): Promise<ServerInstance> {
 
     proc = spawn(bunPath, [
       "--conditions=browser",
-      SERVER_ENTRY,
+      serverEntry,
       "serve",
       `--hostname=${hostname}`,
       `--port=${port}`,

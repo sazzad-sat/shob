@@ -72,6 +72,7 @@ export interface ElectronTerminalSpawnResult {
 
 export interface ShobNativeApi {
   platform: "windows" | "macos" | "linux" | string
+  getServerUrl(): string | null
   invoke<T = unknown>(command: string, payload?: unknown): Promise<T>
   listen<T = unknown>(
     channel: string,
