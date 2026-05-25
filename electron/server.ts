@@ -7,8 +7,11 @@ import fs from "node:fs"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const projectRoot = path.resolve(__dirname, "..")
+const isPackaged = projectRoot.endsWith('app.asar')
 
-const SERVER_ENTRY = path.resolve(projectRoot, "packages", "server", "src", "index.ts")
+const SERVER_ENTRY = isPackaged
+  ? path.resolve(projectRoot, "..", "dist-server", process.platform === "win32" ? "server.exe" : "server")
+  : path.resolve(projectRoot, "packages", "server", "src", "index.ts")
 const START_TIMEOUT_MS = 120000
 const HEALTH_POLL_INTERVAL_MS = 100
 const HEALTH_TIMEOUT_MS = 30000
@@ -78,24 +81,40 @@ async function waitForHealth(url: string, timeoutMs = HEALTH_TIMEOUT_MS): Promis
 export async function startServer(): Promise<ServerInstance> {
   const hostname = "127.0.0.1"
   const port = await findFreePort(hostname)
-  const bunPath = resolveBun()
+  let proc;
+  if (isPackaged) {
+    console.log(`[shob] starting packaged server on ${hostname}:${port} at ${SERVER_ENTRY}`)
+    proc = spawn(SERVER_ENTRY, [
+      "serve",
+      `--hostname=${hostname}`,
+      `--port=${port}`,
+    ], {
+      cwd: path.dirname(SERVER_ENTRY),
+      env: {
+        ...process.env,
+        OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+  } else {
+    const bunPath = resolveBun()
+    console.log(`[shob] starting server on ${hostname}:${port} with ${bunPath}`)
 
-  console.log(`[shob] starting server on ${hostname}:${port} with ${bunPath}`)
-
-  const proc = spawn(bunPath, [
-    "--conditions=browser",
-    SERVER_ENTRY,
-    "serve",
-    `--hostname=${hostname}`,
-    `--port=${port}`,
-  ], {
-    cwd: projectRoot,
-    env: {
-      ...process.env,
-      OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  })
+    proc = spawn(bunPath, [
+      "--conditions=browser",
+      SERVER_ENTRY,
+      "serve",
+      `--hostname=${hostname}`,
+      `--port=${port}`,
+    ], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+  }
 
   const url = await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
