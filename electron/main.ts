@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, shell } from "electron";
 import pkg from "electron-updater";
 const { autoUpdater } = pkg;
 import path from "node:path";
@@ -70,6 +70,17 @@ function updateWindowTitlebarOverlay(win: BrowserWindow, mode: "light" | "dark" 
 
 function userDataPath(...parts: string[]) {
   return path.join(app.getPath("userData"), ...parts);
+}
+
+function resolveAppIconPath() {
+  const candidates = [
+    path.join(__dirname, "..", "electron", "icons", "icon.png"),
+    path.join(process.resourcesPath, "electron", "icons", "icon.png"),
+  ];
+  for (const candidate of candidates) {
+    if (fsSync.existsSync(candidate)) return candidate;
+  }
+  return undefined;
 }
 
 async function ensureDataDirs() {
@@ -796,6 +807,7 @@ function registerIpc() {
 
 async function createWindow() {
   await ensureDataDirs();
+  const appIconPath = resolveAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -824,6 +836,7 @@ async function createWindow() {
       nodeIntegration: false,
       sandbox: false,
     },
+    ...(appIconPath ? { icon: appIconPath } : {}),
   });
 
   mainWindow.on("maximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: true }));
@@ -860,6 +873,15 @@ async function createWindow() {
 
 app.setName("shob");
 app.whenReady().then(async () => {
+  if (process.platform === "win32") {
+    app.setAppUserModelId("app.shob.desktop");
+  }
+  if (process.platform === "darwin") {
+    const appIconPath = resolveAppIconPath();
+    if (appIconPath) {
+      app.dock.setIcon(nativeImage.createFromPath(appIconPath));
+    }
+  }
   registerIpc();
   try {
     await ensureServerStarted();
