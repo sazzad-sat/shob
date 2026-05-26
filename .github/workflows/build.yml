@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   release:
@@ -16,7 +18,60 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.compute.outputs.release_tag }}
+      should_release: ${{ steps.compute.outputs.should_release }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute release tag
+        id: compute
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          tag="v${version}"
+          should_release="false"
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+              echo "Tag ${tag} already exists. Skipping auto-release."
+              should_release="false"
+            else
+              should_release="true"
+            fi
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            if [[ "${GITHUB_ACTOR}" == "github-actions[bot]" ]]; then
+              echo "Tag push from workflow bot detected. Skipping duplicate run."
+              should_release="false"
+            else
+              should_release="true"
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            tag="${{ github.event.release.tag_name }}"
+            should_release="true"
+          fi
+
+          echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "should_release=${should_release}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag for main bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.compute.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          tag="${{ steps.compute.outputs.release_tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${tag}"
+          git push origin "${tag}"
+
   build:
+    needs: prepare-release
+    if: needs.prepare-release.outputs.should_release == 'true'
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
@@ -26,6 +81,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release.outputs.release_tag }}
       
       - name: Setup Bun (macOS/Linux)
         if: runner.os != 'Windows'
@@ -59,14 +117,10 @@ jobs:
         run: bun install
 
       - name: Validate release version
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         shell: bash
         run: |
           package_version="$(node -p "require('./package.json').version")"
-          release_tag="${GITHUB_REF_NAME}"
-          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
-            release_tag="${{ github.event.release.tag_name }}"
-          fi
+          release_tag="${{ needs.prepare-release.outputs.release_tag }}"
           if [ "${release_tag}" != "v${package_version}" ]; then
             echo "::error::Release tag ${release_tag} does not match package.json version v${package_version}"
             exit 1
@@ -94,11 +148,10 @@ jobs:
           if-no-files-found: warn
           
       - name: Publish release assets
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.release_tag }}
         run: |
           $ErrorActionPreference = "Stop"
           $tag = $env:TAG_NAME
