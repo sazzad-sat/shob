@@ -421,12 +421,12 @@ export function MainView() {
   }
 
   return (
-    <div class="flex min-h-0 flex-1 bg-background text-foreground">
+    <div class="flex min-h-0 flex-1 overflow-hidden bg-background text-foreground">
       <Sidebar
         onOpenSettingsPage={() => setActivePage('settings')}
         onOpenWorkspacePage={() => setActivePage('workspace')}
       />
-      <div class="min-w-0 flex-1 flex flex-col bg-background">
+      <div class="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden bg-background">
         {activePage() === 'workspace' ? (
           <>
 

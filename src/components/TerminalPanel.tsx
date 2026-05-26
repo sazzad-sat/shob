@@ -22,7 +22,7 @@ export function TerminalPanel(_props: TerminalPanelProps) {
       <For each={projectSessions()}>
         {(session) => (
           <div
-            class="h-full w-full"
+            class="h-full w-full min-h-0 overflow-hidden"
             classList={{ hidden: session.id !== activeSessionId() }}
           >
             <Show
