@@ -25,6 +25,23 @@ function dataUrl(file: File, mime: string) {
   })
 }
 
+async function readClipboardImageFromWebApi() {
+  if (!navigator.clipboard?.read) return null
+  try {
+    const items = await navigator.clipboard.read()
+    for (const item of items) {
+      const imageType = item.types.find((type) => type.startsWith("image/"))
+      if (!imageType) continue
+      const blob = await item.getType(imageType)
+      const ext = imageType.split("/")[1] || "png"
+      return new File([blob], `pasted-image-${Date.now()}.${ext}`, { type: imageType })
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 type PromptAttachmentsInput = {
   editor: () => HTMLDivElement | undefined
   isDialogActive: () => boolean
@@ -110,9 +127,18 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
 
     const plainText = clipboardData.getData("text/plain") ?? ""
 
-    // Desktop: Browser clipboard has no images and no text, try platform's native clipboard for images
+    // Desktop: Browser clipboard may have no image items, try native bridge first
     if (input.readClipboardImage && !plainText) {
       const file = await input.readClipboardImage()
+      if (file) {
+        await addAttachment(file)
+        return
+      }
+    }
+
+    // Fallback: Clipboard API image read when supported
+    if (!plainText) {
+      const file = await readClipboardImageFromWebApi()
       if (file) {
         await addAttachment(file)
         return

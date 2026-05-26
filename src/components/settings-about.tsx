@@ -14,6 +14,15 @@ export function SettingsAbout() {
   const [message, setMessage] = createSignal("Check for updates to see if a newer version is available.")
   const [updateDownloaded, setUpdateDownloaded] = createSignal(false)
   const [lastCheckedAt, setLastCheckedAt] = createSignal<string | null>(null)
+  const [checkInFlight, setCheckInFlight] = createSignal(false)
+  const [installInFlight, setInstallInFlight] = createSignal(false)
+
+  const isBusy = () =>
+    checkInFlight() ||
+    installInFlight() ||
+    status() === "checking" ||
+    status() === "downloading" ||
+    status() === "installing"
 
   onMount(() => {
     void nativeApi
@@ -26,6 +35,12 @@ export function SettingsAbout() {
   })
 
   const checkForUpdates = async () => {
+    if (checkInFlight() || installInFlight()) return
+    if (status() === "downloading") {
+      setMessage("Update download is already in progress in the background.")
+      return
+    }
+    setCheckInFlight(true)
     setStatus("checking")
     setMessage("Checking for updates...")
     try {
@@ -46,7 +61,7 @@ export function SettingsAbout() {
       if (result.updateAvailable) {
         if (result.downloaded) {
           setStatus("available")
-          setMessage(`Update ${result.version ?? ""} is ready to install.`.trim())
+          setMessage(`Update ${result.version ?? ""} downloaded. Restart to install and complete the update.`.trim())
         } else {
           setStatus("downloading")
           setMessage(`Update ${result.version ?? ""} found. Downloading in the background...`.trim())
@@ -58,10 +73,14 @@ export function SettingsAbout() {
     } catch {
       setStatus("error")
       setMessage("Could not check for updates. Please try again.")
+    } finally {
+      setCheckInFlight(false)
     }
   }
 
   const installUpdate = async () => {
+    if (installInFlight() || checkInFlight()) return
+    setInstallInFlight(true)
     setStatus("installing")
     setMessage("Installing update and restarting app...")
     try {
@@ -73,6 +92,8 @@ export function SettingsAbout() {
     } catch {
       setStatus("error")
       setMessage("Failed to install update.")
+    } finally {
+      setInstallInFlight(false)
     }
   }
 
@@ -103,12 +124,12 @@ export function SettingsAbout() {
 
         <div class="border-t border-border px-5 py-4">
           <div class="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" disabled={status() === "checking"} onClick={() => void checkForUpdates()}>
-              {status() === "checking" ? "Checking..." : "Check for updates"}
+            <Button type="button" variant="outline" disabled={isBusy()} onClick={() => void checkForUpdates()}>
+              {status() === "checking" ? "Checking..." : status() === "downloading" ? "Downloading..." : status() === "installing" ? "Installing..." : "Check for updates"}
             </Button>
             <Show when={updateDownloaded() || status() === "available"}>
-              <Button type="button" onClick={() => void installUpdate()}>
-                Update now
+              <Button type="button" disabled={installInFlight() || checkInFlight()} onClick={() => void installUpdate()}>
+                Restart to install
               </Button>
             </Show>
           </div>
