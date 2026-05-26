@@ -276,55 +276,55 @@ export function Sidebar(props: {
           edge="end"
           onResize={(clientX) => setSidebarWidth(Math.max(220, Math.min(520, clientX)))}
         />
+        <div class="relative flex h-full max-h-full flex-col bg-sidebar select-none">
+          <div class="sticky top-0 z-10 flex flex-col bg-sidebar select-none">
+            <div class="flex items-center justify-between px-5 pt-4 pb-2">
+              <span class="text-[13px] font-medium text-muted-foreground">Projects</span>
+              <button
+                class="flex items-center justify-center rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-sidebar-foreground"
+                title="New Project"
+                onClick={() => void handleAddProject()}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div class="custom-scrollbar flex-1 overflow-y-auto">
+            <div class="flex flex-col gap-0.5 pb-3">
+              <For each={projects()}>
+                {(project) => (
+                  <FolderSection
+                    project={project}
+                    activeSessionId={activeSessionId()}
+                    onSelectProject={setCurrentProject}
+                    onSelectSession={handleSelectSession}
+                    onCreateSession={handleCreateSession}
+                    onDeleteSession={handleDeleteSession}
+                    onDeleteProject={handleDeleteProject}
+                    onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
+                    onOpenWorkspacePage={props.onOpenWorkspacePage}
+                  />
+                )}
+              </For>
+            </div>
+          </div>
+
+          <div class="border-t border-sidebar-border p-2">
+            <button
+              type="button"
+              class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-foreground transition-colors hover:bg-sidebar-accent"
+              title="Settings"
+              onClick={() => {
+                props.onOpenSettingsPage?.()
+              }}
+            >
+              <Settings size={15} />
+              <span class="text-[13px] leading-none">Settings</span>
+            </button>
+          </div>
+        </div>
       </Show>
-      <div class="relative flex h-full max-h-full flex-col bg-sidebar select-none">
-      <div class="sticky top-0 z-10 flex items-center justify-between bg-sidebar px-3 pt-4 pb-2">
-        <div class="px-2 text-[13px] font-medium text-muted-foreground">Projects</div>
-        <div class="flex items-center gap-0.5 text-muted-foreground">
-          <button
-            class="flex items-center justify-center rounded-md p-1.5 transition-colors hover:bg-accent hover:text-sidebar-foreground"
-            title="New Project"
-            onClick={() => void handleAddProject()}
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div class="custom-scrollbar flex-1 overflow-y-auto">
-        <div class="flex flex-col gap-0.5 pb-3">
-          <For each={projects()}>
-            {(project) => (
-              <FolderSection
-                project={project}
-                activeSessionId={activeSessionId()}
-                onSelectProject={setCurrentProject}
-                onSelectSession={handleSelectSession}
-                onCreateSession={handleCreateSession}
-                onDeleteSession={handleDeleteSession}
-                onDeleteProject={handleDeleteProject}
-                onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
-                onOpenWorkspacePage={props.onOpenWorkspacePage}
-              />
-            )}
-          </For>
-        </div>
-      </div>
-
-      <div class="border-t border-sidebar-border p-2">
-        <button
-          type="button"
-          class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-foreground transition-colors hover:bg-sidebar-accent"
-          title="Settings"
-          onClick={() => {
-            props.onOpenSettingsPage?.()
-          }}
-        >
-          <Settings size={15} />
-          <span class="text-[13px] leading-none">Settings</span>
-        </button>
-      </div>
-      </div>
     </aside>
   )
 }
