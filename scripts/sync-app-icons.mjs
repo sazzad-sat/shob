@@ -32,10 +32,32 @@ async function syncIco() {
 
 async function syncIcns() {
   if (process.platform !== "darwin") return;
+  const iconsetDir = path.join(iconDir, "icon.iconset");
+  const iconsetSizes = [16, 32, 64, 128, 256, 512, 1024];
+
   try {
     execFileSync("sips", ["-s", "format", "icns", sourceIcon, "--out", iconIcns], { stdio: "inherit" });
+    return;
   } catch (error) {
     console.warn("[icons] failed to generate icon.icns with sips:", error instanceof Error ? error.message : error);
+  }
+
+  try {
+    await fs.rm(iconsetDir, { recursive: true, force: true });
+    await fs.mkdir(iconsetDir, { recursive: true });
+
+    for (const size of iconsetSizes) {
+      const file1x = path.join(iconsetDir, `icon_${size}x${size}.png`);
+      const file2x = path.join(iconsetDir, `icon_${size}x${size}@2x.png`);
+      execFileSync("sips", ["-z", String(size), String(size), sourceIcon, "--out", file1x], { stdio: "inherit" });
+      execFileSync("sips", ["-z", String(size * 2), String(size * 2), sourceIcon, "--out", file2x], { stdio: "inherit" });
+    }
+
+    execFileSync("iconutil", ["-c", "icns", iconsetDir, "-o", iconIcns], { stdio: "inherit" });
+  } catch (error) {
+    console.warn("[icons] failed to generate icon.icns with iconutil fallback:", error instanceof Error ? error.message : error);
+  } finally {
+    await fs.rm(iconsetDir, { recursive: true, force: true });
   }
 }
 
