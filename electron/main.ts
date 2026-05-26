@@ -46,6 +46,7 @@ let lastWatcherOperationAt = 0;
 let serverInstance: ServerInstance | null = null;
 let serverStartPromise: Promise<ServerInstance> | null = null;
 const ptySessions = new Map<string, PtyRuntime>();
+let downloadedUpdateVersion: string | null = null;
 const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
 const TITLEBAR_HEIGHT = 40;
@@ -108,9 +109,11 @@ function setupAutoUpdater() {
   });
   autoUpdater.on("update-available", (info) => {
     console.log("[shob] update available:", info.version);
+    downloadedUpdateVersion = null;
   });
   autoUpdater.on("update-downloaded", async (info) => {
     console.log("[shob] update downloaded:", info.version);
+    downloadedUpdateVersion = info.version;
     const result = await dialog.showMessageBox({
       type: "info",
       title: "Update Ready",
@@ -531,6 +534,12 @@ async function getGitFileState(filePath: string) {
 }
 
 const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
+  get_app_info: async () => ({
+    name: app.getName(),
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    platform: normalizeOs(),
+  }),
   check_for_updates: async ({ manual } = {}) => {
     if (!app.isPackaged) {
       if (manual) {
@@ -555,6 +564,7 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
         status: "success",
         updateAvailable: result?.isUpdateAvailable,
         version: result?.updateInfo?.version,
+        downloaded: Boolean(downloadedUpdateVersion),
       };
     } catch (error) {
       console.warn("[shob] update check failed:", error);
@@ -567,6 +577,12 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
       }
       return { status: "error" };
     }
+  },
+  install_update: async () => {
+    if (!app.isPackaged) return { status: "dev" };
+    if (!downloadedUpdateVersion) return { status: "not-downloaded" };
+    autoUpdater.quitAndInstall(false, true);
+    return { status: "installing", version: downloadedUpdateVersion };
   },
   opencode_server_start: async () => {
     return (await ensureServerStarted()).url;

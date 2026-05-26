@@ -30,6 +30,9 @@ const allowedCommands = new Set([
   "reveal_in_finder",
   "show_open_dialog",
   "open_external",
+  "get_app_info",
+  "check_for_updates",
+  "install_update",
 ]);
 
 const eventSubscriptions = new Map<string, Set<(data: any) => void>>();

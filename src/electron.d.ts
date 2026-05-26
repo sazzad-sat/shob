@@ -107,6 +107,18 @@ declare global {
 }
 
 export interface NativeCommandMap {
+  get_app_info: {
+    args: undefined
+    result: { name: string; version: string; packaged: boolean; platform: "windows" | "macos" | "linux" | string }
+  }
+  check_for_updates: {
+    args: { manual?: boolean } | undefined
+    result: { status: "dev" | "success" | "error"; updateAvailable?: boolean; version?: string; downloaded?: boolean }
+  }
+  install_update: {
+    args: undefined
+    result: { status: "dev" | "not-downloaded" | "installing"; version?: string | null }
+  }
   opencode_server_start: { args: undefined; result: string }
   get_projects: { args: undefined; result: Project[] }
   save_project: { args: { project: Project }; result: Project }

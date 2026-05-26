@@ -1,21 +1,14 @@
-import claudeLogo from '../assets/logo/claude.webp';
-import codexLogo from '../assets/logo/codex.png';
-import droidLogo from '../assets/logo/droid.svg';
-import geminiLogo from '../assets/logo/gemini.png';
-import kiloLogo from '../assets/logo/kilo.png';
-import opencodeLogo from '../assets/logo/opencode.png';
-import qwenLogo from '../assets/logo/qwen.jpg';
 import defaultIcon from '../assets/icon/shob.png';
 import { CLI_CATALOG, getCatalogItem } from './check';
 
 export const CLI_LOGO_BY_ICON_KEY: Record<string, string> = {
-  codex: codexLogo,
-  claude: claudeLogo,
-  gemini: geminiLogo,
-  opencode: opencodeLogo,
-  droid: droidLogo,
-  kilo: kiloLogo,
-  qwen: qwenLogo,
+  codex: defaultIcon,
+  claude: defaultIcon,
+  gemini: defaultIcon,
+  opencode: defaultIcon,
+  droid: defaultIcon,
+  kilo: defaultIcon,
+  qwen: defaultIcon,
 };
 
 export const DEFAULT_CLI_ICON = defaultIcon;

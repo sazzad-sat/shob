@@ -1,13 +1,14 @@
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { Boxes, SlidersHorizontal, Terminal, Box } from "lucide-solid"
+import { Boxes, SlidersHorizontal, Terminal, Box, CircleHelp } from "lucide-solid"
 import { SettingsProviders } from "./opencode-settings/settings-providers"
 import { SettingsModels } from "./opencode-settings/settings-models"
+import { SettingsAbout } from "./settings-about"
 import { useStore } from "../store"
 import { OPEN_CODE_THEME_LIST } from "../theme"
 import { CliAvatar } from "./CliAvatar"
 import { Button } from "@/components/ui/button"
 
-type SettingsSection = "general" | "providers" | "models" | "cli-tools"
+type SettingsSection = "general" | "providers" | "models" | "cli-tools" | "about"
 
 const getShellLabel = (shell: string) => shell.split(/[\\/]/).pop() || shell
 
@@ -45,6 +46,9 @@ export function SettingsPage() {
             </Button>
             <Button type="button" variant={section() === "cli-tools" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("cli-tools")}>
               <Terminal class="mr-2 h-4 w-4" /> CLI Tools
+            </Button>
+            <Button type="button" variant={section() === "about" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("about")}>
+              <CircleHelp class="mr-2 h-4 w-4" /> About
             </Button>
           </div>
         </aside>
@@ -145,6 +149,10 @@ export function SettingsPage() {
                 </For>
               </div>
             </div>
+          </Show>
+
+          <Show when={section() === "about"}>
+            <SettingsAbout />
           </Show>
         </div>
       </div>
