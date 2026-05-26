@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { Boxes, SlidersHorizontal, Terminal, Box, CircleHelp } from "lucide-solid"
+import { Boxes, SlidersHorizontal, Box, CircleHelp } from "lucide-solid"
 import { SettingsProviders } from "./opencode-settings/settings-providers"
 import { SettingsModels } from "./opencode-settings/settings-models"
 import { SettingsAbout } from "./settings-about"
@@ -8,20 +8,17 @@ import { OPEN_CODE_THEME_LIST } from "../theme"
 import { CliAvatar } from "./CliAvatar"
 import { Button } from "@/components/ui/button"
 
-type SettingsSection = "general" | "providers" | "models" | "cli-tools" | "about"
+type SettingsSection = "general" | "providers" | "models" | "about"
 
 const getShellLabel = (shell: string) => shell.split(/[\\/]/).pop() || shell
 
 export function SettingsPage() {
   const preferredCliId = useStore((s) => s.preferredCliId)
   const preferredShell = useStore((s) => s.preferredShell)
-  const cliLaunchMode = useStore((s) => s.cliLaunchMode)
   const cliTools = useStore((s) => s.cliTools)
   const availableShells = useStore((s) => s.availableShells)
   const setPreferredCliTool = useStore((s) => s.setPreferredCliTool)
   const setPreferredShell = useStore((s) => s.setPreferredShell)
-  const setCliLaunchMode = useStore((s) => s.setCliLaunchMode)
-  const installCliTool = useStore((s) => s.installCliTool)
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
   const setThemeId = useStore((s) => s.setThemeId)
@@ -43,9 +40,6 @@ export function SettingsPage() {
             </Button>
             <Button type="button" variant={section() === "models" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("models")}>
               <Box class="mr-2 h-4 w-4" /> Models
-            </Button>
-            <Button type="button" variant={section() === "cli-tools" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("cli-tools")}>
-              <Terminal class="mr-2 h-4 w-4" /> CLI Tools
             </Button>
             <Button type="button" variant={section() === "about" ? "secondary" : "ghost"} class="justify-start" onClick={() => setSection("about")}>
               <CircleHelp class="mr-2 h-4 w-4" /> About
@@ -121,34 +115,6 @@ export function SettingsPage() {
 
           <Show when={section() === "models"}>
             <SettingsModels />
-          </Show>
-
-          <Show when={section() === "cli-tools"}>
-            <div class="space-y-4">
-              <h2 class="text-lg font-semibold">CLI Tools</h2>
-              <div class="space-y-2">
-                <For each={cliTools()}>
-                  {(tool) => (
-                    <div class="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
-                      <div class="flex items-center gap-2">
-                        <CliAvatar cliId={tool.id} label={tool.label} size="sm" />
-                        <span class="text-sm">{tool.label}</span>
-                      </div>
-                      <Show
-                        when={tool.installed}
-                        fallback={
-                          <Button size="sm" variant="outline" onClick={() => void installCliTool(tool.id, tool.installCommand)}>
-                            Install
-                          </Button>
-                        }
-                      >
-                        <span class="text-xs text-green-500">Installed</span>
-                      </Show>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </div>
           </Show>
 
           <Show when={section() === "about"}>

@@ -31,12 +31,20 @@ export function TitleBar() {
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
+  const [isFullscreen, setIsFullscreen] = createSignal(false)
 
   const mac = () => platform() === "macos"
   const windows = () => platform() === "windows"
 
   onMount(() => {
     setPlatform(mapPlatform(nativeApi.platform()))
+    void currentWindow()
+      .onResized((state) => {
+        if (typeof state?.fullscreen === "boolean") {
+          setIsFullscreen(state.fullscreen)
+        }
+      })
+      .catch(() => undefined)
   })
 
   onMount(() => {
@@ -76,7 +84,7 @@ export function TitleBar() {
       class="h-10 shrink-0 bg-background-base relative overflow-hidden flex flex-row"
       style={{
         "min-height": `${TITLEBAR_HEIGHT}px`,
-        "padding-left": mac() ? "84px" : "0",
+        "padding-left": mac() ? (isFullscreen() ? "10px" : "84px") : "0",
         "-webkit-app-region": "drag",
       }}
       onDblClick={maximize}

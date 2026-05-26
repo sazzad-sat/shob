@@ -828,6 +828,12 @@ async function createWindow() {
 
   mainWindow.on("maximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: true }));
   mainWindow.on("unmaximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: false }));
+  mainWindow.on("enter-full-screen", () =>
+    mainWindow?.webContents.send("shob:window-state", { fullscreen: true }),
+  );
+  mainWindow.on("leave-full-screen", () =>
+    mainWindow?.webContents.send("shob:window-state", { fullscreen: false }),
+  );
   mainWindow.webContents.on("zoom-changed", () => {
     if (!mainWindow) return;
     updateWindowTitlebarOverlay(mainWindow);

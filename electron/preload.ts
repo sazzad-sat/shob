@@ -102,8 +102,8 @@ contextBridge.exposeInMainWorld("shob", {
     toggleMaximize: () => ipcRenderer.invoke("shob:invoke", "toggle_maximize_window", {}),
     isMaximized: () => ipcRenderer.invoke("shob:invoke", "is_window_maximized", {}),
     close: () => ipcRenderer.invoke("shob:invoke", "close_window", {}),
-    onResized: (callback: () => void) => {
-      const listener = () => callback();
+    onResized: (callback: (state?: { maximized?: boolean; fullscreen?: boolean }) => void) => {
+      const listener = (_event: unknown, state: { maximized?: boolean; fullscreen?: boolean }) => callback(state);
       ipcRenderer.on("shob:window-state", listener);
       return Promise.resolve(() => ipcRenderer.removeListener("shob:window-state", listener));
     },

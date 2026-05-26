@@ -83,7 +83,7 @@ export interface ShobNativeApi {
     toggleMaximize(): Promise<boolean>
     isMaximized(): Promise<boolean>
     close(): Promise<void>
-    onResized(callback: () => void): Promise<() => void>
+    onResized(callback: (state?: { maximized?: boolean; fullscreen?: boolean }) => void): Promise<() => void>
   }
   terminal: {
     spawn(options: ElectronTerminalSpawnOptions): Promise<ElectronTerminalSpawnResult>
