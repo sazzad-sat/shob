@@ -1,8 +1,8 @@
 import { createSignal, onMount, Show } from "solid-js"
 import { Button } from "@/components/ui/button"
 import { nativeApi } from "@/services/native"
-import shobLogo from "@/assets/icon/shob.png"
 import { CheckCircle2 } from "lucide-solid"
+import { Ico } from "@/components/Ico"
 
 type AboutStatus = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "error" | "installing" | "dev"
 
@@ -103,7 +103,7 @@ export function SettingsAbout() {
 
       <section class="overflow-hidden rounded-xl border border-border bg-card">
         <div class="flex items-center gap-3 px-5 py-4">
-          <img src={shobLogo} alt="shob logo" class="h-9 w-9 rounded-lg object-cover" />
+          <Ico class="h-9 w-9 rounded-lg object-cover" />
           <p class="text-2xl font-semibold leading-none text-foreground">{appName()}</p>
         </div>
 

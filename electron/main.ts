@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron";
 import pkg from "electron-updater";
 const { autoUpdater } = pkg;
 import path from "node:path";
@@ -22,6 +22,7 @@ import {
   saveSessionOutput as savePersistedSessionOutput,
 } from "./session-db.js";
 import { startServer, type ServerInstance } from "./server.js";
+import { applyMacDockIcon, applyWindowIcon, applyWindowsAppIdentity, resolveAppIconPath } from "./icon.js";
 
 const execFileAsync = promisify(execFile);
 const isDev = !app.isPackaged;
@@ -51,6 +52,8 @@ const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
 const TITLEBAR_HEIGHT = 40;
 
+applyWindowsAppIdentity();
+
 function titlebarTone() {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
 }
@@ -70,17 +73,6 @@ function updateWindowTitlebarOverlay(win: BrowserWindow, mode: "light" | "dark" 
 
 function userDataPath(...parts: string[]) {
   return path.join(app.getPath("userData"), ...parts);
-}
-
-function resolveAppIconPath() {
-  const candidates = [
-    path.join(__dirname, "..", "electron", "icons", "icon.png"),
-    path.join(process.resourcesPath, "electron", "icons", "icon.png"),
-  ];
-  for (const candidate of candidates) {
-    if (fsSync.existsSync(candidate)) return candidate;
-  }
-  return undefined;
 }
 
 async function ensureDataDirs() {
@@ -838,6 +830,10 @@ async function createWindow() {
     },
     ...(appIconPath ? { icon: appIconPath } : {}),
   });
+  if (mainWindow && (process.platform === "win32" || process.platform === "linux") && appIconPath) {
+    mainWindow.setIcon(appIconPath);
+  }
+  applyWindowIcon(mainWindow);
 
   mainWindow.on("maximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: true }));
   mainWindow.on("unmaximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: false }));
@@ -873,15 +869,7 @@ async function createWindow() {
 
 app.setName("shob");
 app.whenReady().then(async () => {
-  if (process.platform === "win32") {
-    app.setAppUserModelId("app.shob.desktop");
-  }
-  if (process.platform === "darwin") {
-    const appIconPath = resolveAppIconPath();
-    if (appIconPath) {
-      app.dock.setIcon(nativeImage.createFromPath(appIconPath));
-    }
-  }
+  applyMacDockIcon();
   registerIpc();
   try {
     await ensureServerStarted();
