@@ -113,6 +113,7 @@ function AgentViewInner(props: AgentViewProps) {
   const orphanMessages = createMemo(() =>
     messages().filter((message) => message.role !== "user" && (!("parentID" in message) || !message.parentID)),
   )
+  const isNewSession = createMemo(() => messages().length === 0)
 
   createEffect(() => {
     const sessionID = activeSessionId()
@@ -191,7 +192,7 @@ function AgentViewInner(props: AgentViewProps) {
   return (
     <DataProvider data={sync.data} directory={props.projectPath ?? ""}>
       <FileComponentProvider component={FilePreview}>
-        <div class="flex h-full min-h-0 w-full flex-col bg-background-stronger text-foreground">
+        <div class="flex h-full min-h-0 w-full flex-col overflow-x-hidden bg-background-stronger text-foreground">
           <div class="relative min-h-0 flex-1">
             <div
               class="pointer-events-none absolute bottom-6 left-1/2 z-[60] -translate-x-1/2 transition-all duration-200 ease-out"
@@ -221,7 +222,7 @@ function AgentViewInner(props: AgentViewProps) {
             <div
               ref={setScrollRef}
               data-slot="session-turn-content"
-              class="h-full min-w-0 overflow-y-auto thin-scrollbar"
+              class="h-full min-w-0 overflow-x-hidden overflow-y-auto thin-scrollbar"
               style={{
                 "--session-title-height": "40px",
                 "--sticky-accordion-top": "48px",
@@ -338,24 +339,48 @@ function AgentViewInner(props: AgentViewProps) {
                   </For>
 
                   <Show when={messages().length === 0}>
-                    <div class="flex h-[50vh] flex-col items-center justify-center px-6 text-center">
+                    <div class="relative isolate flex h-[50vh] flex-col items-center justify-center px-6 text-center overflow-visible">
+                      <div
+                        aria-hidden="true"
+                        class="pointer-events-none absolute left-1/2 top-[74%] z-0 h-[62vh] w-[88vw] -translate-x-1/2 -translate-y-1/2 rounded-[100%] opacity-60 blur-[115px]"
+                        style={{
+                          background:
+                            "radial-gradient(ellipse at center, rgba(37, 99, 235, 0.34) 0%, rgba(30, 64, 175, 0.18) 38%, rgba(15, 23, 42, 0.10) 58%, rgba(7, 9, 19, 0) 80%)",
+                        }}
+                      />
+                      <div
+                        aria-hidden="true"
+                        class="pointer-events-none absolute left-1/2 top-[78%] z-0 h-[36vh] w-[56vw] -translate-x-1/2 -translate-y-1/2 rounded-[100%] opacity-55 blur-[85px]"
+                        style={{
+                          background:
+                            "radial-gradient(ellipse at center, rgba(96, 165, 250, 0.24) 0%, rgba(59, 130, 246, 0.14) 46%, rgba(30, 58, 138, 0.08) 66%, rgba(7, 9, 19, 0) 84%)",
+                        }}
+                      />
+                      <div
+                        aria-hidden="true"
+                        class="pointer-events-none absolute left-1/2 top-[82%] z-0 h-[18vh] w-[34vw] -translate-x-1/2 -translate-y-1/2 rounded-[100%] opacity-45 blur-[62px]"
+                        style={{
+                          background:
+                            "radial-gradient(ellipse at center, rgba(147, 197, 253, 0.18) 0%, rgba(59, 130, 246, 0.10) 50%, rgba(7, 9, 19, 0) 82%)",
+                        }}
+                      />
                       {/* Floating Glow Brand Icon */}
-                      <div class="relative mb-5 flex size-14 items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800/80 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
+                      <div class="relative z-10 mb-5 flex size-14 items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800/80 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
                         <Show when={local.model.current()?.provider?.id} fallback={<Icon name="models" class="size-6 text-indigo-400" />}>
                           <ProviderIcon id={local.model.current()?.provider?.id ?? ""} class="size-6 opacity-90" />
                         </Show>
                       </div>
 
                       {/* Welcoming Text */}
-                      <h2 class="text-18-semibold text-text-strong tracking-tight mb-1.5">
+                      <h2 class="relative z-10 text-18-semibold text-text-strong tracking-tight mb-1.5">
                         {language.t("agent.welcome") || "How can I help you today?"}
                       </h2>
-                      <p class="text-13-regular text-text-weak max-w-sm mb-5">
+                      <p class="relative z-10 text-13-regular text-text-weak max-w-sm mb-5">
                         Start a conversation with the agent. You are currently connected to:
                       </p>
 
                       {/* Status Pill capsules */}
-                      <div class="flex items-center gap-2 flex-wrap justify-center">
+                      <div class="relative z-10 flex items-center gap-2 flex-wrap justify-center">
                         {/* Model Capsule */}
                         <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 text-11-medium text-text-strong font-mono">
                           <Show when={local.model.current()?.provider?.id} fallback={<Icon name="models" class="size-3 text-indigo-400" />}>
@@ -374,6 +399,9 @@ function AgentViewInner(props: AgentViewProps) {
                           )}
                         </Show>
                       </div>
+                      <div class="relative z-10 mt-8 w-full max-w-4xl text-left">
+                        <PromptInput />
+                      </div>
                     </div>
                   </Show>
                 </div>
@@ -381,43 +409,45 @@ function AgentViewInner(props: AgentViewProps) {
             </div>
           </div>
 
-          <div
-            data-component="session-prompt-dock"
-            class="pointer-events-none flex w-full shrink-0 flex-col items-center justify-center bg-background-stronger pb-3"
-          >
-            <div class="pointer-events-auto w-full px-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
-              <Show when={composerState.questionRequest()} keyed>
-                {(request) => (
+          <Show when={!isNewSession()}>
+            <div
+              data-component="session-prompt-dock"
+              class="pointer-events-none flex w-full shrink-0 flex-col items-center justify-center bg-background-stronger pb-3"
+            >
+              <div class="pointer-events-auto w-full px-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
+                <Show when={composerState.questionRequest()} keyed>
+                  {(request) => (
+                    <div class="pb-2">
+                      <SessionQuestionDock request={request} onSubmit={() => undefined} />
+                    </div>
+                  )}
+                </Show>
+                <Show when={composerState.permissionRequest()} keyed>
+                  {(request) => (
+                    <div class="pb-2">
+                      <SessionPermissionDock
+                        request={request}
+                        responding={composerState.permissionResponding()}
+                        onDecide={composerState.decide}
+                      />
+                    </div>
+                  )}
+                </Show>
+                <Show when={composerState.dock() && composerState.todos().length > 0}>
                   <div class="pb-2">
-                    <SessionQuestionDock request={request} onSubmit={() => undefined} />
-                  </div>
-                )}
-              </Show>
-              <Show when={composerState.permissionRequest()} keyed>
-                {(request) => (
-                  <div class="pb-2">
-                    <SessionPermissionDock
-                      request={request}
-                      responding={composerState.permissionResponding()}
-                      onDecide={composerState.decide}
+                    <SessionTodoDock
+                      todos={composerState.todos()}
+                      collapsed={todoCollapsed()}
+                      onToggle={() => setTodoCollapsed((v) => !v)}
+                      collapseLabel={language.t("session.todo.collapse")}
+                      expandLabel={language.t("session.todo.expand")}
                     />
                   </div>
-                )}
-              </Show>
-              <Show when={composerState.dock() && composerState.todos().length > 0}>
-                <div class="pb-2">
-                  <SessionTodoDock
-                    todos={composerState.todos()}
-                    collapsed={todoCollapsed()}
-                    onToggle={() => setTodoCollapsed((v) => !v)}
-                    collapseLabel={language.t("session.todo.collapse")}
-                    expandLabel={language.t("session.todo.expand")}
-                  />
-                </div>
-              </Show>
-              <PromptInput />
+                </Show>
+                <PromptInput />
+              </div>
             </div>
-          </div>
+          </Show>
         </div>
       </FileComponentProvider>
     </DataProvider>
