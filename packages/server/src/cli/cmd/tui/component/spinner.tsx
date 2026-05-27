@@ -1,11 +1,26 @@
 import { Show } from "solid-js"
+import { createSignal, onCleanup, onMount } from "solid-js"
 import { useTheme } from "../context/theme"
 import { useKV } from "../context/kv"
 import type { JSX } from "@opentui/solid"
 import type { RGBA } from "@opentui/core"
-import "opentui-spinner/solid"
 
 const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+export function InlineSpinner(props: { frames: string[]; interval?: number; color?: RGBA }) {
+  const [index, setIndex] = createSignal(0)
+
+  onMount(() => {
+    const ms = props.interval ?? 80
+    const timer = setInterval(() => {
+      const len = props.frames.length || 1
+      setIndex((i) => (i + 1) % len)
+    }, ms)
+    onCleanup(() => clearInterval(timer))
+  })
+
+  return <text fg={props.color}>{props.frames[index()] ?? "⋯"}</text>
+}
 
 export function Spinner(props: { children?: JSX.Element; color?: RGBA }) {
   const { theme } = useTheme()
@@ -14,7 +29,7 @@ export function Spinner(props: { children?: JSX.Element; color?: RGBA }) {
   return (
     <Show when={kv.get("animations_enabled", true)} fallback={<text fg={color()}>⋯ {props.children}</text>}>
       <box flexDirection="row" gap={1}>
-        <spinner frames={frames} interval={80} color={color()} />
+        <InlineSpinner frames={frames} interval={80} color={color()} />
         <Show when={props.children}>
           <text fg={color()}>{props.children}</text>
         </Show>

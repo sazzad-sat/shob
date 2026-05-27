@@ -1,4 +1,3 @@
-import "@opentui/solid/runtime-plugin-support"
 import {
   type TuiDispose,
   type TuiPlugin,
