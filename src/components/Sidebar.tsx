@@ -7,6 +7,7 @@ import { ResizeHandle } from "@/opencode-ported/resize-handle"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import type { Session as OpenCodeSession } from "@opencode-ai/sdk/v2/client"
+import { Spinner } from "@opencode-ai/ui/spinner"
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -39,6 +40,116 @@ function FolderSection(props: {
   const [showMenu, setShowMenu] = createSignal(false)
   let menuRef: HTMLDivElement | undefined
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
+  const sortedSessions = createMemo(() =>
+    [...props.project.sessions].sort((left, right) => (right.lastActiveAt ?? right.createdAt ?? 0) - (left.lastActiveAt ?? left.createdAt ?? 0)),
+  )
+  const sessionsByParent = createMemo(() => {
+    const map = new Map<string, Project["sessions"]>()
+    const ROOT = "__root__"
+    for (const session of sortedSessions()) {
+      const parent = session.parentSessionId && sortedSessions().some((item) => item.id === session.parentSessionId)
+        ? session.parentSessionId
+        : ROOT
+      const list = map.get(parent) ?? []
+      list.push(session)
+      map.set(parent, list)
+    }
+    return { map, ROOT }
+  })
+  const [workingVisible, setWorkingVisible] = createSignal<Record<string, boolean>>({})
+  const hideTimers = new Map<string, number>()
+  const isSessionWorking = (sessionId: string) => {
+    const status = (projectStore().session_status as Record<string, { type?: string } | undefined>)[sessionId]
+    return status?.type && status.type !== "idle"
+  }
+
+  createEffect(() => {
+    const sessions = sortedSessions().map((session) => session.id)
+    for (const sessionId of sessions) {
+      const running = !!isSessionWorking(sessionId)
+      if (running) {
+        const timer = hideTimers.get(sessionId)
+        if (timer) {
+          window.clearTimeout(timer)
+          hideTimers.delete(sessionId)
+        }
+        setWorkingVisible((prev) => ({ ...prev, [sessionId]: true }))
+        continue
+      }
+      if (hideTimers.has(sessionId)) continue
+      const timer = window.setTimeout(() => {
+        setWorkingVisible((prev) => ({ ...prev, [sessionId]: false }))
+        hideTimers.delete(sessionId)
+      }, 380)
+      hideTimers.set(sessionId, timer)
+    }
+  })
+
+  onCleanup(() => {
+    for (const timer of hideTimers.values()) window.clearTimeout(timer)
+    hideTimers.clear()
+  })
+
+  const sessionTree = (sessionId: string) => sessionsByParent().map.get(sessionId) ?? []
+
+  const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
+    <>
+      <div
+        class={`group/session flex cursor-pointer items-center justify-between rounded-md py-[5px] pr-3 transition-colors hover:bg-sidebar-accent ${
+          props.activeSessionId === session.id ? "bg-sidebar-accent" : ""
+        }`}
+        style={{ "padding-left": `${30 + level * 14}px` }}
+        onClick={() => props.onSelectSession(props.project.id, session.id)}
+      >
+        <div class="min-w-0 flex flex-1 items-center gap-2">
+          <div class="flex size-4 items-center justify-center">
+            <div class="relative flex size-4 items-center justify-center">
+              <div
+                class={`absolute transition-opacity duration-200 ${
+                  workingVisible()[session.id] ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                <Spinner class="size-[15px] text-icon-interactive-base" />
+              </div>
+              <div
+                class={`absolute size-1.5 rounded-full transition-opacity duration-200 ${
+                  workingVisible()[session.id] ? "opacity-0" : "opacity-100"
+                } ${
+                  props.activeSessionId === session.id ? "bg-text-interactive-base" : "bg-muted-foreground/60"
+                }`}
+              />
+            </div>
+          </div>
+          <span
+            class={`truncate text-[13px] ${
+              props.activeSessionId === session.id ? "text-sidebar-foreground" : "text-muted-foreground"
+            }`}
+          >
+            {session.name}
+          </span>
+        </div>
+
+        <div class="ml-3 flex shrink-0 items-center gap-1">
+          <button
+            class="w-0 overflow-hidden rounded p-0 text-muted-foreground opacity-0 transition-all duration-150 hover:bg-accent hover:text-destructive group-hover/session:w-5 group-hover/session:p-0.5 group-hover/session:opacity-100"
+            title="Delete session"
+            onClick={(e) => {
+              e.stopPropagation()
+              props.onDeleteSession(props.project.id, session.id)
+            }}
+          >
+            <Trash2 size={13} />
+          </button>
+          <span class="rounded bg-muted px-1.5 py-[1px] text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent">
+            {formatSessionAge(session.lastActiveAt ?? session.createdAt)}
+          </span>
+        </div>
+      </div>
+      <For each={sessionTree(session.id)}>
+        {(child) => renderSessionNode(child, level + 1)}
+      </For>
+    </>
+  )
 
   createEffect(() => {
     void globalSync.project.loadSessions(props.project.path)
@@ -124,40 +235,13 @@ function FolderSection(props: {
       </div>
 
       <Show when={isOpen()}>
-        <div class="mt-0.5 flex flex-col">
+        <div class="mt-0.5 flex flex-col overflow-hidden transition-all duration-200 ease-out">
           <Show
-            when={props.project.sessions.length > 0}
+            when={(sessionsByParent().map.get(sessionsByParent().ROOT) ?? []).length > 0}
             fallback={<div class="py-[5px] pr-4 pl-[38px] text-[13px] text-muted-foreground">No sessions</div>}
           >
-            <For each={props.project.sessions}>
-              {(session) => (
-                <div
-                  class={`group flex cursor-pointer items-center justify-between py-[5px] pr-4 pl-[38px] hover:bg-sidebar-accent ${
-                    props.activeSessionId === session.id ? "bg-sidebar-accent" : ""
-                  }`}
-                  onClick={() => props.onSelectSession(props.project.id, session.id)}
-                >
-                  <span class={`truncate text-[13px] ${props.activeSessionId === session.id ? "text-sidebar-foreground" : "text-muted-foreground"}`}>
-                    {session.name}
-                  </span>
-
-                  <div class="ml-3 flex shrink-0 items-center gap-1">
-                    <button
-                      class="hidden rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive group-hover:block"
-                      title="Delete session"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        props.onDeleteSession(props.project.id, session.id)
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                    <span class="rounded bg-muted px-1.5 py-[1px] text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent">
-                      {formatSessionAge(session.lastActiveAt ?? session.createdAt)}
-                    </span>
-                  </div>
-                </div>
-              )}
+            <For each={sessionsByParent().map.get(sessionsByParent().ROOT) ?? []}>
+              {(session) => renderSessionNode(session, 0)}
             </For>
           </Show>
         </div>

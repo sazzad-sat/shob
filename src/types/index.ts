@@ -10,6 +10,7 @@ export interface Project {
 export interface Session {
   id: string;
   name: string;
+  parentSessionId?: string | null;
   shell: string;
   cliTool?: string | null;
   pendingLaunchCommand?: string | null;

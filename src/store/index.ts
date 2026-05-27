@@ -20,6 +20,7 @@ let launchSessionQueue: Promise<unknown> = Promise.resolve();
 
 type OpenCodeSession = {
   id: string;
+  parentID?: string;
   title?: string;
   time?: {
     created?: number;
@@ -469,17 +470,18 @@ export const actions: AppActions = {
     const normalized = sessions
       .filter((session) => session.id?.startsWith('ses'))
       .filter((session) => !session.time?.archived)
-      .map((session): Session => {
-        const createdAt = session.time?.created ?? Date.now();
-        const lastActiveAt = session.time?.updated ?? createdAt;
-        const title = sessionTitle(session.title) || 'New session';
+        .map((session): Session => {
+          const createdAt = session.time?.created ?? Date.now();
+          const lastActiveAt = session.time?.updated ?? createdAt;
+          const title = sessionTitle(session.title) || 'New session';
 
-        return {
-          id: session.id,
-          name: title,
-          shell: 'opencode',
-          cliTool: 'opencode',
-          pendingLaunchCommand: null,
+          return {
+            id: session.id,
+            name: title,
+            parentSessionId: session.parentID ?? null,
+            shell: 'opencode',
+            cliTool: 'opencode',
+            pendingLaunchCommand: null,
           createdAt,
           lastActiveAt,
           commandCount: 0,
@@ -493,11 +495,12 @@ export const actions: AppActions = {
       project.sessions.every((session, index) => {
         const next = normalized[index];
         return (
-          session.id === next.id &&
-          session.name === next.name &&
-          session.createdAt === next.createdAt &&
-          session.lastActiveAt === next.lastActiveAt
-        );
+            session.id === next.id &&
+            session.name === next.name &&
+            (session.parentSessionId ?? null) === (next.parentSessionId ?? null) &&
+            session.createdAt === next.createdAt &&
+            session.lastActiveAt === next.lastActiveAt
+          );
       });
     if (same) return;
 
