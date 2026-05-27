@@ -123,6 +123,16 @@ export function TitleBar() {
             <Button
               variant="ghost"
               class="titlebar-icon"
+              onClick={() => window.dispatchEvent(new Event("gg-toggle-file-tree"))}
+              title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
+              aria-label="Toggle file tree"
+              aria-pressed={isFileTreeVisible()}
+            >
+              <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
+            </Button>
+            <Button
+              variant="ghost"
+              class="titlebar-icon"
               onClick={() => window.dispatchEvent(new Event("gg-toggle-review-workspace"))}
               title={isReviewVisible() || isFileTreeVisible() ? "Hide file tree and review panel" : "Show file tree and review panel"}
               aria-label="Toggle review workspace"
