@@ -46,57 +46,29 @@ function FolderSection(props: {
   const sessionsByParent = createMemo(() => {
     const map = new Map<string, Project["sessions"]>()
     const ROOT = "__root__"
+    const ids = new Set(sortedSessions().map((session) => session.id))
     for (const session of sortedSessions()) {
-      const parent = session.parentSessionId && sortedSessions().some((item) => item.id === session.parentSessionId)
-        ? session.parentSessionId
-        : ROOT
+      const parent = session.parentSessionId && ids.has(session.parentSessionId) ? session.parentSessionId : ROOT
       const list = map.get(parent) ?? []
       list.push(session)
       map.set(parent, list)
     }
     return { map, ROOT }
   })
-  const [workingVisible, setWorkingVisible] = createSignal<Record<string, boolean>>({})
-  const hideTimers = new Map<string, number>()
   const isSessionWorking = (sessionId: string) => {
     const status = (projectStore().session_status as Record<string, { type?: string } | undefined>)[sessionId]
     return status?.type && status.type !== "idle"
   }
-
-  createEffect(() => {
-    const sessions = sortedSessions().map((session) => session.id)
-    for (const sessionId of sessions) {
-      const running = !!isSessionWorking(sessionId)
-      if (running) {
-        const timer = hideTimers.get(sessionId)
-        if (timer) {
-          window.clearTimeout(timer)
-          hideTimers.delete(sessionId)
-        }
-        setWorkingVisible((prev) => ({ ...prev, [sessionId]: true }))
-        continue
-      }
-      if (hideTimers.has(sessionId)) continue
-      const timer = window.setTimeout(() => {
-        setWorkingVisible((prev) => ({ ...prev, [sessionId]: false }))
-        hideTimers.delete(sessionId)
-      }, 380)
-      hideTimers.set(sessionId, timer)
-    }
-  })
-
-  onCleanup(() => {
-    for (const timer of hideTimers.values()) window.clearTimeout(timer)
-    hideTimers.clear()
-  })
 
   const sessionTree = (sessionId: string) => sessionsByParent().map.get(sessionId) ?? []
 
   const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
     <>
       <div
-        class={`group/session flex cursor-pointer items-center justify-between rounded-md py-[5px] pr-3 transition-colors hover:bg-sidebar-accent ${
-          props.activeSessionId === session.id ? "bg-sidebar-accent" : ""
+        class={`group/session flex cursor-pointer items-center justify-between rounded-md border py-[6px] pr-3 transition-colors ${
+          props.activeSessionId === session.id
+            ? "border-border bg-sidebar-accent"
+            : "border-transparent hover:bg-sidebar-accent/70"
         }`}
         style={{ "padding-left": `${30 + level * 14}px` }}
         onClick={() => props.onSelectSession(props.project.id, session.id)}
@@ -104,43 +76,42 @@ function FolderSection(props: {
         <div class="min-w-0 flex flex-1 items-center gap-2">
           <div class="flex size-4 items-center justify-center">
             <div class="relative flex size-4 items-center justify-center">
-              <div
-                class={`absolute transition-opacity duration-200 ${
-                  workingVisible()[session.id] ? "opacity-100" : "opacity-0"
-                }`}
+              <Show
+                when={isSessionWorking(session.id)}
+                fallback={
+                  <div
+                    class={`absolute size-1.5 rounded-full ${
+                      props.activeSessionId === session.id ? "bg-foreground" : "bg-muted-foreground/60"
+                    }`}
+                  />
+                }
               >
                 <Spinner class="size-[15px] text-icon-interactive-base" />
-              </div>
-              <div
-                class={`absolute size-1.5 rounded-full transition-opacity duration-200 ${
-                  workingVisible()[session.id] ? "opacity-0" : "opacity-100"
-                } ${
-                  props.activeSessionId === session.id ? "bg-text-interactive-base" : "bg-muted-foreground/60"
-                }`}
-              />
+              </Show>
             </div>
           </div>
           <span
             class={`truncate text-[13px] ${
-              props.activeSessionId === session.id ? "text-sidebar-foreground" : "text-muted-foreground"
+              props.activeSessionId === session.id ? "font-medium text-foreground" : "text-muted-foreground"
             }`}
           >
             {session.name}
           </span>
         </div>
 
-        <div class="ml-3 flex shrink-0 items-center gap-1">
+        <div class="relative ml-3 flex h-5 w-6 shrink-0 items-center justify-end">
           <button
-            class="w-0 overflow-hidden rounded p-0 text-muted-foreground opacity-0 transition-all duration-150 hover:bg-accent hover:text-destructive group-hover/session:w-5 group-hover/session:p-0.5 group-hover/session:opacity-100"
+            type="button"
+            class="absolute right-0 z-10 rounded p-0.5 text-muted-foreground opacity-0 transition-all duration-150 hover:bg-accent hover:text-destructive group-hover/session:opacity-100"
             title="Delete session"
             onClick={(e) => {
               e.stopPropagation()
               props.onDeleteSession(props.project.id, session.id)
             }}
           >
-            <Trash2 size={13} />
+            <SessionDeleteIcon />
           </button>
-          <span class="rounded bg-muted px-1.5 py-[1px] text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent">
+          <span class="pointer-events-none rounded bg-muted px-1.5 py-[1px] text-[11px] font-medium text-muted-foreground transition-opacity duration-150 group-hover/session:opacity-0">
             {formatSessionAge(session.lastActiveAt ?? session.createdAt)}
           </span>
         </div>
@@ -176,7 +147,7 @@ function FolderSection(props: {
   return (
     <div class="flex flex-col">
       <div
-        class="group mx-2 flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 hover:bg-sidebar-accent"
+        class="group mx-2 flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 transition-colors hover:bg-sidebar-accent/80"
         onClick={() => {
           props.onOpenWorkspacePage?.()
           props.onSelectProject(props.project.id)
@@ -235,7 +206,7 @@ function FolderSection(props: {
       </div>
 
       <Show when={isOpen()}>
-        <div class="mt-0.5 flex flex-col overflow-hidden transition-all duration-200 ease-out">
+        <div class="mt-1 flex flex-col gap-0.5 overflow-hidden px-1 transition-all duration-150 ease-out">
           <Show
             when={(sessionsByParent().map.get(sessionsByParent().ROOT) ?? []).length > 0}
             fallback={<div class="py-[5px] pr-4 pl-[38px] text-[13px] text-muted-foreground">No sessions</div>}
@@ -267,6 +238,7 @@ export function Sidebar(props: {
   const globalSync = useGlobalSync()
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
   const [sidebarWidth, setSidebarWidth] = createSignal(320)
+  const [pendingDeleteSessionIDs, setPendingDeleteSessionIDs] = createSignal<Set<string>>(new Set())
 
   createEffect(() => {
     window.dispatchEvent(
@@ -323,19 +295,39 @@ export function Sidebar(props: {
   }
 
   const handleDeleteSession = async (projectId: string, sessionId: string) => {
-    const project = projects().find((item) => item.id === projectId)
-    if (project && sessionId.startsWith("ses")) {
-      await globalSDK
-        .createClient({ directory: project.path, throwOnError: true })
-        .session.delete({ sessionID: sessionId })
-        .catch(() => undefined)
-      void globalSync.project.loadSessions(project.path)
+    setPendingDeleteSessionIDs((prev) => {
+      const next = new Set(prev)
+      next.add(sessionId)
+      return next
+    })
+
+    try {
+      // Optimistic local removal for immediate UI feedback.
+      await removeSession(projectId, sessionId)
+
+      const project = projects().find((item) => item.id === projectId)
+      if (project && sessionId.startsWith("ses")) {
+        await globalSDK
+          .createClient({ directory: project.path, throwOnError: true })
+          .session.delete({ sessionID: sessionId })
+          .catch(() => undefined)
+        // Wait for refreshed remote sessions before clearing pending-delete
+        // so this item cannot flicker back during sync.
+        await globalSync.project.loadSessions(project.path)
+      }
+    } finally {
+      setPendingDeleteSessionIDs((prev) => {
+        const next = new Set(prev)
+        next.delete(sessionId)
+        return next
+      })
     }
-    await removeSession(projectId, sessionId)
   }
 
   const handleSyncOpenCodeSessions = (projectId: string, sessions: OpenCodeSession[]) => {
-    void syncOpenCodeSessions(projectId, sessions)
+    const pending = pendingDeleteSessionIDs()
+    const filtered = pending.size > 0 ? sessions.filter((session) => !pending.has(session.id)) : sessions
+    void syncOpenCodeSessions(projectId, filtered)
   }
 
   const handleDeleteProject = async (projectId: string) => {
@@ -361,9 +353,9 @@ export function Sidebar(props: {
           onResize={(clientX) => setSidebarWidth(Math.max(220, Math.min(520, clientX)))}
         />
         <div class="relative flex h-full max-h-full flex-col bg-sidebar select-none">
-          <div class="sticky top-0 z-10 flex flex-col bg-sidebar select-none">
-            <div class="flex items-center justify-between px-5 pt-4 pb-2">
-              <span class="text-[13px] font-medium text-muted-foreground">Projects</span>
+          <div class="sticky top-0 z-10 flex flex-col border-b border-sidebar-border/70 bg-sidebar select-none">
+            <div class="flex items-center justify-between px-4 pt-4 pb-2.5">
+              <span class="text-[12px] font-medium tracking-wide text-muted-foreground uppercase">Projects</span>
               <button
                 class="flex items-center justify-center rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-sidebar-foreground"
                 title="New Project"
@@ -374,7 +366,7 @@ export function Sidebar(props: {
             </div>
           </div>
 
-          <div class="custom-scrollbar flex-1 overflow-y-auto">
+          <div class="custom-scrollbar flex-1 overflow-y-auto px-1.5 py-2">
             <div class="flex flex-col gap-0.5 pb-3">
               <For each={projects()}>
                 {(project) => (
@@ -397,7 +389,7 @@ export function Sidebar(props: {
           <div class="border-t border-sidebar-border p-2">
             <button
               type="button"
-              class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-foreground transition-colors hover:bg-sidebar-accent"
+              class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-foreground transition-colors hover:bg-sidebar-accent/80"
               title="Settings"
               onClick={() => {
                 props.onOpenSettingsPage?.()
@@ -413,3 +405,8 @@ export function Sidebar(props: {
   )
 }
 
+  const SessionDeleteIcon = () => (
+    <svg viewBox="0 0 24 24" class="size-[18px]" aria-hidden="true" fill="currentColor">
+      <path d="M21,5.25H17.441A1.251,1.251,0,0,1,16.255,4.4l-.316-.95a1.746,1.746,0,0,0-1.66-1.2H9.721a1.745,1.745,0,0,0-1.66,1.2l-.316.948a1.251,1.251,0,0,1-1.186.855H3a.75.75,0,0,0,0,1.5H4.3l.767,11.5a3.76,3.76,0,0,0,3.742,3.5h6.386a3.76,3.76,0,0,0,3.742-3.5L19.7,6.75H21a.75.75,0,0,0,0-1.5ZM9.483,3.921a.252.252,0,0,1,.238-.171h4.558a.252.252,0,0,1,.238.17l.316.95a2.777,2.777,0,0,0,.161.38H9.006a2.737,2.737,0,0,0,.161-.381ZM17.438,18.15a2.255,2.255,0,0,1-2.245,2.1H8.807a2.255,2.255,0,0,1-2.245-2.1L5.8,6.75h.757a2.783,2.783,0,0,0,.317-.025A.736.736,0,0,0,7,6.75H17a.736.736,0,0,0,.124-.025,2.783,2.783,0,0,0,.317.025H18.2ZM14.75,11v5a.75.75,0,0,1-1.5,0V11a.75.75,0,0,1,1.5,0Zm-4,0v5a.75.75,0,0,1-1.5,0V11a.75.75,0,0,1,1.5,0Z" />
+    </svg>
+  )
