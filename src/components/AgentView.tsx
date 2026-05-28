@@ -24,6 +24,7 @@ import { useStore } from "../store"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectModel } from "@/components/dialog-select-model"
 import { nativeApi } from "@/services/native"
+import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 
 interface AgentViewProps {
   sessionId: string
@@ -340,6 +341,17 @@ function AgentViewInner(props: AgentViewProps) {
                     {(message, index) => {
                       const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
                       const latestTurn = createMemo(() => index() === userMessages().length - 1)
+                      const assistantVisible = createMemo(() => {
+                        let visible = 0
+                        for (const msg of assistants()) {
+                          const parts = getParts(msg.id)
+                          for (const part of parts) {
+                            if (part.type === "text" && part.text?.trim()) visible++
+                            if (part.type === "tool" && part.tool !== "todowrite") visible++
+                          }
+                        }
+                        return visible
+                      })
 
                       return (
                         <div
@@ -378,6 +390,18 @@ function AgentViewInner(props: AgentViewProps) {
                                       shellToolDefaultOpen={false}
                                       editToolDefaultOpen={false}
                                     />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Show>
+
+                          <Show when={working() && latestTurn() && assistantVisible() === 0}>
+                            <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3">
+                              <div data-component="session-turn" class="relative min-w-0 w-full">
+                                <div data-slot="session-turn-message-container" class="w-full">
+                                  <div data-slot="session-turn-thinking" class="pl-2">
+                                    <TextShimmer text={language.t("ui.sessionTurn.status.thinking") ?? "Thinking..."} />
                                   </div>
                                 </div>
                               </div>

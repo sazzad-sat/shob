@@ -237,7 +237,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return paths
   })
   const info = createMemo(() => (params.sessionId ? sync.session.get(params.sessionId) : undefined))
-  const working = createMemo(() => false)
+  const working = createMemo(() => {
+    const sessionID = params.sessionId
+    const status = sessionID ? sync.data.session_status[sessionID]?.type ?? "idle" : "idle"
+    return status !== "idle"
+  })
   const imageAttachments = createMemo(() =>
     prompt.current().filter((part): part is ImageAttachmentPart => part.type === "image"),
   )
