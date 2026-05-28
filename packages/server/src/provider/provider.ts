@@ -60,6 +60,7 @@ import { ModelID, ProviderID } from "./schema"
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })
+  let cachedKiloModels: Record<string, Model> | null = null
 
   function shouldUseCopilotResponsesApi(modelID: string): boolean {
     const match = /^gpt-(\d+)/.exec(modelID)
@@ -446,10 +447,10 @@ export namespace Provider {
 
         const location = String(
           provider.options?.location ??
-            Env.get("GOOGLE_VERTEX_LOCATION") ??
-            Env.get("GOOGLE_CLOUD_LOCATION") ??
-            Env.get("VERTEX_LOCATION") ??
-            "us-central1",
+          Env.get("GOOGLE_VERTEX_LOCATION") ??
+          Env.get("GOOGLE_CLOUD_LOCATION") ??
+          Env.get("VERTEX_LOCATION") ??
+          "us-central1",
         )
 
         const autoload = Boolean(project)
@@ -608,9 +609,9 @@ export namespace Provider {
                 log.info("gitlab model discovery skipped: no models found", {
                   project: result.project
                     ? {
-                        id: result.project.id,
-                        path: result.project.pathWithNamespace,
-                      }
+                      id: result.project.id,
+                      path: result.project.pathWithNamespace,
+                    }
                     : null,
                 })
                 return {}
@@ -752,7 +753,7 @@ export namespace Provider {
         if (!apiToken) {
           throw new Error(
             "CLOUDFLARE_API_TOKEN (or CF_AIG_TOKEN) is required for Cloudflare AI Gateway. " +
-              "Set it via environment variable or run `opencode auth cloudflare-ai-gateway`.",
+            "Set it via environment variable or run `opencode auth cloudflare-ai-gateway`.",
           )
         }
 
@@ -816,10 +817,22 @@ export namespace Provider {
           },
           async getModel(sdk: any, modelID: string) {
             const id = String(modelID).trim()
-            if (typeof sdk.responses === "function") {
-              return sdk.responses(id)
+            const responsesOnly = [
+              "kilo-auto/free",
+              "x-ai/grok-code-fast-1:optimized:free",
+              "nvidia/nemotron-3-super-120b-a12b:free",
+              "inclusionai/ling-2.6-1t:free",
+              "inclusionai/ling-2.6-flash:free",
+              "tencent/hy3-preview:free",
+            ]
+            const useResponses = id.startsWith("kilo-") || responsesOnly.includes(id)
+            if (useResponses) {
+              if (typeof sdk.responses === "function") {
+                return sdk.responses(id)
+              }
+              throw new Error(`Kilo model ${id} requires responses API, but responses() is unavailable`)
             }
-            throw new Error(`Kilo model ${id} requires responses API, but responses() is unavailable`)
+            return sdk.languageModel(id)
           },
         }),
     }
@@ -932,7 +945,7 @@ export namespace Provider {
     varsLoaders: Record<string, CustomVarsLoader>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") {}
+  export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") { }
 
   function cost(c: ModelsDev.Model["cost"]): Model["cost"] {
     const result: Model["cost"] = {
@@ -1284,13 +1297,115 @@ export namespace Provider {
           const router = ProviderID.openrouter
           const extra = [
             "kilo-auto/free",
-            "x-ai/grok-code-fast-1:optimized:free",
             "nvidia/nemotron-3-super-120b-a12b:free",
-            "inclusionai/ling-2.6-1t:free",
-            "inclusionai/ling-2.6-flash:free",
-            "tencent/hy3-preview:free",
+            "poolside/laguna-m.1:free",
+            "moonshotai/kimi-k2.6:free",
+            "openrouter/owl-alpha",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "poolside/laguna-xs.2:free",
+            "openrouter/free",
           ]
           if (providers[kilo]) {
+            if (cachedKiloModels) {
+              providers[kilo].models = cachedKiloModels
+            } else {
+              yield* Effect.promise(async () => {
+                try {
+                  log.info("fetching kilo models from https://app.kilo.ai/api/openrouter/models")
+                  const res = await fetch("https://app.kilo.ai/api/openrouter/models", {
+                    headers: { "User-Agent": "opencode" },
+                    signal: AbortSignal.timeout(10000),
+                  })
+                  if (res.ok) {
+                    const body = (await res.json()) as { data: any[] }
+                    if (body && Array.isArray(body.data)) {
+                      const newModels: Record<string, Model> = {}
+                      for (const item of body.data) {
+                        const isText = (arr?: string[]) => arr?.includes("text") ?? true
+                        const isImage = (arr?: string[]) => arr?.includes("image") ?? false
+                        const isPdf = (arr?: string[]) => arr?.includes("pdf") ?? false
+                        const isAudio = (arr?: string[]) => arr?.includes("audio") ?? false
+                        const isVideo = (arr?: string[]) => arr?.includes("video") ?? false
+
+                        const promptCost = Number(item.pricing?.prompt ?? 0) * 1_000_000
+                        const completionCost = Number(item.pricing?.completion ?? 0) * 1_000_000
+                        const cacheReadCost = Number(item.pricing?.input_cache_read ?? 0) * 1_000_000
+                        const cacheWriteCost = Number(item.pricing?.input_cache_write ?? 0) * 1_000_000
+
+                        const model: Model = {
+                          id: ModelID.make(item.id),
+                          providerID: kilo,
+                          name: item.name,
+                          family: item.opencode?.family ?? "",
+                          api: {
+                            id: item.id,
+                            url: "https://api.kilo.ai/api/gateway",
+                            npm: "@ai-sdk/github-copilot",
+                          },
+                          status: "active",
+                          headers: {},
+                          options: {},
+                          cost: {
+                            input: promptCost,
+                            output: completionCost,
+                            cache: {
+                              read: cacheReadCost,
+                              write: cacheWriteCost,
+                            },
+                          },
+                          limit: {
+                            context: item.context_length ?? item.top_provider?.context_length ?? 4096,
+                            input: item.context_length ?? item.top_provider?.context_length ?? 4096,
+                            output: item.top_provider?.max_completion_tokens ?? 4096,
+                          },
+                          capabilities: {
+                            temperature: item.supported_parameters?.includes("temperature") ?? true,
+                            reasoning: item.supported_parameters?.includes("reasoning") ?? false,
+                            attachment: isImage(item.architecture?.input_modalities) || isPdf(item.architecture?.input_modalities),
+                            toolcall: item.supported_parameters?.includes("tools") ?? true,
+                            input: {
+                              text: isText(item.architecture?.input_modalities),
+                              audio: isAudio(item.architecture?.input_modalities),
+                              image: isImage(item.architecture?.input_modalities),
+                              video: isVideo(item.architecture?.input_modalities),
+                              pdf: isPdf(item.architecture?.input_modalities),
+                            },
+                            output: {
+                              text: isText(item.architecture?.output_modalities),
+                              audio: isAudio(item.architecture?.output_modalities),
+                              image: isImage(item.architecture?.output_modalities),
+                              video: isVideo(item.architecture?.output_modalities),
+                              pdf: isPdf(item.architecture?.output_modalities),
+                            },
+                            interleaved: false,
+                          },
+                          release_date: item.created > 0
+                            ? new Date(item.created * 1000).toISOString().split("T")[0]
+                            : "2020-01-01",
+                          variants: {},
+                        }
+
+                        model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
+                        if (item.opencode?.variants) {
+                          model.variants = mergeDeep(model.variants, item.opencode.variants)
+                        }
+
+                        newModels[item.id] = model
+                      }
+
+                      if (Object.keys(newModels).length > 0) {
+                        providers[kilo].models = newModels
+                        cachedKiloModels = newModels
+                        log.info("successfully fetched and updated kilo models", { count: Object.keys(newModels).length })
+                      }
+                    }
+                  }
+                } catch (err) {
+                  log.warn("failed to fetch dynamic kilo models, falling back to built-ins", { error: err })
+                }
+              })
+            }
+
             const base = Object.values(providers[kilo].models)[0]
             for (const id of extra) {
               const existing = providers[kilo].models[id]
@@ -1561,7 +1676,13 @@ export namespace Provider {
           throw new ModelNotFoundError({ providerID, modelID, suggestions: matches.map((m) => m.target) })
         }
 
-        const info = provider.models[modelID]
+        let info = provider.models[modelID]
+        // shorthand fallback: e.g. "kimi-k2.6:free" -> "moonshotai/kimi-k2.6:free"
+        if (!info) {
+          const suffix = "/" + modelID
+          const match = Object.keys(provider.models).find((k) => k.endsWith(suffix))
+          if (match) info = provider.models[match]
+        }
         if (!info) {
           const available = Object.keys(provider.models)
           const matches = fuzzysort.go(modelID, available, { limit: 3, threshold: -10000 })
@@ -1600,16 +1721,18 @@ export namespace Provider {
 
           try {
             const language =
-              model.providerID === ProviderID.make("kilo") && typeof (sdk as any).responses === "function"
+              model.providerID === ProviderID.make("kilo") &&
+                (model.api.id.startsWith("kilo-") || responsesOnly.includes(model.api.id)) &&
+                typeof (sdk as any).responses === "function"
                 ? (sdk as any).responses(model.api.id)
                 : responsesOnly.includes(model.api.id) && typeof (sdk as any).responses === "function"
-                ? (sdk as any).responses(model.api.id)
-                : s.modelLoaders[model.providerID]
-                  ? await s.modelLoaders[model.providerID](sdk, model.api.id, {
+                  ? (sdk as any).responses(model.api.id)
+                  : s.modelLoaders[model.providerID]
+                    ? await s.modelLoaders[model.providerID](sdk, model.api.id, {
                       ...provider.options,
                       ...model.options,
                     })
-                  : sdk.languageModel(model.api.id)
+                    : sdk.languageModel(model.api.id)
             s.models.set(key, language)
             return language
           } catch (e) {
