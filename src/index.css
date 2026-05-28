@@ -1327,8 +1327,16 @@ button {
 
 .agent-terminal-turn [data-slot="session-turn-message-container"],
 .agent-terminal-assistant [data-slot="session-turn-message-container"] {
-  padding-left: 0 !important;
-  padding-right: 0 !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+@media (min-width: 768px) {
+  .agent-terminal-turn [data-slot="session-turn-message-container"],
+  .agent-terminal-assistant [data-slot="session-turn-message-container"] {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
 }
 
 .agent-terminal-turn [data-component="user-message"] {
@@ -1545,7 +1553,7 @@ button {
 }
 
 .agent-terminal-empty {
-  width: min(100% - 40px, 1000px) !important;
+  width: min(100% - 16px, 1000px) !important;
   max-width: 1000px !important;
   flex: 0 0 auto !important;
   min-height: 0 !important;

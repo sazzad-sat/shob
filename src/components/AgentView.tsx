@@ -350,7 +350,7 @@ function AgentViewInner(props: AgentViewProps) {
                           classList={{ "pt-6": index() > 0 }}
                         >
                           <div data-component="session-turn" class="relative min-w-0 w-full">
-                            <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+                            <div data-slot="session-turn-message-container" class="w-full">
                               <div data-slot="session-turn-message-content" aria-live="off">
                                 <Message message={message} parts={getParts(message.id)} />
                               </div>
@@ -364,7 +364,7 @@ function AgentViewInner(props: AgentViewProps) {
                               class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3"
                             >
                               <div data-component="session-turn" class="relative min-w-0 w-full">
-                                <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+                                <div data-slot="session-turn-message-container" class="w-full">
                                   <div
                                     data-slot="session-turn-assistant-content"
                                     aria-hidden={working() && latestTurn()}
@@ -392,7 +392,7 @@ function AgentViewInner(props: AgentViewProps) {
                     {(message) => (
                       <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
                         <div data-component="session-turn" class="relative min-w-0 w-full">
-                          <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
+                          <div data-slot="session-turn-message-container" class="w-full">
                             <div data-slot="session-turn-assistant-content">
                               <Message message={message} parts={getParts(message.id)} showReasoningSummaries={true} />
                             </div>
@@ -403,7 +403,7 @@ function AgentViewInner(props: AgentViewProps) {
                   </For>
 
                   <Show when={messages().length === 0}>
-                    <div class="agent-terminal-empty relative isolate flex min-h-0 flex-col items-stretch justify-center px-4 text-left overflow-visible md:mx-auto md:px-5">
+                    <div class="agent-terminal-empty relative isolate flex min-h-0 flex-col items-stretch justify-center px-2 text-left overflow-visible md:mx-auto md:px-5">
                       <div class="agent-terminal-new-session relative z-10 w-full">
                         <div class="relative z-10 w-full text-left">
                           <PromptInput />
@@ -462,7 +462,7 @@ function AgentViewInner(props: AgentViewProps) {
               data-component="session-prompt-dock"
               class="agent-terminal-dock pointer-events-none absolute inset-x-0 bottom-0 z-40 flex w-full flex-col items-center justify-center pb-3"
             >
-              <div class="pointer-events-auto w-full px-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
+              <div class="pointer-events-auto w-full px-2 md:px-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
                 <Show when={composerState.questionRequest()} keyed>
                   {(request) => (
                     <div class="pb-2">

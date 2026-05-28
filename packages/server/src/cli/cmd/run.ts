@@ -283,7 +283,7 @@ export const RunCommand = cmd({
       .option("password", {
         alias: ["p"],
         type: "string",
-        describe: "basic auth password (defaults to OPENCODE_SERVER_PASSWORD)",
+        describe: "basic auth password (defaults to SHOB_SERVER_PASSWORD)",
       })
       .option("dir", {
         type: "string",
@@ -559,7 +559,7 @@ export const RunCommand = cmd({
               UI.println(
                 UI.Style.TEXT_WARNING_BOLD + "!",
                 UI.Style.TEXT_NORMAL +
-                  `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
+                `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
               )
               await sdk.permission.reply({
                 requestID: permission.id,
@@ -667,7 +667,7 @@ export const RunCommand = cmd({
 
     if (args.attach) {
       const headers = (() => {
-        const password = args.password ?? process.env.OPENCODE_SERVER_PASSWORD
+        const password = args.password ?? process.env.SHOB_SERVER_PASSWORD
         if (!password) return undefined
         const username = process.env.OPENCODE_SERVER_USERNAME ?? "opencode"
         const auth = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`
