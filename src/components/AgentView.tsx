@@ -21,10 +21,19 @@ import { TextField } from "@opencode-ai/ui/text-field"
 import { Button } from "@opencode-ai/ui/button"
 import { formatError } from "@/pages/error"
 import { useStore } from "../store"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogSelectModel } from "@/components/dialog-select-model"
+import { nativeApi } from "@/services/native"
 
 interface AgentViewProps {
   sessionId: string
   projectPath?: string
+}
+
+const basename = (path?: string | null) => {
+  if (!path) return "No project"
+  const parts = path.split(/[\\/]/).filter(Boolean)
+  return parts[parts.length - 1] || path
 }
 
 function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
@@ -66,10 +75,16 @@ function AgentViewInner(props: AgentViewProps) {
   const navigate = useNavigate()
   const activeSidebarSessionId = useStore((s) => s.activeSessionId)
   const setActiveSidebarSession = useStore((s) => s.setActiveSession)
+  const projects = useStore((s) => s.projects)
+  const currentProjectId = useStore((s) => s.currentProjectId)
+  const setCurrentProject = useStore((s) => s.setCurrentProject)
   const language = useLanguage()
   const local = useLocal()
+  const dialog = useDialog()
   const [showJump, setShowJump] = createSignal(false)
   const [todoCollapsed, setTodoCollapsed] = createSignal(false)
+  const [gitBranch, setGitBranch] = createSignal("")
+  const [gitChanges, setGitChanges] = createSignal<number | null>(null)
   let scrollRef: HTMLDivElement | undefined
   let rafId: number | undefined
   const composerState = createSessionComposerState({ closeMs: 320 })
@@ -103,6 +118,13 @@ function AgentViewInner(props: AgentViewProps) {
     return sessionID ? sync.data.session_status[sessionID]?.type ?? "idle" : "idle"
   })
   const working = createMemo(() => status() !== "idle")
+  const currentProjectName = createMemo(() => {
+    const current = projects().find((project) => project.id === currentProjectId())
+    return current?.name || basename(current?.path || props.projectPath)
+  })
+  const selectedModel = createMemo(() => local.model.current())
+  const selectedAgent = createMemo(() => local.agent.current()?.name || "auto")
+  const selectedVariant = createMemo(() => local.model.variant.current() || "default")
   const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
   const sessionID = createMemo(() => activeSessionId() ?? "")
   const assistantByParent = createMemo(() => {
@@ -126,6 +148,37 @@ function AgentViewInner(props: AgentViewProps) {
     const sessionID = activeSessionId()
     if (!sessionID) return
     void sync.session.sync(sessionID)
+  })
+
+  createEffect(() => {
+    const path = props.projectPath
+    setGitBranch("")
+    setGitChanges(null)
+    if (!path) return
+
+    let cancelled = false
+    void nativeApi.invoke("get_git_branch", { path })
+      .then((info: any) => {
+        if (cancelled) return
+        setGitBranch(typeof info?.head === "string" ? info.head : "")
+      })
+      .catch(() => {
+        if (!cancelled) setGitBranch("")
+      })
+
+    void nativeApi.invoke("get_git_status", { path })
+      .then((status: any) => {
+        if (cancelled) return
+        const count = Array.isArray(status?.changedFiles) ? status.changedFiles.length : null
+        setGitChanges(count)
+      })
+      .catch(() => {
+        if (!cancelled) setGitChanges(null)
+      })
+
+    onCleanup(() => {
+      cancelled = true
+    })
   })
 
   // Keep global sidebar/terminal active session in sync with in-view route changes
@@ -214,7 +267,7 @@ function AgentViewInner(props: AgentViewProps) {
   return (
     <DataProvider data={sync.data} directory={props.projectPath ?? ""}>
       <FileComponentProvider component={FilePreview}>
-        <div class="relative flex h-full min-h-0 w-full flex-col overflow-x-hidden bg-background-stronger text-foreground">
+        <div class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-x-hidden bg-background-stronger text-foreground">
           <div class="relative min-h-0 flex-1 overflow-hidden">
             <div
               class="pointer-events-none absolute bottom-6 left-1/2 z-[60] -translate-x-1/2 transition-all duration-200 ease-out"
@@ -244,7 +297,8 @@ function AgentViewInner(props: AgentViewProps) {
             <div
               ref={setScrollRef}
               data-slot="session-turn-content"
-              class="h-full min-w-0 overflow-x-hidden overflow-y-auto thin-scrollbar"
+              class="agent-terminal-scroll h-full min-w-0 overflow-x-hidden overflow-y-auto thin-scrollbar"
+              classList={{ "agent-terminal-scroll-empty": messages().length === 0 }}
               style={{
                 "--session-title-height": "40px",
                 "--sticky-accordion-top": "48px",
@@ -257,18 +311,18 @@ function AgentViewInner(props: AgentViewProps) {
               <div onClick={autoScroll.handleInteraction}>
                 <div
                   data-session-title
-                  class="sticky top-0 z-30 w-full bg-[linear-gradient(to_bottom,var(--background-stronger)_48px,transparent)] pb-4 pl-2 pr-3 md:mx-auto md:max-w-200 md:pl-4 md:pr-3 2xl:max-w-[1000px]"
+                  class="agent-terminal-title sticky top-0 z-30 w-full pb-4 pl-2 pr-3 md:mx-auto md:max-w-200 md:pl-4 md:pr-3 2xl:max-w-[1000px]"
                 >
                   <div class="flex h-12 w-full items-center justify-between gap-2">
                     <div class="flex min-w-0 flex-1 items-center gap-2 pr-3">
-                      <h1 data-slot="session-title-child" class="min-w-0 flex-1 truncate text-14-medium text-text-strong">
+                      <h1 data-slot="session-title-child" class="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-text-strong">
                         {title()}
                       </h1>
                     </div>
                     <Show when={parentSessionID()}>
                       <button
                         type="button"
-                        class="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        class="shrink-0 rounded-[4px] border border-border px-2 py-1 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         onClick={goToParentSession}
                       >
                         Back to parent
@@ -277,7 +331,11 @@ function AgentViewInner(props: AgentViewProps) {
                   </div>
                 </div>
 
-                <div ref={autoScroll.contentRef} class="min-h-full pb-56 pt-2">
+                <div
+                  ref={autoScroll.contentRef}
+                  class="agent-terminal-buffer min-h-full pb-56 pt-2"
+                  classList={{ "agent-terminal-buffer-empty": messages().length === 0 }}
+                >
                   <For each={userMessages()}>
                     {(message, index) => {
                       const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
@@ -288,7 +346,7 @@ function AgentViewInner(props: AgentViewProps) {
                           id={`message-${message.id}`}
                           data-message-id={message.id}
                           data-timeline-row="UserMessage"
-                          class="min-w-0 w-full max-w-full md:mx-auto md:max-w-200 2xl:max-w-[1000px]"
+                          class="agent-terminal-turn min-w-0 w-full max-w-full md:mx-auto md:max-w-200 2xl:max-w-[1000px]"
                           classList={{ "pt-6": index() > 0 }}
                         >
                           <div data-component="session-turn" class="relative min-w-0 w-full">
@@ -303,7 +361,7 @@ function AgentViewInner(props: AgentViewProps) {
                             <div
                               data-message-id={message.id}
                               data-timeline-row="AssistantPart"
-                              class="min-w-0 w-full max-w-full pt-3"
+                              class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3"
                             >
                               <div data-component="session-turn" class="relative min-w-0 w-full">
                                 <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
@@ -313,7 +371,7 @@ function AgentViewInner(props: AgentViewProps) {
                                   >
                                     <AssistantParts
                                       messages={assistants() as any}
-                                      showReasoningSummaries
+                                      showReasoningSummaries={true}
                                       working={working() && latestTurn()}
                                       turnDurationMs={turnDurationMs(message, assistants())}
                                       showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
@@ -332,11 +390,11 @@ function AgentViewInner(props: AgentViewProps) {
 
                   <For each={orphanMessages()}>
                     {(message) => (
-                      <div class="min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
+                      <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
                         <div data-component="session-turn" class="relative min-w-0 w-full">
                           <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
                             <div data-slot="session-turn-assistant-content">
-                              <Message message={message} parts={getParts(message.id)} />
+                              <Message message={message} parts={getParts(message.id)} showReasoningSummaries={true} />
                             </div>
                           </div>
                         </div>
@@ -345,68 +403,52 @@ function AgentViewInner(props: AgentViewProps) {
                   </For>
 
                   <Show when={messages().length === 0}>
-                    <div class="relative isolate flex h-[50vh] flex-col items-center justify-center px-6 text-center overflow-visible">
-                      <div
-                        aria-hidden="true"
-                        class="pointer-events-none absolute left-1/2 top-[74%] z-0 h-[62vh] w-[88vw] -translate-x-1/2 -translate-y-1/2 rounded-[100%] opacity-60 blur-[115px]"
-                        style={{
-                          background:
-                            "radial-gradient(ellipse at center, rgba(37, 99, 235, 0.34) 0%, rgba(30, 64, 175, 0.18) 38%, rgba(15, 23, 42, 0.10) 58%, rgba(7, 9, 19, 0) 80%)",
-                        }}
-                      />
-                      <div
-                        aria-hidden="true"
-                        class="pointer-events-none absolute left-1/2 top-[78%] z-0 h-[36vh] w-[56vw] -translate-x-1/2 -translate-y-1/2 rounded-[100%] opacity-55 blur-[85px]"
-                        style={{
-                          background:
-                            "radial-gradient(ellipse at center, rgba(96, 165, 250, 0.24) 0%, rgba(59, 130, 246, 0.14) 46%, rgba(30, 58, 138, 0.08) 66%, rgba(7, 9, 19, 0) 84%)",
-                        }}
-                      />
-                      <div
-                        aria-hidden="true"
-                        class="pointer-events-none absolute left-1/2 top-[82%] z-0 h-[18vh] w-[34vw] -translate-x-1/2 -translate-y-1/2 rounded-[100%] opacity-45 blur-[62px]"
-                        style={{
-                          background:
-                            "radial-gradient(ellipse at center, rgba(147, 197, 253, 0.18) 0%, rgba(59, 130, 246, 0.10) 50%, rgba(7, 9, 19, 0) 82%)",
-                        }}
-                      />
-                      {/* Floating Glow Brand Icon */}
-                      <div class="relative z-10 mb-5 flex size-14 items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800/80 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
-                        <Show when={local.model.current()?.provider?.id} fallback={<Icon name="models" class="size-6 text-indigo-400" />}>
-                          <ProviderIcon id={local.model.current()?.provider?.id ?? ""} class="size-6 opacity-90" />
-                        </Show>
-                      </div>
-
-                      {/* Welcoming Text */}
-                      <h2 class="relative z-10 text-18-semibold text-text-strong tracking-tight mb-1.5">
-                        {language.t("agent.welcome") || "How can I help you today?"}
-                      </h2>
-                      <p class="relative z-10 text-13-regular text-text-weak max-w-sm mb-5">
-                        Start a conversation with the agent. You are currently connected to:
-                      </p>
-
-                      {/* Status Pill capsules */}
-                      <div class="relative z-10 flex items-center gap-2 flex-wrap justify-center">
-                        {/* Model Capsule */}
-                        <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 text-11-medium text-text-strong font-mono">
-                          <Show when={local.model.current()?.provider?.id} fallback={<Icon name="models" class="size-3 text-indigo-400" />}>
-                            <ProviderIcon id={local.model.current()?.provider?.id ?? ""} class="size-3" />
-                          </Show>
-                          <span>{local.model.current()?.name || "No Model"}</span>
+                    <div class="agent-terminal-empty relative isolate flex min-h-0 flex-col items-stretch justify-center px-4 text-left overflow-visible md:mx-auto md:px-5">
+                      <div class="agent-terminal-new-session relative z-10 w-full">
+                        <div class="relative z-10 w-full text-left">
+                          <PromptInput />
                         </div>
 
-                        {/* Agent Capsule */}
-                        <Show when={local.agent.current()?.name}>
-                          {(agentName) => (
-                            <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 text-11-medium text-text-strong font-mono capitalize">
-                              <Icon name="brain" class="size-3 text-purple-400" />
-                              <span>{agentName()} Agent</span>
+                        <div class="agent-terminal-session-bar">
+                          <div class="agent-terminal-session-controls">
+                            <label class="agent-terminal-project-switch">
+                              <Icon name="folder" class="size-3.5" />
+                              <select
+                                value={currentProjectId() ?? ""}
+                                onChange={(event) => setCurrentProject(event.currentTarget.value || null)}
+                                aria-label="Switch project"
+                              >
+                                <For each={projects()}>
+                                  {(project) => <option value={project.id}>{project.name || basename(project.path)}</option>}
+                                </For>
+                              </select>
+                            </label>
+
+                            <button
+                              type="button"
+                              class="agent-terminal-model-switch"
+                              onClick={() => dialog.show(() => <DialogSelectModel model={local.model} />)}
+                            >
+                              <Show when={selectedModel()?.provider?.id} fallback={<Icon name="models" class="size-3.5" />}>
+                                <ProviderIcon id={selectedModel()?.provider?.id ?? ""} class="size-3.5" />
+                              </Show>
+                              <span>{selectedModel()?.name || "Select model"}</span>
+                            </button>
+
+                            <div class="agent-terminal-session-meta agent-terminal-session-meta-inline">
+                              <div class="agent-terminal-meta-chip">
+                                <Icon name="brain" class="size-3.5" />
+                                <span class="capitalize">{selectedAgent()}</span>
+                              </div>
+                              <Show when={gitBranch()}>
+                                <div class="agent-terminal-meta-chip">
+                                  <Icon name="branch" class="size-3.5" />
+                                  <span>{gitBranch()}</span>
+                                </div>
+                              </Show>
                             </div>
-                          )}
-                        </Show>
-                      </div>
-                      <div class="relative z-10 mt-8 w-full max-w-4xl text-left">
-                        <PromptInput />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </Show>
@@ -418,7 +460,7 @@ function AgentViewInner(props: AgentViewProps) {
           <Show when={!isNewSession()}>
             <div
               data-component="session-prompt-dock"
-              class="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex w-full flex-col items-center justify-center bg-background-stronger pb-3"
+              class="agent-terminal-dock pointer-events-none absolute inset-x-0 bottom-0 z-40 flex w-full flex-col items-center justify-center pb-3"
             >
               <div class="pointer-events-auto w-full px-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
                 <Show when={composerState.questionRequest()} keyed>

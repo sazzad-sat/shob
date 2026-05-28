@@ -1287,7 +1287,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   )
 
   return (
-    <div class="relative size-full _max-h-[320px] flex flex-col gap-0">
+    <div class="agent-terminal-prompt relative size-full _max-h-[320px] flex flex-col gap-0">
       {(promptReady(), null)}
       <PromptPopover
         popover={store.popover}
@@ -1312,7 +1312,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           "border-white! shadow-[0_0_12px_rgba(255,255,255,0.12)]!": store.mode === "shell",
           [props.class ?? ""]: !!props.class,
         }}
-        class="bg-background! border border-border rounded-xl flex flex-col w-full overflow-visible! transition-all duration-300"
+        class="agent-terminal-prompt-shell bg-background! border border-border rounded-xl flex flex-col w-full overflow-visible! transition-all duration-300"
       >
         <PromptDragOverlay
           type={store.draggingType}
@@ -1340,7 +1340,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           removeLabel={language.t("prompt.attachment.remove")}
         />
         <div
-          class="relative flex items-start justify-between gap-3 p-3"
+          class="agent-terminal-prompt-line relative flex items-start justify-between gap-3 p-3"
           onMouseDown={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
@@ -1350,46 +1350,49 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             editorRef?.focus()
           }}
         >
-          <div
-            class="relative flex-1 max-h-[240px] overflow-y-auto no-scrollbar"
-            ref={(el) => (scrollRef = el)}
-          >
+          <div class="agent-terminal-input-wrap flex min-w-0 flex-1 items-start gap-2">
+            <span class="agent-terminal-caret select-none font-mono text-[14px] leading-5" aria-hidden="true">
+              {store.mode === "shell" ? ">" : ""}
+            </span>
             <div
-              data-component="prompt-input"
-              ref={(el) => {
-                editorRef = el
-                props.ref?.(el)
-              }}
-              role="textbox"
-              aria-multiline="true"
-              aria-label={placeholder()}
-              contenteditable="true"
-              autocapitalize={store.mode === "normal" ? "sentences" : "off"}
-              autocorrect={store.mode === "normal" ? "on" : "off"}
-              spellcheck={store.mode === "normal"}
-              inputMode="text"
-              // @ts-expect-error
-              autocomplete="off"
-              onInput={handleInput}
-              onPaste={handlePaste}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-              classList={{
-                "select-text": true,
-                "w-full text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap": true,
-                "[&_[data-type=file]]:text-syntax-property": true,
-                "[&_[data-type=agent]]:text-syntax-type": true,
-                "font-mono!": store.mode === "shell",
-              }}
-            />
-            <div
-              class="absolute top-0 inset-x-0 text-14-regular text-text-weak pointer-events-none whitespace-nowrap truncate"
-              classList={{ "font-mono!": store.mode === "shell" }}
-              style={{ display: prompt.dirty() ? "none" : undefined }}
+              class="relative flex-1 max-h-[240px] overflow-y-auto no-scrollbar"
+              ref={(el) => (scrollRef = el)}
             >
-              {placeholder()}
+              <div
+                data-component="prompt-input"
+                ref={(el) => {
+                  editorRef = el
+                  props.ref?.(el)
+                }}
+                role="textbox"
+                aria-multiline="true"
+                aria-label={placeholder()}
+                contenteditable="true"
+                autocapitalize={store.mode === "normal" ? "sentences" : "off"}
+                autocorrect={store.mode === "normal" ? "on" : "off"}
+                spellcheck={store.mode === "normal"}
+                inputMode="text"
+                // @ts-expect-error
+                autocomplete="off"
+                onInput={handleInput}
+                onPaste={handlePaste}
+                onCompositionStart={handleCompositionStart}
+                onCompositionEnd={handleCompositionEnd}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                classList={{
+                  "select-text": true,
+                  "w-full text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap font-mono!": true,
+                  "[&_[data-type=file]]:text-syntax-property": true,
+                  "[&_[data-type=agent]]:text-syntax-type": true,
+                }}
+              />
+              <div
+                class="absolute top-0 inset-x-0 text-14-regular text-text-weak pointer-events-none whitespace-nowrap truncate font-mono!"
+                style={{ display: prompt.dirty() ? "none" : undefined }}
+              >
+                {placeholder()}
+              </div>
             </div>
           </div>
 
@@ -1432,10 +1435,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         </div>
 
         {/* Horizontal Divider Line */}
-        <div class="h-px bg-border/40" />
+        <div class="agent-terminal-prompt-divider h-px bg-border/40" />
 
         {/* Bottom Toolbar Row */}
-        <div class="flex items-center justify-between px-3 py-2 bg-muted/20 min-h-[44px] rounded-b-xl">
+        <div class="agent-terminal-toolbar flex items-center justify-between px-3 py-2 bg-muted/20 min-h-[44px] rounded-b-xl">
           <div class="flex items-center gap-2 flex-wrap">
             {/* Attach File (+) Button */}
             <input

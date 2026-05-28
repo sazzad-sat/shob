@@ -1244,4 +1244,598 @@ button {
   100% { content: "⠋"; }
 }
 
+/* ═══════════════════════════════════════════════════
+   AGENT VIEW: CODEX ACTIVITY LOG STYLE
+   ═══════════════════════════════════════════════════ */
+.agent-terminal-view {
+  --terminal-agent-bg: var(--background);
+  --terminal-agent-panel: var(--card);
+  --terminal-agent-border: var(--border);
+  --terminal-agent-border-soft: color-mix(in srgb, var(--border) 45%, transparent);
+  --terminal-agent-accent: var(--ring);
+  --terminal-agent-text: var(--foreground);
+  --terminal-agent-muted: var(--muted-foreground);
+  --terminal-agent-dim: color-mix(in srgb, var(--muted-foreground) 72%, transparent);
+
+  background: var(--terminal-agent-bg) !important;
+  color: var(--terminal-agent-text);
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.agent-terminal-scroll {
+  background: var(--terminal-agent-bg);
+}
+
+.agent-terminal-scroll-empty {
+  display: flex !important;
+  width: 100% !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.agent-terminal-scroll-empty > div {
+  width: 100% !important;
+}
+
+.agent-terminal-title {
+  display: none;
+}
+
+.agent-terminal-title > div {
+  height: auto !important;
+}
+
+.agent-terminal-title [data-slot="session-title-child"] {
+  color: var(--terminal-agent-text) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.4;
+}
+
+.agent-terminal-title [data-slot="session-title-child"]::before {
+  content: "~/ ";
+  color: var(--terminal-agent-accent);
+  font-weight: 500;
+}
+
+.agent-terminal-buffer {
+  padding: 20px 0 156px 0 !important;
+}
+
+.agent-terminal-buffer-empty {
+  display: flex !important;
+  width: 100% !important;
+  min-height: 100% !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+.agent-terminal-buffer:has(.agent-terminal-empty) {
+  display: flex !important;
+  min-height: 100% !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+.agent-terminal-turn,
+.agent-terminal-assistant {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.agent-terminal-turn [data-slot="session-turn-message-container"],
+.agent-terminal-assistant [data-slot="session-turn-message-container"] {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.agent-terminal-turn [data-component="user-message"] {
+  align-items: flex-end;
+  min-height: 44px;
+  padding-top: 2px;
+}
+
+.agent-terminal-turn [data-slot="user-message-text"] {
+  border: 1px solid var(--terminal-agent-border) !important;
+  border-radius: 6px !important;
+  background: var(--terminal-agent-panel) !important;
+  color: var(--terminal-agent-text) !important;
+  padding: 10px 13px !important;
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.agent-terminal-assistant {
+  position: relative;
+  padding-left: 0;
+}
+
+.agent-terminal-assistant::before {
+  display: none;
+}
+
+.agent-terminal-assistant::after {
+  display: none;
+}
+
+.agent-terminal-view [data-component="assistant-message"] {
+  gap: 12px;
+  color: var(--terminal-agent-muted);
+}
+
+.agent-terminal-view [data-component="text-part"] {
+  margin-top: 0;
+}
+
+.agent-terminal-view [data-component="markdown"] {
+  color: var(--terminal-agent-muted);
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.agent-terminal-view [data-component="markdown"] p {
+  margin: 0 0 14px 0;
+}
+
+.agent-terminal-view [data-component="markdown"] ol {
+  margin: 12px 0 0 0;
+  padding-left: 24px;
+}
+
+.agent-terminal-view [data-component="markdown"] li {
+  padding-left: 2px;
+  margin: 9px 0;
+}
+
+.agent-terminal-view [data-component="markdown"] strong,
+.agent-terminal-view [data-component="markdown"] b {
+  color: var(--terminal-agent-text);
+}
+
+.agent-terminal-view [data-component="context-tool-group"] {
+  position: relative;
+  margin: 8px 0 14px 0;
+  padding-left: 30px;
+}
+
+.agent-terminal-view [data-component="context-tool-group"]::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--terminal-agent-accent);
+}
+
+.agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-trigger"] {
+  width: auto;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-main"] {
+  gap: 10px !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-title"] span[style*="opacity"] {
+  display: none !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-title"] {
+  color: var(--terminal-agent-text) !important;
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+}
+
+.agent-terminal-view [data-component="context-tool-group"][data-status] [data-slot="context-tool-group-title"] {
+  color: var(--terminal-agent-text) !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-title"] .tabular-nums,
+.agent-terminal-view [data-slot="context-tool-group-title"] [style*="step"] {
+  display: none !important;
+}
+
+.agent-terminal-view [data-component="context-tool-batch"] {
+  border-left: 1px solid var(--terminal-agent-border-soft) !important;
+  margin: 8px 0 0 -18px !important;
+  padding: 6px 0 0 18px !important;
+  gap: 7px !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-glow"],
+.agent-terminal-view [data-component="context-tool-batch"]::before {
+  display: none !important;
+}
+
+.agent-terminal-view [data-slot="message-part-title-text"],
+.agent-terminal-view [data-slot="message-part-filename"],
+.agent-terminal-view [data-slot="basic-tool-title"],
+.agent-terminal-view [data-slot="basic-tool-tool-title"],
+.agent-terminal-view [data-component="task-tool-title"] {
+  color: var(--terminal-agent-muted) !important;
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-subtitle"],
+.agent-terminal-view [data-slot="message-part-path"],
+.agent-terminal-view [data-slot="message-part-directory"],
+.agent-terminal-view [data-slot="basic-tool-tool-arg"] {
+  color: var(--terminal-agent-muted) !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 14px !important;
+  opacity: 1 !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-indicator"],
+.agent-terminal-view [data-slot="basic-tool-tool-spinner"],
+.agent-terminal-view [data-component="task-tool-action"],
+.agent-terminal-view [data-slot="collapsible-arrow-icon"] {
+  color: var(--terminal-agent-accent) !important;
+}
+
+.agent-terminal-view [data-slot="collapsible-content"] {
+  padding: 3px 0 3px 22px !important;
+}
+
+.agent-terminal-view [data-component="reasoning-part"] [data-component="markdown"] {
+  margin-top: 0 !important;
+  color: var(--terminal-agent-muted) !important;
+  font-size: 14px !important;
+}
+
+.agent-terminal-view [data-component="reasoning-part"] [data-component="markdown"] p {
+  margin: 0 !important;
+}
+
+.agent-terminal-view [data-component="reasoning-part"] [data-slot="collapsible-content"] {
+  padding-bottom: 0 !important;
+}
+
+.agent-terminal-view [data-component="reasoning-part"] [data-component="tool-output"] {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  max-height: none !important;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"],
+.agent-terminal-view [data-component="task-tool-card"],
+.agent-terminal-view [data-component="tool-trigger"] {
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+.agent-terminal-view [data-slot="collapsible-trigger"] {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+.agent-terminal-view [data-component="task-tool-card"] {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-indicator"] svg,
+.agent-terminal-view [data-slot="basic-tool-tool-spinner"] svg,
+.agent-terminal-view [data-component="task-tool-action"] svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-indicator"],
+.agent-terminal-view [data-slot="basic-tool-tool-spinner"] {
+  width: 15px !important;
+  height: 15px !important;
+}
+
+.agent-terminal-view [data-component="tool-trigger"]:has([data-component="task-tool-card"]) > [data-slot="basic-tool-tool-indicator"],
+.agent-terminal-view [data-component="tool-trigger"]:has([data-component="task-tool-card"]) > [data-slot="basic-tool-tool-spinner"] {
+  display: none !important;
+}
+
+.agent-terminal-empty {
+  width: min(100% - 40px, 1000px) !important;
+  max-width: 1000px !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+.agent-terminal-empty > div:last-child,
+.agent-terminal-empty .agent-terminal-prompt {
+  width: 100% !important;
+}
+
+.agent-terminal-new-session {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-terminal-session-bar {
+  display: flex;
+  min-height: 54px;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--terminal-agent-border);
+  border-radius: 4px;
+  background: var(--terminal-agent-panel);
+}
+
+.agent-terminal-session-main {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 12px;
+}
+
+.agent-terminal-session-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  color: var(--terminal-agent-muted);
+}
+
+.agent-terminal-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--terminal-agent-accent);
+}
+
+.agent-terminal-session-title {
+  overflow: hidden;
+  color: var(--terminal-agent-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-terminal-session-controls {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.agent-terminal-session-controls::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-terminal-session-meta-inline {
+  flex-wrap: nowrap !important;
+  margin-left: 2px;
+}
+
+.agent-terminal-project-switch,
+.agent-terminal-model-switch,
+.agent-terminal-meta-chip {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--terminal-agent-border);
+  border-radius: 3px;
+  background: var(--terminal-agent-bg);
+  color: var(--terminal-agent-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.agent-terminal-project-switch,
+.agent-terminal-model-switch {
+  height: 31px;
+  max-width: 260px;
+  padding: 0 9px;
+}
+
+.agent-terminal-project-switch select {
+  min-width: 0;
+  max-width: 190px;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--terminal-agent-text);
+  font: inherit;
+  outline: none;
+}
+
+.agent-terminal-project-switch select option {
+  background: var(--terminal-agent-panel);
+  color: var(--terminal-agent-text);
+}
+
+.agent-terminal-model-switch {
+  cursor: pointer;
+}
+
+.agent-terminal-model-switch:hover,
+.agent-terminal-project-switch:hover,
+.agent-terminal-meta-chip:hover {
+  border-color: color-mix(in srgb, var(--terminal-agent-border) 55%, var(--terminal-agent-text));
+  background: color-mix(in srgb, var(--terminal-agent-panel) 86%, var(--terminal-agent-bg));
+}
+
+.agent-terminal-model-switch span,
+.agent-terminal-meta-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-terminal-session-meta {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.agent-terminal-session-meta::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-terminal-meta-chip {
+  height: 28px;
+  padding: 0 8px;
+  flex: 0 0 auto;
+}
+
+.agent-terminal-meta-chip[data-warn="true"] {
+  color: var(--terminal-agent-text);
+}
+
+.agent-terminal-dock {
+  background: linear-gradient(to top, var(--terminal-agent-bg) 0%, color-mix(in srgb, var(--terminal-agent-bg) 96%, transparent) 72%, transparent 100%);
+  padding-bottom: 12px !important;
+}
+
+.agent-terminal-dock > div {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+.agent-terminal-prompt-shell {
+  border-radius: 4px !important;
+  border-color: var(--terminal-agent-border) !important;
+  background: var(--terminal-agent-panel) !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  min-height: 92px;
+}
+
+.agent-terminal-prompt-shell:focus-within {
+  border-color: color-mix(in srgb, var(--terminal-agent-border) 55%, var(--terminal-agent-text)) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--terminal-agent-accent) 18%, transparent) !important;
+}
+
+.agent-terminal-prompt-line {
+  padding: 13px 10px 12px 10px !important;
+}
+
+.agent-terminal-caret {
+  color: var(--terminal-agent-accent);
+}
+
+.agent-terminal-caret:empty {
+  display: none;
+}
+
+.agent-terminal-prompt [data-component="prompt-input"] {
+  min-height: 18px;
+  caret-color: var(--terminal-agent-accent);
+  color: var(--terminal-agent-text) !important;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.agent-terminal-prompt [data-component="prompt-input"] + div {
+  color: var(--terminal-agent-muted) !important;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.agent-terminal-prompt-divider {
+  background: var(--terminal-agent-border) !important;
+}
+
+.agent-terminal-toolbar {
+  min-height: 36px !important;
+  border-radius: 0 0 4px 4px !important;
+  background: var(--terminal-agent-bg) !important;
+  padding: 6px 8px !important;
+  gap: 8px !important;
+}
+
+.agent-terminal-toolbar button,
+.agent-terminal-toolbar [data-slot="select-trigger"],
+.agent-terminal-toolbar [data-action="prompt-model"] {
+  min-height: 26px;
+  height: 26px !important;
+  border-radius: 2px !important;
+  border-color: var(--terminal-agent-border) !important;
+  background: transparent !important;
+  color: var(--terminal-agent-text) !important;
+  font-size: 12px !important;
+}
+
+.agent-terminal-toolbar [data-action="prompt-model"] {
+  max-width: min(280px, 42vw);
+}
+
+.agent-terminal-toolbar [data-action="prompt-agent"],
+.agent-terminal-toolbar [data-action="prompt-model-variant"] {
+  max-width: 170px;
+}
+
+.agent-terminal-toolbar button:hover,
+.agent-terminal-toolbar [data-slot="select-trigger"]:hover,
+.agent-terminal-toolbar [data-action="prompt-model"]:hover {
+  background: color-mix(in srgb, var(--terminal-agent-panel) 86%, var(--terminal-agent-bg)) !important;
+}
+
+.agent-terminal-prompt [data-action="prompt-submit"] {
+  border: 1px solid var(--terminal-agent-accent) !important;
+  background: var(--terminal-agent-accent) !important;
+  color: var(--terminal-agent-bg) !important;
+  box-shadow: none !important;
+}
+
+.agent-terminal-prompt [data-action="prompt-submit"] [data-slot="icon-svg"] {
+  color: var(--terminal-agent-bg) !important;
+}
+
+.agent-terminal-prompt [data-action="prompt-submit"]:disabled {
+  border-color: var(--terminal-agent-border) !important;
+  background: transparent !important;
+  color: var(--terminal-agent-dim) !important;
+}
+
+@media (max-width: 720px) {
+  .agent-terminal-title {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+
+  .agent-terminal-buffer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
 

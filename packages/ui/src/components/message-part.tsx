@@ -1638,22 +1638,23 @@ PART_MAPPING["reasoning"] = function ReasoningPartDisplay(props) {
 
   return (
     <Show when={text()}>
-      <BasicTool
-        icon="brain"
-        status={streaming() ? "running" : "completed"}
-        defaultOpen={streaming()}
-        hideDetails={!text()}
-        animated
-        trigger={{
-          title: title(),
-        }}
-      >
-        <div data-component="tool-output" data-scrollable>
-          <Show when={streaming()} fallback={<Markdown text={text()} cacheKey={part().id} streaming={false} />}>
-            <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
-          </Show>
-        </div>
-      </BasicTool>
+      <div data-component="reasoning-part">
+        <BasicTool
+          icon="brain"
+          status={streaming() ? "running" : "completed"}
+          defaultOpen={streaming()}
+          hideDetails={!text()}
+          trigger={{
+            title: title(),
+          }}
+        >
+          <div data-component="tool-output" data-scrollable>
+            <Show when={streaming()} fallback={<Markdown text={text()} cacheKey={part().id} streaming={false} />}>
+              <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
+            </Show>
+          </div>
+        </BasicTool>
+      </div>
     </Show>
   )
 }
