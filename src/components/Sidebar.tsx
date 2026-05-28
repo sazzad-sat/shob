@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import { Folder, MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucide-solid"
+import { MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucide-solid"
 import { nativeApi } from "../services/native"
 import { useStore } from "../store"
 import type { Project } from "../types"
@@ -7,7 +7,7 @@ import { ResizeHandle } from "@/opencode-ported/resize-handle"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import type { Session as OpenCodeSession } from "@opencode-ai/sdk/v2/client"
-import { Spinner } from "@opencode-ai/ui/spinner"
+import { DotsSpinner } from "./DotsSpinner"
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -65,34 +65,28 @@ function FolderSection(props: {
   const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
     <>
       <div
-        class={`group/session flex cursor-pointer items-center justify-between rounded-md border py-[6px] pr-3 transition-colors ${
+        class={`group/session flex cursor-pointer items-center justify-between rounded-md py-[5px] pr-3 transition-colors ${
           props.activeSessionId === session.id
-            ? "border-border bg-sidebar-accent"
-            : "border-transparent hover:bg-sidebar-accent/70"
+            ? "bg-sidebar-accent text-foreground"
+            : "hover:bg-sidebar-accent/60"
         }`}
-        style={{ "padding-left": `${30 + level * 14}px` }}
+        style={{ "padding-left": `${8 + level * 14}px` }}
         onClick={() => props.onSelectSession(props.project.id, session.id)}
       >
-        <div class="min-w-0 flex flex-1 items-center gap-2">
+        <div class="min-w-0 flex flex-1 items-center gap-1.5">
           <div class="flex size-4 items-center justify-center">
             <div class="relative flex size-4 items-center justify-center">
               <Show
                 when={isSessionWorking(session.id)}
-                fallback={
-                  <div
-                    class={`absolute size-1.5 rounded-full ${
-                      props.activeSessionId === session.id ? "bg-foreground" : "bg-muted-foreground/60"
-                    }`}
-                  />
-                }
+                fallback={<span class="inline-block w-[1ch]" aria-hidden="true" />}
               >
-                <Spinner class="size-[15px] text-icon-interactive-base" />
+                <DotsSpinner class="text-[14px] leading-none text-icon-interactive-base font-mono" />
               </Show>
             </div>
           </div>
           <span
             class={`truncate text-[13px] ${
-              props.activeSessionId === session.id ? "font-medium text-foreground" : "text-muted-foreground"
+              props.activeSessionId === session.id ? "font-medium text-foreground" : "text-foreground/90"
             }`}
           >
             {session.name}
@@ -111,7 +105,7 @@ function FolderSection(props: {
           >
             <SessionDeleteIcon />
           </button>
-          <span class="pointer-events-none rounded bg-muted px-1.5 py-[1px] text-[11px] font-medium text-muted-foreground transition-opacity duration-150 group-hover/session:opacity-0">
+          <span class="pointer-events-none text-[12px] font-medium text-muted-foreground transition-opacity duration-150 group-hover/session:opacity-0">
             {formatSessionAge(session.lastActiveAt ?? session.createdAt)}
           </span>
         </div>
@@ -147,15 +141,15 @@ function FolderSection(props: {
   return (
     <div class="flex flex-col">
       <div
-        class="group mx-2 flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 transition-colors hover:bg-sidebar-accent/80"
+        class="group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent/60"
         onClick={() => {
           props.onOpenWorkspacePage?.()
           props.onSelectProject(props.project.id)
           setIsOpen(!isOpen())
         }}
       >
-        <div class="flex items-center gap-2.5 text-sidebar-foreground">
-          <Folder size={15} class="stroke-[1.5]" />
+        <div class="flex items-center gap-2 text-muted-foreground">
+          <ProjectFolderIcon />
           <span class="text-[13px] leading-none font-medium">{props.project.name}</span>
         </div>
 
@@ -206,10 +200,10 @@ function FolderSection(props: {
       </div>
 
       <Show when={isOpen()}>
-        <div class="mt-1 flex flex-col gap-0.5 overflow-hidden px-1 transition-all duration-150 ease-out">
+        <div class="mt-1 flex flex-col gap-0.5 overflow-hidden transition-all duration-150 ease-out">
           <Show
             when={(sessionsByParent().map.get(sessionsByParent().ROOT) ?? []).length > 0}
-            fallback={<div class="py-[5px] pr-4 pl-[38px] text-[13px] text-muted-foreground">No sessions</div>}
+            fallback={<div class="py-[5px] pr-4 pl-[16px] text-[13px] text-muted-foreground">No sessions</div>}
           >
             <For each={sessionsByParent().map.get(sessionsByParent().ROOT) ?? []}>
               {(session) => renderSessionNode(session, 0)}
@@ -366,7 +360,7 @@ export function Sidebar(props: {
             </div>
           </div>
 
-          <div class="custom-scrollbar flex-1 overflow-y-auto px-1.5 py-2">
+          <div class="custom-scrollbar flex-1 overflow-y-auto py-2">
             <div class="flex flex-col gap-0.5 pb-3">
               <For each={projects()}>
                 {(project) => (
@@ -408,5 +402,16 @@ export function Sidebar(props: {
   const SessionDeleteIcon = () => (
     <svg viewBox="0 0 24 24" class="size-[18px]" aria-hidden="true" fill="currentColor">
       <path d="M21,5.25H17.441A1.251,1.251,0,0,1,16.255,4.4l-.316-.95a1.746,1.746,0,0,0-1.66-1.2H9.721a1.745,1.745,0,0,0-1.66,1.2l-.316.948a1.251,1.251,0,0,1-1.186.855H3a.75.75,0,0,0,0,1.5H4.3l.767,11.5a3.76,3.76,0,0,0,3.742,3.5h6.386a3.76,3.76,0,0,0,3.742-3.5L19.7,6.75H21a.75.75,0,0,0,0-1.5ZM9.483,3.921a.252.252,0,0,1,.238-.171h4.558a.252.252,0,0,1,.238.17l.316.95a2.777,2.777,0,0,0,.161.38H9.006a2.737,2.737,0,0,0,.161-.381ZM17.438,18.15a2.255,2.255,0,0,1-2.245,2.1H8.807a2.255,2.255,0,0,1-2.245-2.1L5.8,6.75h.757a2.783,2.783,0,0,0,.317-.025A.736.736,0,0,0,7,6.75H17a.736.736,0,0,0,.124-.025,2.783,2.783,0,0,0,.317.025H18.2ZM14.75,11v5a.75.75,0,0,1-1.5,0V11a.75.75,0,0,1,1.5,0Zm-4,0v5a.75.75,0,0,1-1.5,0V11a.75.75,0,0,1,1.5,0Z" />
+    </svg>
+  )
+  const ProjectFolderIcon = () => (
+    <svg viewBox="0 0 24 24" class="size-[14px]" aria-hidden="true" fill="none">
+      <path
+        d="M13 7L11.8845 4.76892C11.5634 4.1268 11.4029 3.80573 11.1634 3.57116C10.9516 3.36373 10.6963 3.20597 10.4161 3.10931C10.0992 3 9.74021 3 9.02229 3H5.2C4.0799 3 3.51984 3 3.09202 3.21799C2.71569 3.40973 2.40973 3.71569 2.21799 4.09202C2 4.51984 2 5.0799 2 6.2V7M2 7H17.2C18.8802 7 19.7202 7 20.362 7.32698C20.9265 7.6146 21.3854 8.07354 21.673 8.63803C22 9.27976 22 10.1198 22 11.8V16.2C22 17.8802 22 18.7202 21.673 19.362C21.3854 19.9265 20.9265 20.3854 20.362 20.673C19.7202 21 18.8802 21 17.2 21H6.8C5.11984 21 4.27976 21 3.63803 20.673C3.07354 20.3854 2.6146 19.9265 2.32698 19.362C2 18.7202 2 17.8802 2 16.2V7Z"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </svg>
   )

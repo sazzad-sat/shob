@@ -1210,4 +1210,38 @@ button {
   color: var(--foreground) !important;
 }
 
+/* Agent timeline: terminal-style animated dots spinner for subagent task rows. */
+[data-component="task-tool-card"] [data-component="task-tool-spinner"] {
+  display: inline-flex !important;
+  width: 1ch;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  color: var(--icon-interactive-base);
+}
+
+[data-component="task-tool-card"] [data-component="task-tool-spinner"] > * {
+  display: none !important;
+}
+
+[data-component="task-tool-card"] [data-component="task-tool-spinner"]::before {
+  content: "⠋";
+  animation: task-dots-spinner 800ms steps(1, end) infinite;
+  line-height: 1;
+}
+
+@keyframes task-dots-spinner {
+  0% { content: "⠋"; }
+  10% { content: "⠙"; }
+  20% { content: "⠹"; }
+  30% { content: "⠸"; }
+  40% { content: "⠼"; }
+  50% { content: "⠴"; }
+  60% { content: "⠦"; }
+  70% { content: "⠧"; }
+  80% { content: "⠇"; }
+  90% { content: "⠏"; }
+  100% { content: "⠋"; }
+}
+
 

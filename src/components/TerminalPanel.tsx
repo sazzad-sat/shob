@@ -1,4 +1,4 @@
-import { For, Show, createMemo } from "solid-js"
+import { Show, createMemo } from "solid-js"
 import { AgentView } from "./AgentView"
 import { Terminal } from "./Terminal"
 import { useStore } from "../store"
@@ -19,21 +19,15 @@ export function TerminalPanel(_props: TerminalPanelProps) {
 
   return (
     <div class="relative h-full w-full min-h-0 min-w-0 overflow-hidden bg-background">
-      <For each={projectSessions()}>
+      <Show when={activeSession()} keyed>
         {(session) => (
-          <div
-            class="h-full w-full min-h-0 overflow-hidden"
-            classList={{ hidden: session.id !== activeSessionId() }}
-          >
-            <Show
-              when={session.cliTool}
-              fallback={<Terminal sessionId={session.id} />}
-            >
+          <div class="h-full w-full min-h-0 overflow-hidden">
+            <Show when={session.cliTool} fallback={<Terminal sessionId={session.id} />}>
               <AgentView sessionId={session.id} projectPath={currentProject()?.path} />
             </Show>
           </div>
         )}
-      </For>
+      </Show>
 
       <Show when={!activeSession()}>
         <div class="flex h-full items-center justify-center text-sm text-muted-foreground">

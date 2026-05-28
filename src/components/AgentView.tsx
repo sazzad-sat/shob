@@ -2,11 +2,10 @@ import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, 
 import { PromptInput } from "../opencode-ported/prompt-input"
 import { MockSessionProviders } from "../opencode-ported/mock-session-layout"
 import { useSync } from "@/context/sync"
-import { useParams } from "@solidjs/router"
+import { useNavigate, useParams } from "@solidjs/router"
 import { AssistantParts, Message } from "@opencode-ai/ui/message-part"
 import { DataProvider, FileComponentProvider } from "@opencode-ai/ui/context"
 import { Icon } from "@opencode-ai/ui/icon"
-import { Spinner } from "@opencode-ai/ui/spinner"
 import { sessionTitle } from "@/utils/session-title"
 import { createSessionComposerState } from "@/opencode-ported/composer/session-composer-state"
 import { SessionQuestionDock } from "@/opencode-ported/composer/session-question-dock"
@@ -21,6 +20,7 @@ import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Button } from "@opencode-ai/ui/button"
 import { formatError } from "@/pages/error"
+import { useStore } from "../store"
 
 interface AgentViewProps {
   sessionId: string
@@ -63,6 +63,9 @@ function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
 function AgentViewInner(props: AgentViewProps) {
   const sync = useSync()
   const params = useParams()
+  const navigate = useNavigate()
+  const activeSidebarSessionId = useStore((s) => s.activeSessionId)
+  const setActiveSidebarSession = useStore((s) => s.setActiveSession)
   const language = useLanguage()
   const local = useLocal()
   const [showJump, setShowJump] = createSignal(false)
@@ -91,6 +94,10 @@ function AgentViewInner(props: AgentViewProps) {
     return sessionID ? sync.session.get(sessionID) : undefined
   })
   const title = createMemo(() => sessionTitle(info()?.title) || "New session")
+  const parentSessionID = createMemo(() => {
+    const session = info() as { parentID?: string } | undefined
+    return session?.parentID
+  })
   const status = createMemo(() => {
     const sessionID = activeSessionId()
     return sessionID ? sync.data.session_status[sessionID]?.type ?? "idle" : "idle"
@@ -119,6 +126,15 @@ function AgentViewInner(props: AgentViewProps) {
     const sessionID = activeSessionId()
     if (!sessionID) return
     void sync.session.sync(sessionID)
+  })
+
+  // Keep global sidebar/terminal active session in sync with in-view route changes
+  // (e.g. opening a subagent session from inside the agent timeline).
+  createEffect(() => {
+    const routeSessionID = params.id
+    if (!routeSessionID?.startsWith("ses")) return
+    if (activeSidebarSessionId() === routeSessionID) return
+    setActiveSidebarSession(routeSessionID)
   })
 
   const updateJumpState = () => {
@@ -188,6 +204,12 @@ function AgentViewInner(props: AgentViewProps) {
   }
 
   const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
+  const goToParentSession = () => {
+    const parentID = parentSessionID()
+    const dir = params.dir
+    if (!parentID || !dir) return
+    navigate(`/${dir}/session/${parentID}`)
+  }
 
   return (
     <DataProvider data={sync.data} directory={props.projectPath ?? ""}>
@@ -237,37 +259,21 @@ function AgentViewInner(props: AgentViewProps) {
                   data-session-title
                   class="sticky top-0 z-30 w-full bg-[linear-gradient(to_bottom,var(--background-stronger)_48px,transparent)] pb-4 pl-2 pr-3 md:mx-auto md:max-w-200 md:pl-4 md:pr-3 2xl:max-w-[1000px]"
                 >
-                  <Show when={working()}>
-                    <div
-                      data-component="session-progress"
-                      data-state="showing"
-                      aria-hidden="true"
-                      style={{
-                        "--session-progress-color": "var(--icon-interactive-base)",
-                        "--session-progress-ms": "1800ms",
-                      }}
-                    >
-                      <div data-component="session-progress-bar" />
-                    </div>
-                  </Show>
                   <div class="flex h-12 w-full items-center justify-between gap-2">
                     <div class="flex min-w-0 flex-1 items-center gap-2 pr-3">
-                      <div
-                        class="flex shrink-0 items-center justify-center overflow-hidden transition-[width,margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                        style={{
-                          width: working() ? "16px" : "0px",
-                          "margin-right": working() ? "6px" : "0px",
-                        }}
-                        aria-hidden="true"
-                      >
-                        <Show when={working()}>
-                          <Spinner class="size-4 text-icon-interactive" />
-                        </Show>
-                      </div>
                       <h1 data-slot="session-title-child" class="min-w-0 flex-1 truncate text-14-medium text-text-strong">
                         {title()}
                       </h1>
                     </div>
+                    <Show when={parentSessionID()}>
+                      <button
+                        type="button"
+                        class="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        onClick={goToParentSession}
+                      >
+                        Back to parent
+                      </button>
+                    </Show>
                   </div>
                 </div>
 

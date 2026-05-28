@@ -242,6 +242,7 @@ export const actions: AppActions = {
   },
 
   setCurrentProject: (id: string | null) => {
+    if (store.currentProjectId === id) return;
     const project = store.projects.find((item) => item.id === id);
     const nextSessionId = project?.sessions[0]?.id ?? null;
     setStoredValue(STORAGE_KEYS.currentProjectId, id);
