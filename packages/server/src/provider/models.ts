@@ -9,6 +9,7 @@ import { Filesystem } from "../util/filesystem"
 import { Flock } from "@/util/flock"
 import { Hash } from "@/util/hash"
 import { withAntigravityModels } from "./antigravity/models"
+import { withShobGoPlanModels } from "./shob-go-plan/models"
 
 // Try to import bundled snapshot (generated at build time)
 // Falls back to undefined in dev mode when snapshot doesn't exist
@@ -153,7 +154,7 @@ export namespace ModelsDev {
 
   export async function get() {
     const result = await Data()
-    return withAntigravityModels(result as Record<string, Provider>)
+    return withShobGoPlanModels(withAntigravityModels(result as Record<string, Provider>))
   }
 
   export async function refresh(force = false) {

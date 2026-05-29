@@ -326,9 +326,10 @@ export const ProvidersLoginCommand = cmd({
           "github-copilot": 2,
           google: 3,
           antigravity: 4,
-          anthropic: 5,
-          openrouter: 6,
-          vercel: 7,
+          "shob-go-plan": 5,
+          anthropic: 6,
+          openrouter: 7,
+          vercel: 8,
         }
         const pluginProviders = resolvePluginProviders({
           hooks: await Plugin.list(),
@@ -351,6 +352,7 @@ export const ProvidersLoginCommand = cmd({
               hint: {
                 opencode: "recommended",
                 openai: "ChatGPT Plus/Pro or API key",
+                "shob-go-plan": "Xiaomi token plan",
               }[x.id],
             })),
           ),

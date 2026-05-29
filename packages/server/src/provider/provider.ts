@@ -57,6 +57,7 @@ import { GoogleAuth } from "google-auth-library"
 import { ProviderTransform } from "./transform"
 import { Installation } from "../installation"
 import { ModelID, ProviderID } from "./schema"
+import { shobGoPlanFetch } from "./shob-go-plan/token-plan"
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })
@@ -426,6 +427,14 @@ export namespace Provider {
               "HTTP-Referer": "https://opencode.ai/",
               "X-Title": "opencode",
             },
+          },
+        }),
+      "shob-go-plan": () =>
+        Effect.succeed({
+          autoload: true,
+          options: {
+            apiKey: "shob-go-plan",
+            fetch: shobGoPlanFetch,
           },
         }),
       vercel: () =>

@@ -25,6 +25,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectModel } from "@/components/dialog-select-model"
 import { nativeApi } from "@/services/native"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
+import { Card } from "@opencode-ai/ui/card"
 
 interface AgentViewProps {
   sessionId: string
@@ -35,6 +36,100 @@ const basename = (path?: string | null) => {
   if (!path) return "No project"
   const parts = path.split(/[\\/]/).filter(Boolean)
   return parts[parts.length - 1] || path
+}
+
+function record(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function unwrapProviderError(message: string) {
+  const text = message.replace(/^Error:\s*/, "").trim()
+  if (!text) return message
+
+  const parse = (value: string) => {
+    try {
+      return JSON.parse(value) as unknown
+    } catch {
+      return undefined
+    }
+  }
+
+  const read = (value: string) => {
+    const first = parse(value)
+    if (typeof first !== "string") return first
+    return parse(first.trim())
+  }
+
+  let json = read(text)
+  if (json === undefined) {
+    const start = text.indexOf("{")
+    const end = text.lastIndexOf("}")
+    if (start !== -1 && end > start) json = read(text.slice(start, end + 1))
+  }
+  if (!record(json)) return message
+
+  const err = record(json.error) ? json.error : undefined
+  if (err) {
+    const type = typeof err.type === "string" ? err.type : undefined
+    const msg = typeof err.message === "string" ? err.message : undefined
+    const code = typeof err.code === "string" ? err.code : undefined
+    if (type && msg) return `${type}: ${msg}`
+    if (msg) return msg
+    if (type) return type
+    if (code) return code
+  }
+
+  const msg = typeof json.message === "string" ? json.message : undefined
+  if (msg) return msg
+
+  const reason = typeof json.error === "string" ? json.error : undefined
+  if (reason) return reason
+
+  return message
+}
+
+function assistantError(message: ChatMessage) {
+  if (message.role !== "assistant") return
+  const error = (message as { error?: unknown }).error
+  if (!error) return
+  if (record(error) && error.name === "MessageAbortedError") return
+  return error
+}
+
+function errorName(error: unknown) {
+  if (!record(error)) return
+  return typeof error.name === "string" ? error.name : undefined
+}
+
+function errorMessage(error: unknown) {
+  if (typeof error === "string") return error
+  if (!record(error)) return
+
+  const data = record(error.data) ? error.data : undefined
+  const dataMessage = data?.message
+  if (typeof dataMessage === "string" && dataMessage.trim()) return dataMessage
+
+  const message = error.message
+  if (typeof message === "string" && message.trim()) return message
+}
+
+function AgentSessionErrorCard(props: { error: unknown }) {
+  const language = useLanguage()
+  const title = createMemo(() => errorName(props.error) ?? language.t("notification.session.error.title"))
+  const detail = createMemo(() => {
+    const message = errorMessage(props.error)
+    if (message) return unwrapProviderError(message)
+    return formatError(props.error, language.t)
+  })
+
+  return (
+    <Card variant="error" class="error-card">
+      <div class="flex flex-col gap-1">
+        <div class="font-mono text-[12px] font-semibold">{title()}</div>
+        <div class="font-mono text-[12px] leading-relaxed">{detail()}</div>
+      </div>
+    </Card>
+  )
 }
 
 function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
@@ -341,6 +436,7 @@ function AgentViewInner(props: AgentViewProps) {
                     {(message, index) => {
                       const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
                       const latestTurn = createMemo(() => index() === userMessages().length - 1)
+                      const errors = createMemo(() => assistants().map(assistantError).filter(Boolean))
                       const assistantVisible = createMemo(() => {
                         let visible = 0
                         for (const msg of assistants()) {
@@ -390,6 +486,13 @@ function AgentViewInner(props: AgentViewProps) {
                                       shellToolDefaultOpen={false}
                                       editToolDefaultOpen={false}
                                     />
+                                    <For each={errors()}>
+                                      {(error) => (
+                                        <div class="pt-2">
+                                          <AgentSessionErrorCard error={error} />
+                                        </div>
+                                      )}
+                                    </For>
                                   </div>
                                 </div>
                               </div>
@@ -413,17 +516,27 @@ function AgentViewInner(props: AgentViewProps) {
                   </For>
 
                   <For each={orphanMessages()}>
-                    {(message) => (
-                      <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
-                        <div data-component="session-turn" class="relative min-w-0 w-full">
-                          <div data-slot="session-turn-message-container" class="w-full">
-                            <div data-slot="session-turn-assistant-content">
-                              <Message message={message} parts={getParts(message.id)} showReasoningSummaries={true} />
+                    {(message) => {
+                      const error = createMemo(() => assistantError(message))
+                      return (
+                        <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
+                          <div data-component="session-turn" class="relative min-w-0 w-full">
+                            <div data-slot="session-turn-message-container" class="w-full">
+                              <div data-slot="session-turn-assistant-content">
+                                <Message message={message} parts={getParts(message.id)} showReasoningSummaries={true} />
+                                <Show when={error()}>
+                                  {(value) => (
+                                    <div class="pt-2">
+                                      <AgentSessionErrorCard error={value()} />
+                                    </div>
+                                  )}
+                                </Show>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )
+                    }}
                   </For>
 
                   <Show when={messages().length === 0}>
