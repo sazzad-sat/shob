@@ -1,17 +1,19 @@
-import { createSignal, onMount, onCleanup, Show } from "solid-js"
+import { createSignal, onMount, onCleanup, Show, Match, Switch } from "solid-js"
 import { Button } from "@/components/ui/button"
 import { nativeApi } from "@/services/native"
-import { CheckCircle2 } from "lucide-solid"
+import { CheckCircle2, AlertCircle, Loader2, Download, RotateCcw, Info, ExternalLink } from "lucide-solid"
 import { Ico } from "@/components/Ico"
 
 type AboutStatus = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "error" | "installing" | "dev"
 
 export function SettingsAbout() {
-  const [appName, setAppName] = createSignal("Shob")
-  const [version, setVersion] = createSignal("Unknown")
+  const [appName, setAppName] = createSignal("shob")
+  const [version, setVersion] = createSignal("")
+  const [platform, setPlatform] = createSignal("")
+  const [packaged, setPackaged] = createSignal(true)
   const [latestVersion, setLatestVersion] = createSignal<string | null>(null)
   const [status, setStatus] = createSignal<AboutStatus>("idle")
-  const [message, setMessage] = createSignal("Check for updates to see if a newer version is available.")
+  const [message, setMessage] = createSignal("")
   const [updateDownloaded, setUpdateDownloaded] = createSignal(false)
   const [downloadPercent, setDownloadPercent] = createSignal(0)
   const [lastCheckedAt, setLastCheckedAt] = createSignal<string | null>(null)
@@ -33,12 +35,17 @@ export function SettingsAbout() {
     void nativeApi
       .invoke("get_app_info")
       .then((info) => {
-        setAppName(info.name || "Shob")
-        setVersion(info.version || "Unknown")
+        setAppName(info.name || "shob")
+        setVersion(info.version || "0.0.0")
+        setPlatform(info.platform || "unknown")
+        setPackaged(info.packaged ?? true)
+        if (!info.packaged) {
+          setStatus("dev")
+          setMessage("Development build — auto-updates are disabled.")
+        }
       })
       .catch(() => {})
 
-    // Listen to real-time auto-updater events from main process
     const setupListeners = async () => {
       try {
         const uChecking = await nativeApi.listen<null>("update:checking", () => {
@@ -49,7 +56,7 @@ export function SettingsAbout() {
           setStatus("available")
           setLatestVersion(event.payload.version)
           setUpdateDownloaded(false)
-          setMessage(`Version ${event.payload.version} is available. Click 'Download' to start downloading.`)
+          setMessage(`Version ${event.payload.version} is available.`)
         })
         const uNotAvailable = await nativeApi.listen<null>("update:not-available", () => {
           setStatus("up-to-date")
@@ -62,18 +69,18 @@ export function SettingsAbout() {
             setDownloadPercent(event.payload.percent)
             const speedMb = (event.payload.bytesPerSecond / (1024 * 1024)).toFixed(2)
             const percentStr = event.payload.percent.toFixed(1)
-            setMessage(`Downloading update... ${percentStr}% (${speedMb} MB/s)`)
+            setMessage(`Downloading... ${percentStr}% (${speedMb} MB/s)`)
           }
         )
         const uDownloaded = await nativeApi.listen<{ version: string }>("update:downloaded", (event) => {
           setStatus("available")
           setLatestVersion(event.payload.version)
           setUpdateDownloaded(true)
-          setMessage(`Version ${event.payload.version} has been downloaded. Restart the application to install.`)
+          setMessage(`Version ${event.payload.version} downloaded. Restart to install.`)
         })
         const uError = await nativeApi.listen<string>("update:error", (event) => {
           setStatus("error")
-          setMessage(`Error checking/downloading update: ${event.payload}`)
+          setMessage(`Update error: ${event.payload}`)
         })
 
         unlistenList.push(uChecking, uAvailable, uNotAvailable, uProgress, uDownloaded, uError)
@@ -94,7 +101,7 @@ export function SettingsAbout() {
   const checkForUpdates = async () => {
     if (checkInFlight() || installInFlight()) return
     if (status() === "downloading") {
-      setMessage("Update download is already in progress in the background.")
+      setMessage("Update download is already in progress.")
       return
     }
     setCheckInFlight(true)
@@ -105,12 +112,12 @@ export function SettingsAbout() {
       setLastCheckedAt(new Date().toLocaleString())
       if (result.status === "dev") {
         setStatus("dev")
-        setMessage("You are running a development build. Auto-updates are unavailable.")
+        setMessage("Development build — auto-updates are disabled.")
         return
       }
       if (result.status === "error") {
         setStatus("error")
-        setMessage("Could not check for updates. Please verify your internet connection and try again.")
+        setMessage("Could not check for updates. Check your internet connection.")
         return
       }
       setLatestVersion(result.version ?? null)
@@ -118,18 +125,18 @@ export function SettingsAbout() {
       if (result.updateAvailable) {
         if (result.downloaded) {
           setStatus("available")
-          setMessage(`Update ${result.version ?? ""} downloaded. Restart to install and complete the update.`.trim())
+          setMessage(`Version ${result.version} downloaded. Restart to install.`)
         } else {
           setStatus("available")
-          setMessage(`Update ${result.version ?? ""} found. Click 'Download' to start downloading.`.trim())
+          setMessage(`Version ${result.version} is available.`)
         }
       } else {
         setStatus("up-to-date")
-        setMessage("You are on the latest version.")
+        setMessage("You are running the latest version.")
       }
     } catch {
       setStatus("error")
-      setMessage("Could not check for updates. Please try again.")
+      setMessage("Could not check for updates.")
     } finally {
       setCheckInFlight(false)
     }
@@ -145,11 +152,11 @@ export function SettingsAbout() {
       const result = await nativeApi.invoke("download_update")
       if (result.status === "error") {
         setStatus("error")
-        setMessage(`Failed to start download: ${result.message || "Unknown error"}`)
+        setMessage(`Download failed: ${result.message || "Unknown error"}`)
       }
     } catch {
       setStatus("error")
-      setMessage("Failed to start update download.")
+      setMessage("Failed to start download.")
     } finally {
       setDownloadInFlight(false)
     }
@@ -159,12 +166,12 @@ export function SettingsAbout() {
     if (installInFlight() || checkInFlight()) return
     setInstallInFlight(true)
     setStatus("installing")
-    setMessage("Installing update and restarting app...")
+    setMessage("Installing update and restarting...")
     try {
       const result = await nativeApi.invoke("install_update")
       if (result.status === "not-downloaded") {
         setStatus("downloading")
-        setMessage("Update is not downloaded yet. Please wait and try again.")
+        setMessage("Update not downloaded yet. Please wait.")
       }
     } catch {
       setStatus("error")
@@ -175,86 +182,188 @@ export function SettingsAbout() {
   }
 
   return (
-    <div class="space-y-5">
-      <h2 class="text-lg font-semibold">About shob</h2>
+    <div class="space-y-6 max-w-3xl">
+      <div>
+        <h2 class="text-xl font-bold text-foreground">About</h2>
+        <p class="text-sm text-muted-foreground mt-1">App information and update management.</p>
+      </div>
 
-      <section class="overflow-hidden rounded-xl border border-border bg-card">
-        <div class="flex items-center gap-3 px-5 py-4">
-          <Ico class="h-9 w-9 rounded-lg object-cover" />
-          <p class="text-2xl font-semibold leading-none text-foreground">{appName()}</p>
-        </div>
-
-        <div class="border-t border-border px-5 py-4">
-          <div class="flex items-start gap-3">
-            <CheckCircle2 class="mt-0.5 h-4 w-4 text-blue-400" />
-            <div class="space-y-1">
-              <p class="text-sm text-foreground">
-                {status() === "up-to-date" ? "shob is up to date" : status() === "available" || updateDownloaded() ? "Update available for shob" : "Check update status"}
-              </p>
-              <p class="text-sm text-muted-foreground">shob {version()} (Official Build)</p>
-              <Show when={latestVersion()}>
-                <p class="text-sm text-muted-foreground">Latest found: {latestVersion()}</p>
+      {/* App Info */}
+      <div class="rounded-xl border border-border/80 bg-card/40 p-5 backdrop-blur-xs">
+        <div class="flex items-center gap-4">
+          <Ico class="h-14 w-14 rounded-xl object-cover border border-border/60 shadow-sm" />
+          <div class="space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">{appName()}</h3>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-mono text-muted-foreground bg-secondary/60 px-2 py-0.5 rounded-md">v{version()}</span>
+              <Show when={platform()}>
+                <span class="text-xs text-muted-foreground capitalize">{platform()}</span>
               </Show>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="border-t border-border px-5 py-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" disabled={isBusy()} onClick={() => void checkForUpdates()}>
-              {status() === "checking" ? "Checking..." : status() === "downloading" ? "Downloading..." : status() === "installing" ? "Installing..." : "Check for updates"}
-            </Button>
-            <Show when={status() === "available" && !updateDownloaded()}>
-              <Button
-                type="button"
-                class="bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
-                disabled={downloadInFlight() || status() === "downloading" || status() === "installing"}
-                onClick={() => void downloadUpdate()}
-              >
-                Download
-              </Button>
+      {/* Update Section */}
+      <div class="rounded-xl border border-border/80 bg-card/40 p-5 backdrop-blur-xs space-y-4">
+        <div>
+          <h3 class="font-medium text-foreground text-sm">Updates</h3>
+          <p class="text-xs text-muted-foreground mt-0.5">Check for new versions and manage updates.</p>
+        </div>
+
+        {/* Status Display */}
+        <div class="flex items-start gap-3 p-3 rounded-lg bg-background/50 border border-border/40">
+          <Switch>
+            <Match when={status() === "checking"}>
+              <Loader2 class="mt-0.5 h-4 w-4 text-muted-foreground animate-spin shrink-0" />
+            </Match>
+            <Match when={status() === "up-to-date"}>
+              <CheckCircle2 class="mt-0.5 h-4 w-4 text-emerald-500 shrink-0" />
+            </Match>
+            <Match when={status() === "available"}>
+              <Download class="mt-0.5 h-4 w-4 text-blue-500 shrink-0" />
+            </Match>
+            <Match when={status() === "downloading"}>
+              <Loader2 class="mt-0.5 h-4 w-4 text-blue-500 animate-spin shrink-0" />
+            </Match>
+            <Match when={status() === "installing"}>
+              <RotateCcw class="mt-0.5 h-4 w-4 text-amber-500 animate-spin shrink-0" />
+            </Match>
+            <Match when={status() === "error"}>
+              <AlertCircle class="mt-0.5 h-4 w-4 text-red-500 shrink-0" />
+            </Match>
+            <Match when={status() === "dev"}>
+              <Info class="mt-0.5 h-4 w-4 text-muted-foreground shrink-0" />
+            </Match>
+            <Match when={status() === "idle"}>
+              <Info class="mt-0.5 h-4 w-4 text-muted-foreground shrink-0" />
+            </Match>
+          </Switch>
+          <div class="space-y-1 min-w-0 flex-1">
+            <p class="text-sm text-foreground">
+              <Switch>
+                <Match when={status() === "idle"}>Update status</Match>
+                <Match when={status() === "checking"}>Checking for updates...</Match>
+                <Match when={status() === "up-to-date"}>Up to date</Match>
+                <Match when={status() === "available" && !updateDownloaded()}>Update available</Match>
+                <Match when={status() === "available" && updateDownloaded()}>Update ready to install</Match>
+                <Match when={status() === "downloading"}>Downloading update</Match>
+                <Match when={status() === "installing"}>Installing update</Match>
+                <Match when={status() === "error"}>Update error</Match>
+                <Match when={status() === "dev"}>Development build</Match>
+              </Switch>
+            </p>
+            <Show when={version()}>
+              <p class="text-xs text-muted-foreground">
+                Current: <span class="font-mono">v{version()}</span>
+                <Show when={latestVersion()}>
+                  <span> · Latest: <span class="font-mono">v{latestVersion()}</span></span>
+                </Show>
+              </p>
             </Show>
-            <Show when={updateDownloaded()}>
-              <Button
-                type="button"
-                class="bg-green-600 hover:bg-green-500 text-white font-medium transition-colors"
-                disabled={installInFlight() || status() === "installing"}
-                onClick={() => void installUpdate()}
-              >
-                Restart to install
-              </Button>
+            <Show when={message()}>
+              <p class="text-xs text-muted-foreground">{message()}</p>
             </Show>
           </div>
-          
-          <Show when={status() === "downloading"}>
-            <div class="mt-4 space-y-1.5 max-w-sm animate-in fade-in duration-200">
-              <div class="flex items-center justify-between text-xs font-semibold text-foreground/80">
-                <span>Downloading...</span>
-                <span>{downloadPercent().toFixed(0)}%</span>
-              </div>
-              <div class="h-2 w-full overflow-hidden rounded-full bg-secondary/80 border border-border/40">
-                <div
-                  style={{ width: `${downloadPercent()}%` }}
-                  class="h-full bg-blue-500 transition-all duration-300 ease-out shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                />
-              </div>
+        </div>
+
+        {/* Download Progress */}
+        <Show when={status() === "downloading"}>
+          <div class="space-y-1.5 animate-in fade-in duration-200">
+            <div class="flex items-center justify-between text-xs font-medium text-foreground/80">
+              <span>Downloading...</span>
+              <span>{downloadPercent().toFixed(0)}%</span>
             </div>
+            <div class="h-1.5 w-full overflow-hidden rounded-full bg-secondary/80 border border-border/40">
+              <div
+                style={{ width: `${downloadPercent()}%` }}
+                class="h-full bg-blue-500 transition-all duration-300 ease-out"
+              />
+            </div>
+          </div>
+        </Show>
+
+        {/* Action Buttons */}
+        <div class="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isBusy() || status() === "dev"}
+            onClick={() => void checkForUpdates()}
+          >
+            <Show when={!isBusy() || status() === "idle" || status() === "up-to-date" || status() === "available" || status() === "error" || status() === "dev"}>
+              <span>Check for updates</span>
+            </Show>
+            <Show when={status() === "checking"}>
+              <Loader2 class="h-3.5 w-3.5 animate-spin mr-1.5" />
+              <span>Checking...</span>
+            </Show>
+          </Button>
+
+          <Show when={status() === "available" && !updateDownloaded()}>
+            <Button
+              type="button"
+              size="sm"
+              class="bg-blue-600 hover:bg-blue-500 text-white"
+              disabled={downloadInFlight() || status() === "downloading" || status() === "installing"}
+              onClick={() => void downloadUpdate()}
+            >
+              <Download class="h-3.5 w-3.5 mr-1.5" />
+              Download
+            </Button>
           </Show>
 
-          <p class="mt-3 text-sm text-muted-foreground">{message()}</p>
-          <Show when={lastCheckedAt()}>
-            <p class="mt-1 text-xs text-muted-foreground">Last checked: {lastCheckedAt()}</p>
+          <Show when={updateDownloaded()}>
+            <Button
+              type="button"
+              size="sm"
+              class="bg-emerald-600 hover:bg-emerald-500 text-white"
+              disabled={installInFlight() || status() === "installing"}
+              onClick={() => void installUpdate()}
+            >
+              <RotateCcw class="h-3.5 w-3.5 mr-1.5" />
+              Restart to install
+            </Button>
           </Show>
         </div>
-      </section>
 
-      <section class="rounded-xl border border-border bg-card px-5 py-4">
-        <p class="text-base text-foreground">shob</p>
-        <p class="mt-1 text-sm text-muted-foreground">Copyright © 2026 The shob Authors. All rights reserved.</p>
-        <p class="mt-4 text-sm leading-6 text-foreground">
-          shob is an AI agent built to do real work for you. Delegate coding tasks, automate repetitive workflows, review changes, and ship faster with a reliable AI teammate that stays in your flow.
+        <Show when={lastCheckedAt()}>
+          <p class="text-[11px] text-muted-foreground">Last checked: {lastCheckedAt()}</p>
+        </Show>
+      </div>
+
+      {/* Links */}
+      <div class="rounded-xl border border-border/80 bg-card/40 p-5 backdrop-blur-xs space-y-3">
+        <h3 class="font-medium text-foreground text-sm">Links</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <a
+            href="https://github.com/shobcoder/shob"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-2 p-2.5 rounded-lg border border-border/40 bg-background/30 hover:bg-background/60 transition-colors text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ExternalLink class="h-3.5 w-3.5 shrink-0" />
+            <span>GitHub Repository</span>
+          </a>
+          <a
+            href="https://github.com/shobcoder/shob/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-2 p-2.5 rounded-lg border border-border/40 bg-background/30 hover:bg-background/60 transition-colors text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ExternalLink class="h-3.5 w-3.5 shrink-0" />
+            <span>Release Notes</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Copyright */}
+      <div class="rounded-xl border border-border/80 bg-card/40 p-5 backdrop-blur-xs">
+        <p class="text-sm text-muted-foreground">
+          Copyright © 2026 The shob Authors. All rights reserved.
         </p>
-      </section>
+      </div>
     </div>
   )
 }
