@@ -48,7 +48,6 @@ export function applyMacDockIcon() {
 
 export function applyWindowIcon(mainWindow: BrowserWindow) {
   const appIconPath = resolveAppIconPath();
-  const winTaskbarIconPath = resolveAppIconPath("win32");
 
   if ((process.platform === "win32" || process.platform === "linux") && appIconPath) {
     mainWindow.setIcon(appIconPath);
@@ -56,7 +55,6 @@ export function applyWindowIcon(mainWindow: BrowserWindow) {
   if (process.platform === "win32") {
     mainWindow.setAppDetails({
       appId: WINDOWS_APP_ID,
-      ...(winTaskbarIconPath ? { appIconPath: winTaskbarIconPath, appIconIndex: 0 } : {}),
       relaunchDisplayName: "shob",
     });
   }
