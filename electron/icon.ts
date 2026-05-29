@@ -9,6 +9,10 @@ const __dirname = path.dirname(__filename);
 export const WINDOWS_APP_ID = app.isPackaged ? "app.shob.desktop" : "app.shob.desktop.dev";
 
 export function resolveAppIconPath(platform: NodeJS.Platform = process.platform) {
+  if (app.isPackaged && platform === "win32") {
+    return process.execPath;
+  }
+
   const preferredExt =
     platform === "win32" ? ".ico" :
     platform === "darwin" ? ".icns" :
