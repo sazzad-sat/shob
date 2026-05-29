@@ -101,43 +101,63 @@ function normalizeOs() {
   return process.platform;
 }
 
+function sendUpdateEvent(channel: string, payload: any) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("shob:event", {
+    channel: `update:${channel}`,
+    payload,
+  });
+}
+
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
 
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    console.log("[shob] checking for update...");
+    sendUpdateEvent("checking", null);
+  });
 
   autoUpdater.on("error", (error) => {
     console.warn("[shob] auto update failed:", error);
+    sendUpdateEvent("error", error instanceof Error ? error.message : String(error));
   });
+
   autoUpdater.on("update-available", (info) => {
     console.log("[shob] update available:", info.version);
     downloadedUpdateVersion = null;
+    sendUpdateEvent("available", info);
   });
-  autoUpdater.on("update-downloaded", async (info) => {
+
+  autoUpdater.on("update-not-available", (info) => {
+    console.log("[shob] update not available:", info.version);
+    sendUpdateEvent("not-available", info);
+  });
+
+  autoUpdater.on("download-progress", (progressObj) => {
+    console.log("[shob] download progress:", progressObj.percent);
+    sendUpdateEvent("progress", {
+      percent: progressObj.percent,
+      bytesPerSecond: progressObj.bytesPerSecond,
+      total: progressObj.total,
+      transferred: progressObj.transferred,
+    });
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
     console.log("[shob] update downloaded:", info.version);
     downloadedUpdateVersion = info.version;
-    const result = await dialog.showMessageBox({
-      type: "info",
-      title: "Update Ready",
-      message: `A new version of Shob (${info.version}) has been downloaded!`,
-      detail: "Would you like to restart and install the update now?",
-      buttons: ["Restart & Install", "Later"],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (result.response === 0) {
-      autoUpdater.quitAndInstall(false, true);
-    }
+    sendUpdateEvent("downloaded", info);
   });
 
-  // Delay the initial update check by 15 seconds so startup is fast and unblocked
+  // Delay the initial update check by 5 seconds so the window is fully loaded
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch((error) => {
       console.warn("[shob] initial update check failed:", error);
     });
-  }, 15000);
+  }, 5000);
 }
 
 function getImageMimeType(filePath: string) {
@@ -586,6 +606,16 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
     if (!downloadedUpdateVersion) return { status: "not-downloaded" };
     autoUpdater.quitAndInstall(false, true);
     return { status: "installing", version: downloadedUpdateVersion };
+  },
+  download_update: async () => {
+    if (!app.isPackaged) return { status: "dev" };
+    try {
+      await autoUpdater.downloadUpdate();
+      return { status: "downloading" };
+    } catch (error) {
+      console.warn("[shob] failed to start update download:", error);
+      return { status: "error", message: error instanceof Error ? error.message : String(error) };
+    }
   },
   opencode_server_start: async () => {
     return (await ensureServerStarted()).url;

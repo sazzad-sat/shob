@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
 import { MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucide-solid"
 import { nativeApi } from "../services/native"
 import { useStore } from "../store"
@@ -8,21 +8,39 @@ import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import type { Session as OpenCodeSession } from "@opencode-ai/sdk/v2/client"
 import { DotsSpinner } from "./DotsSpinner"
+import { useNotification } from "@/context/notification"
+import { usePermission } from "@/context/permission"
+import { sessionPermissionRequest } from "@/opencode-ported/composer/session-request-tree"
+import { useServer } from "@/context/server"
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
   return parts[parts.length - 1] || path
 }
 
-const formatSessionAge = (createdAt?: number | null) => {
+const formatSessionAge = (createdAt: number | null | undefined, now: number) => {
   if (!createdAt || !Number.isFinite(createdAt)) return ""
-  const mins = Math.floor((Date.now() - createdAt) / 60000)
+  const mins = Math.floor((now - createdAt) / 60000)
   if (mins < 1) return "now"
   if (mins < 60) return `${mins}m`
   const h = Math.floor(mins / 60)
   if (h < 24) return `${h}h`
   return `${Math.floor(h / 24)}d`
 }
+
+const ChevronIcon = (props: { isOpen: boolean }) => (
+  <svg
+    viewBox="0 0 24 24"
+    class={`size-3 transition-transform duration-200 shrink-0 ${props.isOpen ? "rotate-90 text-foreground/80" : "text-muted-foreground/40"}`}
+    fill="none"
+    stroke="currentColor"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
 
 function FolderSection(props: {
   project: Project
@@ -34,15 +52,59 @@ function FolderSection(props: {
   onDeleteProject: (projectId: string) => void
   onSyncOpenCodeSessions: (projectId: string, sessions: OpenCodeSession[]) => void
   onOpenWorkspacePage?: () => void
+  onRenameSession: (projectId: string, sessionId: string, newName: string) => void
 }) {
   const globalSync = useGlobalSync()
+  const globalSDK = useGlobalSDK()
+  const notification = useNotification()
+  const permission = usePermission()
+
   const [isOpen, setIsOpen] = createSignal(true)
   const [showMenu, setShowMenu] = createSignal(false)
   let menuRef: HTMLDivElement | undefined
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
-  const sortedSessions = createMemo(() =>
-    [...props.project.sessions].sort((left, right) => (right.lastActiveAt ?? right.createdAt ?? 0) - (left.lastActiveAt ?? left.createdAt ?? 0)),
+
+  // Periodic sortNow signal to dynamically recalculate session ages and keep sorting stable/reactive.
+  const [sortNow, setSortNow] = createSignal(Date.now())
+  let sortNowInterval: number | undefined
+  const sortNowTimeout = setTimeout(
+    () => {
+      setSortNow(Date.now())
+      sortNowInterval = window.setInterval(() => setSortNow(Date.now()), 60_000)
+    },
+    60_000 - (Date.now() % 60_000),
   )
+
+  onCleanup(() => {
+    clearTimeout(sortNowTimeout)
+    if (sortNowInterval) clearInterval(sortNowInterval)
+  })
+
+  // Search filter and Inline editing signals
+  const [searchQuery, setSearchQuery] = createSignal("")
+  const [editingSessionId, setEditingSessionId] = createSignal<string | null>(null)
+  const [editSessionValue, setEditSessionValue] = createSignal("")
+
+  const sortedSessions = createMemo(() => {
+    const now = sortNow()
+    const oneMinuteAgo = now - 60000
+    const query = searchQuery().toLowerCase().trim()
+    let filtered = [...props.project.sessions]
+    if (query) {
+      filtered = filtered.filter((s) => s.name.toLowerCase().includes(query))
+    }
+    return filtered.sort((left, right) => {
+      const leftUpdated = left.lastActiveAt ?? left.createdAt ?? 0
+      const rightUpdated = right.lastActiveAt ?? right.createdAt ?? 0
+      const leftRecent = leftUpdated > oneMinuteAgo
+      const rightRecent = rightUpdated > oneMinuteAgo
+      if (leftRecent && rightRecent) return left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+      if (leftRecent && !rightRecent) return -1
+      if (!leftRecent && rightRecent) return 1
+      return rightUpdated - leftUpdated
+    })
+  })
+
   const sessionsByParent = createMemo(() => {
     const map = new Map<string, Project["sessions"]>()
     const ROOT = "__root__"
@@ -55,9 +117,42 @@ function FolderSection(props: {
     }
     return { map, ROOT }
   })
+
   const isSessionWorking = (sessionId: string) => {
     const status = (projectStore().session_status as Record<string, { type?: string } | undefined>)[sessionId]
     return status?.type && status.type !== "idle"
+  }
+
+  const sessionHasPermissions = (sessionId: string) => {
+    return !!sessionPermissionRequest(
+      projectStore().session,
+      projectStore().permission,
+      sessionId,
+      (item) => !permission.autoResponds(item, props.project.path)
+    )
+  }
+
+  const sessionUnseenCount = (sessionId: string) => {
+    return notification.session.unseenCount(sessionId)
+  }
+
+  const sessionHasError = (sessionId: string) => {
+    return notification.session.unseenHasError(sessionId)
+  }
+
+  const handleRenameSession = async (sessionId: string, newName: string) => {
+    const trimmed = newName.trim()
+    if (trimmed) {
+      props.onRenameSession(props.project.id, sessionId, trimmed)
+      if (sessionId.startsWith("ses")) {
+        await globalSDK
+          .createClient({ directory: props.project.path, throwOnError: true })
+          .session.update({ sessionID: sessionId, title: trimmed })
+          .catch(() => undefined)
+        void globalSync.project.loadSessions(props.project.path)
+      }
+    }
+    setEditingSessionId(null)
   }
 
   const sessionTree = (sessionId: string) => sessionsByParent().map.get(sessionId) ?? []
@@ -65,39 +160,82 @@ function FolderSection(props: {
   const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
     <>
       <div
-        class={`group/session flex cursor-pointer items-center justify-between rounded-md py-[5px] pr-3 transition-colors ${
+        class={`group/session relative flex cursor-pointer items-center justify-between rounded-md py-[5.5px] pr-3 transition-all duration-150 ${
           props.activeSessionId === session.id
-            ? "bg-sidebar-accent text-foreground"
-            : "hover:bg-sidebar-accent/60"
+            ? "bg-secondary/70 text-foreground font-semibold shadow-xs"
+            : "hover:bg-sidebar-accent/50 text-foreground/80 hover:text-foreground"
         }`}
-        style={{ "padding-left": `${8 + level * 14}px` }}
+        style={{ "padding-left": `${12 + level * 14}px` }}
         onClick={() => props.onSelectSession(props.project.id, session.id)}
       >
+        <Show when={props.activeSessionId === session.id}>
+          <div class="absolute left-0 top-[20%] bottom-[20%] w-[3px] rounded-r-md bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-in slide-in-from-left duration-200" />
+        </Show>
         <div class="min-w-0 flex flex-1 items-center gap-1.5">
           <div class="flex size-4 items-center justify-center">
             <div class="relative flex size-4 items-center justify-center">
-              <Show
-                when={isSessionWorking(session.id)}
-                fallback={<span class="inline-block w-[1ch]" aria-hidden="true" />}
-              >
-                <DotsSpinner class="text-[14px] leading-none text-icon-interactive-base font-mono" />
-              </Show>
+              <Switch fallback={<span class="inline-block w-[1ch]" aria-hidden="true" />}>
+                <Match when={isSessionWorking(session.id)}>
+                  <DotsSpinner class="text-[14px] leading-none text-icon-interactive-base font-mono" />
+                </Match>
+                <Match when={sessionHasPermissions(session.id)}>
+                  <div class="size-1.5 rounded-full bg-surface-warning-strong animate-pulse" title="Permission pending" />
+                </Match>
+                <Match when={sessionHasError(session.id)}>
+                  <div class="size-1.5 rounded-full bg-text-diff-delete-base" title="Error" />
+                </Match>
+                <Match when={sessionUnseenCount(session.id) > 0}>
+                  <div class="size-1.5 rounded-full bg-text-interactive-base" title="Unread messages" />
+                </Match>
+              </Switch>
             </div>
           </div>
-          <span
-            class={`truncate text-[13px] ${
-              props.activeSessionId === session.id ? "font-medium text-foreground" : "text-foreground/90"
-            }`}
+          <Show
+            when={editingSessionId() === session.id}
+            fallback={
+              <span
+                class={`truncate text-[13px] ${
+                  props.activeSessionId === session.id ? "font-medium text-foreground" : "text-foreground/90"
+                }`}
+                onDblClick={(e) => {
+                  e.stopPropagation()
+                  setEditingSessionId(session.id)
+                  setEditSessionValue(session.name)
+                }}
+                title="Double click to rename"
+              >
+                {session.name}
+              </span>
+            }
           >
-            {session.name}
-          </span>
+            <input
+              type="text"
+              class="min-w-0 flex-1 rounded border border-sidebar-border bg-sidebar-accent/50 px-1 py-0 text-[13px] text-foreground focus:border-sidebar-border/80 focus:bg-sidebar-accent focus:outline-none"
+              value={editSessionValue()}
+              onInput={(e) => setEditSessionValue(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.stopPropagation()
+                  void handleRenameSession(session.id, editSessionValue())
+                } else if (e.key === "Escape") {
+                  e.stopPropagation()
+                  setEditingSessionId(null)
+                }
+              }}
+              onBlur={() => {
+                void handleRenameSession(session.id, editSessionValue())
+              }}
+              onClick={(e) => e.stopPropagation()}
+              ref={(el) => setTimeout(() => el?.focus(), 50)}
+            />
+          </Show>
         </div>
 
         <div class="relative ml-3 flex h-5 w-6 shrink-0 items-center justify-end">
           <button
             type="button"
-            class="absolute right-0 z-10 rounded p-0.5 text-muted-foreground opacity-0 transition-all duration-150 hover:bg-accent hover:text-destructive group-hover/session:opacity-100"
-            title="Delete session"
+            class="absolute right-0 z-10 rounded p-0.5 text-muted-foreground opacity-0 transition-all duration-150 hover:bg-accent hover:text-foreground group-hover/session:opacity-100"
+            title="Archive session"
             onClick={(e) => {
               e.stopPropagation()
               props.onDeleteSession(props.project.id, session.id)
@@ -106,7 +244,7 @@ function FolderSection(props: {
             <SessionDeleteIcon />
           </button>
           <span class="pointer-events-none text-[12px] font-medium text-muted-foreground transition-opacity duration-150 group-hover/session:opacity-0">
-            {formatSessionAge(session.lastActiveAt ?? session.createdAt)}
+            {formatSessionAge(session.lastActiveAt ?? session.createdAt, sortNow())}
           </span>
         </div>
       </div>
@@ -148,9 +286,12 @@ function FolderSection(props: {
           setIsOpen(!isOpen())
         }}
       >
-        <div class="flex items-center gap-2 text-muted-foreground">
-          <ProjectFolderIcon />
-          <span class="text-[13px] leading-none font-medium">{props.project.name}</span>
+        <div class="flex items-center gap-2 text-muted-foreground select-none">
+          <ChevronIcon isOpen={isOpen()} />
+          <span class="text-amber-500/80 transition-colors group-hover:text-amber-500">
+            <ProjectFolderIcon />
+          </span>
+          <span class="text-[13px] leading-none font-semibold text-foreground/80 group-hover:text-foreground transition-colors">{props.project.name}</span>
         </div>
 
         <div class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
@@ -200,10 +341,14 @@ function FolderSection(props: {
       </div>
 
       <Show when={isOpen()}>
-        <div class="mt-1 flex flex-col gap-0.5 overflow-hidden transition-all duration-150 ease-out">
+        <div class="mt-1 flex flex-col gap-0.5 overflow-hidden transition-all duration-150 ease-out pl-4 pr-1">
           <Show
             when={(sessionsByParent().map.get(sessionsByParent().ROOT) ?? []).length > 0}
-            fallback={<div class="py-[5px] pr-4 pl-[16px] text-[13px] text-muted-foreground">No sessions</div>}
+            fallback={
+              <div class="py-2.5 pr-4 pl-3.5 text-[12px] text-muted-foreground/45 italic font-light select-none">
+                No active chats
+              </div>
+            }
           >
             <For each={sessionsByParent().map.get(sessionsByParent().ROOT) ?? []}>
               {(session) => renderSessionNode(session, 0)}
@@ -219,6 +364,7 @@ export function Sidebar(props: {
   onOpenSettingsPage?: () => void
   onOpenWorkspacePage?: () => void
 }) {
+  const server = useServer()
   const projects = useStore((s) => s.projects)
   const currentProjectId = useStore((s) => s.currentProjectId)
   const activeSessionId = useStore((s) => s.activeSessionId)
@@ -228,6 +374,7 @@ export function Sidebar(props: {
   const removeSession = useStore((s) => s.removeSession)
   const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
   const deleteProject = useStore((s) => s.deleteProject)
+  const renameSession = useStore((s) => s.renameSession)
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
@@ -348,8 +495,28 @@ export function Sidebar(props: {
         />
         <div class="relative flex h-full max-h-full flex-col bg-sidebar select-none">
           <div class="sticky top-0 z-10 flex flex-col border-b border-sidebar-border/70 bg-sidebar select-none">
-            <div class="flex items-center justify-between px-4 pt-4 pb-2.5">
-              <span class="text-[12px] font-medium tracking-wide text-muted-foreground uppercase">Projects</span>
+            <div class="flex items-center justify-between px-4 pt-3.5 pb-2.5">
+              <div class="flex items-center gap-2 select-none">
+                <span class="relative flex h-1.5 w-1.5">
+                  <Show when={server.healthy() !== false}>
+                    <span 
+                      class={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                        server.healthy() === true ? "bg-green-400" : "bg-amber-400"
+                      }`} 
+                    />
+                  </Show>
+                  <span 
+                    class={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                      server.healthy() === true
+                        ? "bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]"
+                        : server.healthy() === false
+                        ? "bg-red-500"
+                        : "bg-amber-500"
+                    }`} 
+                  />
+                </span>
+                <span class="text-[12px] font-bold tracking-wide text-muted-foreground uppercase">Projects</span>
+              </div>
               <button
                 class="flex items-center justify-center rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-sidebar-foreground"
                 title="New Project"
@@ -374,6 +541,7 @@ export function Sidebar(props: {
                     onDeleteProject={handleDeleteProject}
                     onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
                     onOpenWorkspacePage={props.onOpenWorkspacePage}
+                    onRenameSession={renameSession}
                   />
                 )}
               </For>
@@ -400,8 +568,8 @@ export function Sidebar(props: {
 }
 
   const SessionDeleteIcon = () => (
-    <svg viewBox="0 0 24 24" class="size-[18px]" aria-hidden="true" fill="currentColor">
-      <path d="M21,5.25H17.441A1.251,1.251,0,0,1,16.255,4.4l-.316-.95a1.746,1.746,0,0,0-1.66-1.2H9.721a1.745,1.745,0,0,0-1.66,1.2l-.316.948a1.251,1.251,0,0,1-1.186.855H3a.75.75,0,0,0,0,1.5H4.3l.767,11.5a3.76,3.76,0,0,0,3.742,3.5h6.386a3.76,3.76,0,0,0,3.742-3.5L19.7,6.75H21a.75.75,0,0,0,0-1.5ZM9.483,3.921a.252.252,0,0,1,.238-.171h4.558a.252.252,0,0,1,.238.17l.316.95a2.777,2.777,0,0,0,.161.38H9.006a2.737,2.737,0,0,0,.161-.381ZM17.438,18.15a2.255,2.255,0,0,1-2.245,2.1H8.807a2.255,2.255,0,0,1-2.245-2.1L5.8,6.75h.757a2.783,2.783,0,0,0,.317-.025A.736.736,0,0,0,7,6.75H17a.736.736,0,0,0,.124-.025,2.783,2.783,0,0,0,.317.025H18.2ZM14.75,11v5a.75.75,0,0,1-1.5,0V11a.75.75,0,0,1,1.5,0Zm-4,0v5a.75.75,0,0,1-1.5,0V11a.75.75,0,0,1,1.5,0Z" />
+    <svg viewBox="0 0 20 20" class="size-[14px]" aria-hidden="true" fill="currentColor">
+      <path d="M16.8747 6.24935H17.3747V5.74935H16.8747V6.24935ZM16.8747 16.8743V17.3743H17.3747V16.8743H16.8747ZM3.12467 16.8743H2.62467V17.3743H3.12467V16.8743ZM3.12467 6.24935V5.74935H2.62467V6.24935H3.12467ZM2.08301 2.91602V2.41602H1.58301V2.91602H2.08301ZM17.9163 2.91602H18.4163V2.41602H17.9163V2.91602ZM17.9163 6.24935V6.74935H18.4163V6.24935H17.9163ZM2.08301 6.24935H1.58301V6.74935H2.08301V6.24935ZM8.33301 9.08268H7.83301V10.0827H8.33301V9.58268V9.08268ZM11.6663 10.0827H12.1663V9.08268H11.6663V9.58268V10.0827ZM16.8747 6.24935H16.3747V16.8743H16.8747H17.3747V6.24935H16.8747ZM16.8747 16.8743V16.3743H3.12467V16.8743V17.3743H16.8747V16.8743ZM3.12467 16.8743H3.62467V6.24935H3.12467H2.62467V16.8743H3.12467ZM3.12467 6.24935V6.74935H16.8747V6.24935V5.74935H3.12467V6.24935ZM2.08301 2.91602V3.41602H17.9163V2.91602V2.41602H2.08301V2.91602ZM17.9163 2.91602H17.4163V6.24935H17.9163H18.4163V2.91602H17.9163ZM17.9163 6.24935V5.74935H2.08301V6.24935V6.74935H17.9163V6.24935ZM2.08301 6.24935H2.58301V2.91602H2.08301H1.58301V6.24935H2.08301ZM8.33301 9.58268V10.0827H11.6663V9.58268V9.08268H8.33301V9.58268Z" />
     </svg>
   )
   const ProjectFolderIcon = () => (

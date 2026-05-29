@@ -119,6 +119,10 @@ export interface NativeCommandMap {
     args: undefined
     result: { status: "dev" | "not-downloaded" | "installing"; version?: string | null }
   }
+  download_update: {
+    args: undefined
+    result: { status: "dev" | "downloading" | "error"; message?: string }
+  }
   opencode_server_start: { args: undefined; result: string }
   get_projects: { args: undefined; result: Project[] }
   save_project: { args: { project: Project }; result: Project }

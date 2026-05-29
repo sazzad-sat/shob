@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from "solid-js"
+import { createSignal, onMount, onCleanup, Show } from "solid-js"
 import { Button } from "@/components/ui/button"
 import { nativeApi } from "@/services/native"
 import { CheckCircle2 } from "lucide-solid"
@@ -13,12 +13,17 @@ export function SettingsAbout() {
   const [status, setStatus] = createSignal<AboutStatus>("idle")
   const [message, setMessage] = createSignal("Check for updates to see if a newer version is available.")
   const [updateDownloaded, setUpdateDownloaded] = createSignal(false)
+  const [downloadPercent, setDownloadPercent] = createSignal(0)
   const [lastCheckedAt, setLastCheckedAt] = createSignal<string | null>(null)
   const [checkInFlight, setCheckInFlight] = createSignal(false)
+  const [downloadInFlight, setDownloadInFlight] = createSignal(false)
   const [installInFlight, setInstallInFlight] = createSignal(false)
+
+  const unlistenList: Array<() => void> = []
 
   const isBusy = () =>
     checkInFlight() ||
+    downloadInFlight() ||
     installInFlight() ||
     status() === "checking" ||
     status() === "downloading" ||
@@ -32,6 +37,58 @@ export function SettingsAbout() {
         setVersion(info.version || "Unknown")
       })
       .catch(() => {})
+
+    // Listen to real-time auto-updater events from main process
+    const setupListeners = async () => {
+      try {
+        const uChecking = await nativeApi.listen<null>("update:checking", () => {
+          setStatus("checking")
+          setMessage("Checking for updates...")
+        })
+        const uAvailable = await nativeApi.listen<{ version: string }>("update:available", (event) => {
+          setStatus("available")
+          setLatestVersion(event.payload.version)
+          setUpdateDownloaded(false)
+          setMessage(`Version ${event.payload.version} is available. Click 'Download' to start downloading.`)
+        })
+        const uNotAvailable = await nativeApi.listen<null>("update:not-available", () => {
+          setStatus("up-to-date")
+          setMessage("You are running the latest version.")
+        })
+        const uProgress = await nativeApi.listen<{ percent: number; bytesPerSecond: number; total: number; transferred: number }>(
+          "update:progress",
+          (event) => {
+            setStatus("downloading")
+            setDownloadPercent(event.payload.percent)
+            const speedMb = (event.payload.bytesPerSecond / (1024 * 1024)).toFixed(2)
+            const percentStr = event.payload.percent.toFixed(1)
+            setMessage(`Downloading update... ${percentStr}% (${speedMb} MB/s)`)
+          }
+        )
+        const uDownloaded = await nativeApi.listen<{ version: string }>("update:downloaded", (event) => {
+          setStatus("available")
+          setLatestVersion(event.payload.version)
+          setUpdateDownloaded(true)
+          setMessage(`Version ${event.payload.version} has been downloaded. Restart the application to install.`)
+        })
+        const uError = await nativeApi.listen<string>("update:error", (event) => {
+          setStatus("error")
+          setMessage(`Error checking/downloading update: ${event.payload}`)
+        })
+
+        unlistenList.push(uChecking, uAvailable, uNotAvailable, uProgress, uDownloaded, uError)
+      } catch (err) {
+        console.error("Failed to register updater event listeners:", err)
+      }
+    }
+
+    void setupListeners()
+  })
+
+  onCleanup(() => {
+    for (const unlisten of unlistenList) {
+      unlisten()
+    }
   })
 
   const checkForUpdates = async () => {
@@ -44,7 +101,7 @@ export function SettingsAbout() {
     setStatus("checking")
     setMessage("Checking for updates...")
     try {
-      const result = await nativeApi.invoke("check_for_updates", { manual: false })
+      const result = await nativeApi.invoke("check_for_updates", { manual: true })
       setLastCheckedAt(new Date().toLocaleString())
       if (result.status === "dev") {
         setStatus("dev")
@@ -63,8 +120,8 @@ export function SettingsAbout() {
           setStatus("available")
           setMessage(`Update ${result.version ?? ""} downloaded. Restart to install and complete the update.`.trim())
         } else {
-          setStatus("downloading")
-          setMessage(`Update ${result.version ?? ""} found. Downloading in the background...`.trim())
+          setStatus("available")
+          setMessage(`Update ${result.version ?? ""} found. Click 'Download' to start downloading.`.trim())
         }
       } else {
         setStatus("up-to-date")
@@ -75,6 +132,26 @@ export function SettingsAbout() {
       setMessage("Could not check for updates. Please try again.")
     } finally {
       setCheckInFlight(false)
+    }
+  }
+
+  const downloadUpdate = async () => {
+    if (downloadInFlight() || installInFlight() || checkInFlight()) return
+    setDownloadInFlight(true)
+    setStatus("downloading")
+    setDownloadPercent(0)
+    setMessage("Starting download...")
+    try {
+      const result = await nativeApi.invoke("download_update")
+      if (result.status === "error") {
+        setStatus("error")
+        setMessage(`Failed to start download: ${result.message || "Unknown error"}`)
+      }
+    } catch {
+      setStatus("error")
+      setMessage("Failed to start update download.")
+    } finally {
+      setDownloadInFlight(false)
     }
   }
 
@@ -127,12 +204,33 @@ export function SettingsAbout() {
             <Button type="button" variant="outline" disabled={isBusy()} onClick={() => void checkForUpdates()}>
               {status() === "checking" ? "Checking..." : status() === "downloading" ? "Downloading..." : status() === "installing" ? "Installing..." : "Check for updates"}
             </Button>
-            <Show when={updateDownloaded() || status() === "available"}>
+            <Show when={status() === "available" && !updateDownloaded()}>
+              <Button type="button" disabled={isBusy()} onClick={() => void downloadUpdate()}>
+                Download
+              </Button>
+            </Show>
+            <Show when={updateDownloaded()}>
               <Button type="button" disabled={installInFlight() || checkInFlight()} onClick={() => void installUpdate()}>
                 Restart to install
               </Button>
             </Show>
           </div>
+          
+          <Show when={status() === "downloading"}>
+            <div class="mt-4 space-y-1.5 max-w-sm animate-in fade-in duration-200">
+              <div class="flex items-center justify-between text-xs font-semibold text-foreground/80">
+                <span>Downloading...</span>
+                <span>{downloadPercent().toFixed(0)}%</span>
+              </div>
+              <div class="h-2 w-full overflow-hidden rounded-full bg-secondary/80 border border-border/40">
+                <div
+                  style={{ width: `${downloadPercent()}%` }}
+                  class="h-full bg-blue-500 transition-all duration-300 ease-out shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                />
+              </div>
+            </div>
+          </Show>
+
           <p class="mt-3 text-sm text-muted-foreground">{message()}</p>
           <Show when={lastCheckedAt()}>
             <p class="mt-1 text-xs text-muted-foreground">Last checked: {lastCheckedAt()}</p>

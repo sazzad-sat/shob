@@ -11,6 +11,10 @@ import { ModelsProvider } from "@/context/models"
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
 import { nativeApi } from "@/services/native"
 import { ErrorPage } from "@/pages/error"
+import { SettingsProvider } from "@/context/settings"
+import { MemoryRouter, Route } from "@solidjs/router"
+import { NotificationProvider } from "@/context/notification"
+import { PermissionProvider } from "@/context/permission"
 
 const SIDECAR_SERVER_KEY = ServerConnection.Key.make("sidecar")
 
@@ -71,15 +75,25 @@ export function AppProviders(props: ParentProps) {
                   >
                     <GlobalSDKProvider>
                       <GlobalSyncProvider>
-                        <ModelsProvider>
-                          <QueryClientProvider client={queryClient}>
-                            <DialogProvider>
-                              <MarkedProvider>
-                                {props.children}
-                              </MarkedProvider>
-                            </DialogProvider>
-                          </QueryClientProvider>
-                        </ModelsProvider>
+                        <SettingsProvider>
+                          <MemoryRouter>
+                            <Route path="*" component={() => (
+                              <NotificationProvider>
+                                <PermissionProvider>
+                                  <ModelsProvider>
+                                    <QueryClientProvider client={queryClient}>
+                                      <DialogProvider>
+                                        <MarkedProvider>
+                                          {props.children}
+                                        </MarkedProvider>
+                                      </DialogProvider>
+                                    </QueryClientProvider>
+                                  </ModelsProvider>
+                                </PermissionProvider>
+                              </NotificationProvider>
+                            )} />
+                          </MemoryRouter>
+                        </SettingsProvider>
                       </GlobalSyncProvider>
                     </GlobalSDKProvider>
                   </ServerProvider>
@@ -94,3 +108,4 @@ export function AppProviders(props: ParentProps) {
     </PlatformProvider>
   )
 }
+

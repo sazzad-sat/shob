@@ -49,7 +49,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "olovalabs",
+        "owner": "shobcoder",
         "repo": "shob"
       }
     ],

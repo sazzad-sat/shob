@@ -5,6 +5,7 @@ import { MainView } from './components/MainView'
 import { useStore } from './store'
 import { getThemeById, resolveAppThemeTokens } from './theme'
 import { ErrorPage } from './pages/error'
+import { showToast } from '@opencode-ai/ui/toast'
 
 function App() {
   const { loadProjects, loadCliTools, loadAvailableShells } = useStore()
@@ -14,6 +15,88 @@ function App() {
   const [systemMode, setSystemMode] = createSignal<'light' | 'dark'>(
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
   )
+
+  onMount(() => {
+    let unlistenAvailable: (() => void) | null = null
+    let unlistenProgress: (() => void) | null = null
+    let unlistenDownloaded: (() => void) | null = null
+    let unlistenError: (() => void) | null = null
+
+    const setupUpdaterToast = async () => {
+      if (!window.shob) return
+
+      try {
+        unlistenAvailable = await nativeApi.listen<{ version: string }>("update:available", (event) => {
+          showToast({
+            title: "Update Available",
+            description: `A new version of Shob (${event.payload.version}) is available.`,
+            variant: "default",
+            duration: 15000,
+            icon: "download",
+            actions: [
+              {
+                label: "Download Now",
+                onClick: () => {
+                  void nativeApi.invoke("download_update")
+                },
+              },
+              {
+                label: "Dismiss",
+                onClick: "dismiss",
+              },
+            ],
+          })
+        })
+
+        unlistenProgress = await nativeApi.listen<{ percent: number }>("update:progress", (event) => {
+          // Show quick alert of progress
+          showToast({
+            title: "Downloading Update",
+            description: `Shob update is downloading: ${event.payload.percent.toFixed(0)}%`,
+            variant: "default",
+            duration: 4000,
+          })
+        })
+
+        unlistenDownloaded = await nativeApi.listen<{ version: string }>("update:downloaded", (event) => {
+          showToast({
+            title: "Update Ready",
+            description: `Shob version ${event.payload.version} has been successfully downloaded!`,
+            variant: "success",
+            persistent: true,
+            icon: "check",
+            actions: [
+              {
+                label: "Restart & Install",
+                onClick: () => {
+                  void nativeApi.invoke("install_update")
+                },
+              },
+              {
+                label: "Later",
+                onClick: "dismiss",
+              },
+            ],
+          })
+        })
+
+        unlistenError = await nativeApi.listen<string>("update:error", (event) => {
+          console.warn("Auto-updater encountered an error:", event.payload)
+        })
+      } catch (err) {
+        console.error("Failed to setup global updater toast listeners:", err)
+      }
+    }
+
+    void setupUpdaterToast()
+
+    onCleanup(() => {
+      unlistenAvailable?.()
+      unlistenProgress?.()
+      unlistenDownloaded?.()
+      unlistenError?.()
+    })
+  })
 
   onMount(() => {
     const BOOT_TIMEOUT_MS = 4000

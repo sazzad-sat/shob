@@ -33,6 +33,7 @@ const allowedCommands = new Set([
   "get_app_info",
   "check_for_updates",
   "install_update",
+  "download_update",
 ]);
 
 const eventSubscriptions = new Map<string, Set<(data: any) => void>>();
