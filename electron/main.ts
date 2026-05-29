@@ -860,9 +860,6 @@ async function createWindow() {
     },
     ...(appIconPath ? { icon: appIconPath } : {}),
   });
-  if (mainWindow && (process.platform === "win32" || process.platform === "linux") && appIconPath) {
-    mainWindow.setIcon(appIconPath);
-  }
   applyWindowIcon(mainWindow);
 
   mainWindow.on("maximize", () => mainWindow?.webContents.send("shob:window-state", { maximized: true }));
