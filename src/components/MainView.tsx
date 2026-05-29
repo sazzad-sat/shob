@@ -3,6 +3,7 @@ import { nativeApi } from '../services/native'
 import { Sidebar } from './Sidebar'
 
 import { TerminalPanel } from './TerminalPanel'
+import { BottomTerminalPanel } from './BottomTerminalPanel'
 import { WelcomeScreen } from './WelcomeScreen'
 import { SettingsPage } from './SettingsPage'
 import { useStore } from '../store'
@@ -428,38 +429,37 @@ export function MainView() {
       />
       <div class="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden bg-background">
         {activePage() === 'workspace' ? (
-          <>
-
-            <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-              <div ref={workspaceSplitRef} class="flex h-full w-full min-h-0 min-w-0">
-                <div class="min-h-0 min-w-0 flex-1 overflow-hidden" style={{ display: projectSessions().length > 0 ? 'flex' : 'none' }}>
-                  <TerminalPanel onNewSession={handleCreateSession} />
-                </div>
-
-                {projectSessions().length === 0 && (
-                  <div class="min-h-0 min-w-0 flex-1">
-                    <WelcomeScreen
-                      projects={projects()}
-                      currentProject={currentProject()}
-                      onOpenFolder={handleOpenFolder}
-                      onCreateSession={handleCreateSession}
-                      onSelectProject={appStore.setCurrentProject}
-                      onToggleFileTree={handleToggleFileTree}
-                    />
+          <LayoutProvider>
+            <div class="flex flex-col min-h-0 flex-1 overflow-hidden">
+              <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
+                <div ref={workspaceSplitRef} class="flex h-full w-full min-h-0 min-w-0">
+                  <div class="min-h-0 min-w-0 flex-1 overflow-hidden" style={{ display: projectSessions().length > 0 ? 'flex' : 'none' }}>
+                    <TerminalPanel onNewSession={handleCreateSession} />
                   </div>
-                )}
 
-                <Show when={isReviewVisible() || isFileTreeVisible()}>
-                  <div
-                    class="relative min-h-0 shrink-0 overflow-hidden border-l border-border/60"
-                    style={{ width: `${reviewWidth()}px` }}
-                  >
-                    <ResizeHandle
-                      edge="start"
-                      onResize={resizeReviewPanel}
-                    />
-                    <Suspense fallback={null}>
-                      <LayoutProvider>
+                  {projectSessions().length === 0 && (
+                    <div class="min-h-0 min-w-0 flex-1">
+                      <WelcomeScreen
+                        projects={projects()}
+                        currentProject={currentProject()}
+                        onOpenFolder={handleOpenFolder}
+                        onCreateSession={handleCreateSession}
+                        onSelectProject={appStore.setCurrentProject}
+                        onToggleFileTree={handleToggleFileTree}
+                      />
+                    </div>
+                  )}
+
+                  <Show when={isReviewVisible() || isFileTreeVisible()}>
+                    <div
+                      class="relative min-h-0 shrink-0 overflow-hidden border-l border-border/60"
+                      style={{ width: `${reviewWidth()}px` }}
+                    >
+                      <ResizeHandle
+                        edge="start"
+                        onResize={resizeReviewPanel}
+                      />
+                      <Suspense fallback={null}>
                         <SDKProvider directory={projectPath}>
                           <fileCtx.FileProvider>
                             <OpenCodeReviewContent
@@ -473,13 +473,17 @@ export function MainView() {
                             />
                           </fileCtx.FileProvider>
                         </SDKProvider>
-                      </LayoutProvider>
-                    </Suspense>
-                  </div>
-                </Show>
+                      </Suspense>
+                    </div>
+                  </Show>
+                </div>
               </div>
+
+              <Show when={projectSessions().length > 0}>
+                <BottomTerminalPanel />
+              </Show>
             </div>
-          </>
+          </LayoutProvider>
         ) : (
           <SettingsPage />
         )}

@@ -31,6 +31,7 @@ export function TitleBar() {
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
+  const [isTerminalPanelOpen, setIsTerminalPanelOpen] = createSignal(false)
   const [isFullscreen, setIsFullscreen] = createSignal(false)
 
   const mac = () => platform() === "macos"
@@ -72,6 +73,15 @@ export function TitleBar() {
     }
     window.addEventListener("gg-file-tree-state", handleFileTreeState as EventListener)
     onCleanup(() => window.removeEventListener("gg-file-tree-state", handleFileTreeState as EventListener))
+  })
+
+  onMount(() => {
+    const handleTerminalPanelState = (event: Event) => {
+      const detail = (event as CustomEvent<{ isOpen: boolean }>).detail
+      if (detail) setIsTerminalPanelOpen(Boolean(detail.isOpen))
+    }
+    window.addEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener)
+    onCleanup(() => window.removeEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener))
   })
 
   const maximize = (e: MouseEvent) => {
@@ -120,6 +130,16 @@ export function TitleBar() {
           }}
         >
           <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" style={{ "-webkit-app-region": "no-drag" }}>
+            <Button
+              variant="ghost"
+              class="titlebar-icon"
+              onClick={() => window.dispatchEvent(new Event("gg-toggle-terminal-panel"))}
+              title={isTerminalPanelOpen() ? "Hide terminal panel" : "Show terminal panel"}
+              aria-label="Toggle terminal panel"
+              aria-pressed={isTerminalPanelOpen()}
+            >
+              <Icon name={isTerminalPanelOpen() ? "terminal-active" : "terminal"} size="small" />
+            </Button>
             <Button
               variant="ghost"
               class="titlebar-icon"

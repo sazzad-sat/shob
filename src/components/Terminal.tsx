@@ -41,7 +41,6 @@ interface IPty {
 const launchedPendingCommandKeys = new Set<string>()
 const ACTIVITY_THROTTLE_MS = 15_000
 const FIT_SETTLE_DELAYS_MS = [0, 50, 150] as const
-const ALLOWED_SHELLS = new Set(["pwsh", "powershell", "cmd", "bash", "zsh", "fish", "sh"])
 
 const DEFAULT_SESSION_NAME_PATTERN = /^Terminal \d+$/
 const ANSI_ESCAPE_SEQUENCE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|[@-_]|\].*?(?:\x07|\x1b\\)|P.*?\x1b\\|X.*?\x1b\\|\^.*?\x1b\\|_.*?\x1b\\)/g
@@ -70,14 +69,22 @@ function getShellBasename(shell: string): string {
   return baseName.toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "")
 }
 
-function resolveAllowlistedShell(shell: string): string | null {
-  const candidate = stripOptionalWrappingQuotes(shell)
-  if (!candidate) return null
+function getDefaultShell(): string {
+  if (typeof process !== "undefined" && process.platform === "win32") {
+    return process.env.COMSPEC || "powershell.exe"
+  }
+  return process.env.SHELL || "/bin/sh"
+}
 
-  const baseName = getShellBasename(candidate)
-  if (!ALLOWED_SHELLS.has(baseName)) return null
+function resolveShell(shell: string | undefined | null, availableShells?: string[]): string {
+  const candidate = stripOptionalWrappingQuotes(shell ?? "")
+  if (candidate) return candidate
 
-  return candidate
+  if (availableShells && availableShells.length > 0) {
+    return availableShells[0]
+  }
+
+  return getDefaultShell()
 }
 
 function decodePtyChunk(chunk: unknown, decoder: TextDecoder): string {
@@ -304,6 +311,8 @@ export function Terminal(props: TerminalProps) {
   const isActive = () => store.activeSessionId === sessionId
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
+  const availableShells = useStore((s) => s.availableShells)
+  const preferredShell = useStore((s) => s.preferredShell)
 
   let terminalRef: HTMLDivElement | undefined
   let xtermRef: XTerm | null = null
@@ -676,14 +685,7 @@ export function Terminal(props: TerminalProps) {
       if (cancelled) return
 
 
-      const resolvedShell = resolveAllowlistedShell(bootSession.shell)
-      if (!resolvedShell) {
-        term.writeln("\x1b[31mTerminal launch blocked: unsupported shell.\x1b[0m")
-        term.writeln(
-          "\x1b[33mAllowed shells: pwsh, powershell, cmd, bash, zsh, fish, sh. Update your shell in Settings.\x1b[0m",
-        )
-        return
-      }
+      const resolvedShell = resolveShell(bootSession.shell, availableShells())
 
       spawnInFlightRef = true
       try {
@@ -1048,14 +1050,7 @@ export function Terminal(props: TerminalProps) {
       const run = async () => {
         if (spawnInFlightRef) return
 
-        const resolvedShell = resolveAllowlistedShell(currentSession.shell)
-        if (!resolvedShell) {
-          term.writeln("\x1b[31mTerminal relaunch blocked: unsupported shell.\x1b[0m")
-          term.writeln(
-            "\x1b[33mAllowed shells: pwsh, powershell, cmd, bash, zsh, fish, sh. Update your shell in Settings.\x1b[0m",
-          )
-          return
-        }
+        const resolvedShell = resolveShell(currentSession.shell, availableShells())
 
         const hostInfo = await nativeApi.invoke("get_terminal_host_info") as TerminalHostInfo
         const isWindows = hostInfo.os === "windows"

@@ -480,7 +480,7 @@ export const actions: AppActions = {
             id: session.id,
             name: title,
             parentSessionId: session.parentID ?? null,
-            shell: 'opencode',
+            shell: store.preferredShell ?? (process.platform === 'win32' ? 'powershell.exe' : '/bin/sh'),
             cliTool: 'opencode',
             pendingLaunchCommand: null,
           createdAt,

@@ -633,8 +633,19 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       },
       terminal: {
         height: createMemo(() => store.terminal.height),
+        opened: createMemo(() => store.terminal?.opened ?? false),
         resize(height: number) {
           setStore("terminal", "height", height)
+        },
+        open() {
+          setStore("terminal", "opened", true)
+        },
+        close() {
+          setStore("terminal", "opened", false)
+        },
+        toggle() {
+          const current = store.terminal?.opened ?? false
+          setStore("terminal", "opened", !current)
         },
       },
       review: {

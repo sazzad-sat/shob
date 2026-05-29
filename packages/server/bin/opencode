@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-const childProcess = require("child_process")
-const fs = require("fs")
-const path = require("path")
-const os = require("os")
+import { spawnSync } from "node:child_process"
+import { existsSync, readFileSync, realpathSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { platform, arch } from "node:os"
 
 function run(target) {
-  const result = childProcess.spawnSync(target, process.argv.slice(2), {
+  const result = spawnSync(target, process.argv.slice(2), {
     stdio: "inherit",
   })
   if (result.error) {
@@ -22,12 +22,11 @@ if (envPath) {
   run(envPath)
 }
 
-const scriptPath = fs.realpathSync(__filename)
-const scriptDir = path.dirname(scriptPath)
+const scriptPath = realpathSync(import.meta.filename ?? process.argv[1])
+const scriptDir = dirname(scriptPath)
 
-//
-const cached = path.join(scriptDir, ".opencode")
-if (fs.existsSync(cached)) {
+const cached = join(scriptDir, ".opencode")
+if (existsSync(cached)) {
   run(cached)
 }
 
@@ -42,31 +41,31 @@ const archMap = {
   arm: "arm",
 }
 
-let platform = platformMap[os.platform()]
-if (!platform) {
-  platform = os.platform()
+let plat = platformMap[platform()]
+if (!plat) {
+  plat = platform()
 }
-let arch = archMap[os.arch()]
-if (!arch) {
-  arch = os.arch()
+let arc = archMap[arch()]
+if (!arc) {
+  arc = arch()
 }
-const base = "opencode-" + platform + "-" + arch
-const binary = platform === "windows" ? "opencode.exe" : "opencode"
+const base = "opencode-" + plat + "-" + arc
+const binary = plat === "windows" ? "opencode.exe" : "opencode"
 
 function supportsAvx2() {
-  if (arch !== "x64") return false
+  if (arc !== "x64") return false
 
-  if (platform === "linux") {
+  if (plat === "linux") {
     try {
-      return /(^|\s)avx2(\s|$)/i.test(fs.readFileSync("/proc/cpuinfo", "utf8"))
+      return /(^|\s)avx2(\s|$)/i.test(readFileSync("/proc/cpuinfo", "utf8"))
     } catch {
       return false
     }
   }
 
-  if (platform === "darwin") {
+  if (plat === "darwin") {
     try {
-      const result = childProcess.spawnSync("sysctl", ["-n", "hw.optional.avx2_0"], {
+      const result = spawnSync("sysctl", ["-n", "hw.optional.avx2_0"], {
         encoding: "utf8",
         timeout: 1500,
       })
@@ -77,13 +76,13 @@ function supportsAvx2() {
     }
   }
 
-  if (platform === "windows") {
+  if (plat === "windows") {
     const cmd =
       '(Add-Type -MemberDefinition "[DllImport(""kernel32.dll"")] public static extern bool IsProcessorFeaturePresent(int ProcessorFeature);" -Name Kernel32 -Namespace Win32 -PassThru)::IsProcessorFeaturePresent(40)'
 
     for (const exe of ["powershell.exe", "pwsh.exe", "pwsh", "powershell"]) {
       try {
-        const result = childProcess.spawnSync(exe, ["-NoProfile", "-NonInteractive", "-Command", cmd], {
+        const result = spawnSync(exe, ["-NoProfile", "-NonInteractive", "-Command", cmd], {
           encoding: "utf8",
           timeout: 3000,
           windowsHide: true,
@@ -105,18 +104,18 @@ function supportsAvx2() {
 
 const names = (() => {
   const avx2 = supportsAvx2()
-  const baseline = arch === "x64" && !avx2
+  const baseline = arc === "x64" && !avx2
 
-  if (platform === "linux") {
+  if (plat === "linux") {
     const musl = (() => {
       try {
-        if (fs.existsSync("/etc/alpine-release")) return true
+        if (existsSync("/etc/alpine-release")) return true
       } catch {
         // ignore
       }
 
       try {
-        const result = childProcess.spawnSync("ldd", ["--version"], { encoding: "utf8" })
+        const result = spawnSync("ldd", ["--version"], { encoding: "utf8" })
         const text = ((result.stdout || "") + (result.stderr || "")).toLowerCase()
         if (text.includes("musl")) return true
       } catch {
@@ -127,21 +126,21 @@ const names = (() => {
     })()
 
     if (musl) {
-      if (arch === "x64") {
+      if (arc === "x64") {
         if (baseline) return [`${base}-baseline-musl`, `${base}-musl`, `${base}-baseline`, base]
         return [`${base}-musl`, `${base}-baseline-musl`, base, `${base}-baseline`]
       }
       return [`${base}-musl`, base]
     }
 
-    if (arch === "x64") {
+    if (arc === "x64") {
       if (baseline) return [`${base}-baseline`, base, `${base}-baseline-musl`, `${base}-musl`]
       return [base, `${base}-baseline`, `${base}-musl`, `${base}-baseline-musl`]
     }
     return [base, `${base}-musl`]
   }
 
-  if (arch === "x64") {
+  if (arc === "x64") {
     if (baseline) return [`${base}-baseline`, base]
     return [base, `${base}-baseline`]
   }
@@ -151,14 +150,14 @@ const names = (() => {
 function findBinary(startDir) {
   let current = startDir
   for (;;) {
-    const modules = path.join(current, "node_modules")
-    if (fs.existsSync(modules)) {
+    const modules = join(current, "node_modules")
+    if (existsSync(modules)) {
       for (const name of names) {
-        const candidate = path.join(modules, name, "bin", binary)
-        if (fs.existsSync(candidate)) return candidate
+        const candidate = join(modules, name, "bin", binary)
+        if (existsSync(candidate)) return candidate
       }
     }
-    const parent = path.dirname(current)
+    const parent = dirname(current)
     if (parent === current) {
       return
     }
