@@ -31,6 +31,7 @@ import { showToast } from "@opencode-ai/ui/toast"
 import { useSDK } from "@/context/sdk"
 import { formatServerError } from "@/utils/server-errors"
 
+
 interface AgentViewProps {
   sessionId: string
   projectPath?: string
@@ -132,8 +133,12 @@ function AgentViewInner(props: AgentViewProps) {
     onUserInteracted: () => scheduleJumpStateUpdate(),
   })
 
+  // props.sessionId is ALWAYS the authoritative source. params.id lags behind
+  // because the MemoryRouter updates asynchronously. If params.id were checked
+  // first, switching sessions would briefly read the old (possibly-running)
+  // session's status, making working()=true and triggering auto-scroll.
   const activeSessionId = createMemo(() => {
-    const id = params.id || props.sessionId
+    const id = props.sessionId || params.id
     return id?.startsWith("ses") ? id : undefined
   })
 

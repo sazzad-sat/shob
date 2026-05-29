@@ -19,11 +19,11 @@ export function TerminalPanel(_props: TerminalPanelProps) {
 
   return (
     <div class="relative h-full w-full min-h-0 min-w-0 overflow-hidden bg-background">
-      <Show when={activeSession()} keyed>
+      <Show when={activeSession()}>
         {(session) => (
           <div class="h-full w-full min-h-0 overflow-hidden">
-            <Show when={session.cliTool} fallback={<Terminal sessionId={session.id} />}>
-              <AgentView sessionId={session.id} projectPath={currentProject()?.path} />
+            <Show when={session().cliTool} fallback={<Terminal sessionId={session().id} />}>
+              <AgentView sessionId={session().id} projectPath={currentProject()?.path} />
             </Show>
           </div>
         )}

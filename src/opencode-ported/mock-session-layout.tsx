@@ -1,4 +1,4 @@
-import { createContext, useContext } from "solid-js"
+import { createContext, useContext, createEffect } from "solid-js"
 import { base64Encode } from "@opencode-ai/util/encode"
 
 interface MockSessionLayout {
@@ -44,7 +44,8 @@ export function SessionLayoutProvider(props: any) {
   const value = {
     params: {
       get sessionId() {
-        return routeParams.id || props.sessionId
+        // props.sessionId is authoritative; routeParams.id is a fallback only
+        return props.sessionId || routeParams.id
       },
     },
     tabs: () => ({ active: undefined, all: () => [], setActive: () => {}, open: async () => {} }),
@@ -71,12 +72,16 @@ import { MemoryRouter, Route, createMemoryHistory, useParams } from "@solidjs/ro
 export function MockSessionProviders(props: { directory: string; sessionId: string; children: any }) { 
   const dir = () => props.directory; 
   const history = createMemoryHistory();
-  const routeSessionId = props.sessionId?.startsWith("ses") ? props.sessionId : "new";
-  history.set({ value: `/${base64Encode(props.directory)}/session/${routeSessionId}`, replace: true, scroll: false });
+  const routeSessionId = () => props.sessionId?.startsWith("ses") ? props.sessionId : "new";
+  
+  createEffect(() => {
+    history.set({ value: `/${base64Encode(props.directory)}/session/${routeSessionId()}`, replace: true, scroll: false });
+  });
+
   return (
     <MemoryRouter history={history}>
       <Route path="/:dir/session/:id" component={() => (
-        <SessionLayoutProvider sessionId={routeSessionId}>
+        <SessionLayoutProvider sessionId={routeSessionId()}>
           <SettingsProvider>
             <SDKProvider directory={dir}>
               <SyncProvider>
