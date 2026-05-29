@@ -1312,11 +1312,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         onSubmit={handleSubmit}
         classList={{
           "group/prompt-input": true,
-          "border-icon-info-active border-dashed": store.draggingType !== null,
-          "border-white! shadow-[0_0_12px_rgba(255,255,255,0.12)]!": store.mode === "shell",
+          "border-ring! border-dashed!": store.draggingType !== null,
+          "border-ring! shadow-[0_0_16px_rgba(59,130,246,0.2)]!": store.mode === "shell",
           [props.class ?? ""]: !!props.class,
         }}
-        class="agent-terminal-prompt-shell bg-background! border border-border rounded-xl flex flex-col w-full overflow-visible! transition-all duration-300"
+        class="agent-terminal-prompt-shell bg-card! border border-border/60 rounded-2xl flex flex-col w-full overflow-visible! transition-all duration-300"
       >
         <PromptDragOverlay
           type={store.draggingType}
@@ -1344,7 +1344,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           removeLabel={language.t("prompt.attachment.remove")}
         />
         <div
-          class="agent-terminal-prompt-line relative flex items-start justify-between gap-3 p-3"
+          class="agent-terminal-prompt-line relative flex items-start justify-between gap-3 p-4"
           onMouseDown={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
@@ -1354,8 +1354,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             editorRef?.focus()
           }}
         >
-          <div class="agent-terminal-input-wrap flex min-w-0 flex-1 items-start gap-2">
-            <span class="agent-terminal-caret select-none font-mono text-[14px] leading-5" aria-hidden="true">
+          <div class="agent-terminal-input-wrap flex min-w-0 flex-1 items-start gap-3">
+            <span class="agent-terminal-caret select-none font-mono text-[16px] leading-5" aria-hidden="true">
               {store.mode === "shell" ? ">" : ""}
             </span>
             <div
@@ -1371,13 +1371,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 role="textbox"
                 aria-multiline="true"
                 aria-label={placeholder()}
+                aria-placeholder={placeholder()}
                 contenteditable="true"
-                autocapitalize={store.mode === "normal" ? "sentences" : "off"}
-                autocorrect={store.mode === "normal" ? "on" : "off"}
-                spellcheck={store.mode === "normal"}
+                autocapitalize="sentences"
+                autocorrect="on"
+                spellcheck={store.mode === "normal" ? "true" : "false"}
                 inputMode="text"
                 // @ts-expect-error
                 autocomplete="off"
+                enterkeyhint="send"
+                lang="en"
                 onInput={handleInput}
                 onPaste={handlePaste}
                 onCompositionStart={handleCompositionStart}
@@ -1386,13 +1389,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 onKeyDown={handleKeyDown}
                 classList={{
                   "select-text": true,
-                  "w-full text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap font-mono!": true,
+                  "w-full text-[15px] leading-relaxed text-foreground focus:outline-none whitespace-pre-wrap font-mono! caret-primary": true,
                   "[&_[data-type=file]]:text-syntax-property": true,
                   "[&_[data-type=agent]]:text-syntax-type": true,
                 }}
               />
               <div
-                class="absolute top-0 inset-x-0 text-14-regular text-text-weak pointer-events-none whitespace-nowrap truncate font-mono!"
+                class="absolute top-0 inset-x-0 text-[15px] leading-relaxed text-muted-foreground/40 pointer-events-none whitespace-nowrap truncate font-mono!"
                 style={{ display: prompt.dirty() ? "none" : undefined }}
               >
                 {placeholder()}
@@ -1402,7 +1405,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
           <div class="flex items-center gap-2 shrink-0 pt-0.5 pointer-events-auto">
             <Show when={!blank()}>
-              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] bg-muted/10 border border-border/40 text-[10px] font-mono text-text-weak select-none animate-fade-in transition-all">
+              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-card/30 border border-border/15 text-[10px] font-mono text-muted-foreground select-none animate-fade-in backdrop-blur-sm">
                 <span>{promptLength(prompt.current().filter((p) => p.type !== "image"))} ch</span>
                 <button
                   type="button"
@@ -1412,7 +1415,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     resetHistoryNavigation(true)
                     requestAnimationFrame(() => editorRef?.focus())
                   }}
-                  class="size-3.5 flex items-center justify-center rounded-full hover:bg-muted/40 text-text-weak hover:text-text-base transition-colors cursor-pointer outline-none"
+                  class="size-3.5 flex items-center justify-center rounded-full hover:bg-accent/40 text-muted-foreground hover:text-foreground transition-colors cursor-pointer outline-none"
                   aria-label="Clear text"
                 >
                   <Icon name="close-small" class="size-2.5" />
@@ -1428,10 +1431,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 tabIndex={store.mode === "normal" ? undefined : -1}
                 icon={stopping() ? "stop" : "arrow-up"}
                 variant="primary"
-                class="size-8.5 rounded-[6px]! bg-white! hover:bg-white/90! border-none text-black! flex items-center justify-center transition-all cursor-pointer [&_[data-slot=icon-svg]]:text-black! disabled:bg-white/10! disabled:[&_[data-slot=icon-svg]]:text-white/30!"
-                classList={{
-                  "shadow-[0_0_10px_rgba(255,255,255,0.15)]! scale-103": !blank() && !working()
-                }}
+                class="size-9 rounded-lg! flex items-center justify-center transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                 aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
               />
             </Tooltip>
@@ -1442,7 +1442,15 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         <div class="agent-terminal-prompt-divider h-px bg-border/40" />
 
         {/* Bottom Toolbar Row */}
-        <div class="agent-terminal-toolbar flex items-center justify-between px-3 py-2 bg-muted/20 min-h-[44px] rounded-b-xl">
+        <div 
+          class="agent-terminal-toolbar flex items-center justify-between px-4 py-2.5 bg-muted/20 min-h-[48px] rounded-b-2xl"
+          onMouseDown={(e) => {
+            // Prevent toolbar from stealing focus from editor
+            if (e.target instanceof HTMLElement && !e.target.closest('[data-action="prompt-attach"]')) {
+              e.preventDefault()
+            }
+          }}
+        >
           <div class="flex items-center gap-2 flex-wrap">
             {/* Attach File (+) Button */}
             <input
@@ -1455,6 +1463,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 const list = e.currentTarget.files
                 if (list) void addAttachments(Array.from(list))
                 e.currentTarget.value = ""
+                restoreFocus()
               }}
             />
             <TooltipKeybind
@@ -1465,7 +1474,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               <button
                 data-action="prompt-attach"
                 type="button"
-                class="size-7.5 flex items-center justify-center rounded-[6px] border border-border/40 bg-surface-raised-base hover:bg-surface-raised-base-hover text-text-base transition-colors cursor-pointer outline-none shrink-0"
+                class="size-8 flex items-center justify-center rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
                 onClick={pick}
                 disabled={store.mode !== "normal"}
                 aria-label={language.t("prompt.action.attachFile")}
@@ -1484,9 +1493,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               >
                 <button
                   type="button"
-                  class="h-7.5 px-2.5 flex items-center gap-2 rounded-[6px] border border-border/40 bg-surface-raised-base hover:bg-surface-raised-base-hover text-[12px] font-mono text-text-base transition-colors cursor-pointer outline-none shrink-0"
+                  class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
                   data-action="prompt-model"
-                  onClick={() => dialog.show(() => <DialogSelectModel model={local.model} />)}
+                  onClick={() => {
+                    dialog.show(() => <DialogSelectModel model={local.model} />)
+                    restoreFocus()
+                  }}
                 >
                   <Show when={local.model.current()?.provider?.id} fallback={<Icon name="sparkles" class="size-3.5 opacity-80" />}>
                     <ProviderIcon
@@ -1517,7 +1529,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     local.agent.set(value)
                     restoreFocus()
                   }}
-                  class="h-7.5 px-2.5 flex items-center gap-2 rounded-[6px] border border-border/40 bg-surface-raised-base hover:bg-surface-raised-base-hover text-[12px] font-mono text-text-base transition-colors cursor-pointer outline-none shrink-0"
+                  class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
                   valueClass="truncate"
                   triggerStyle={{ border: "none", background: "transparent", padding: 0, height: "100%", "font-family": "inherit" }}
                   triggerProps={{ "data-action": "prompt-agent" }}
@@ -1545,7 +1557,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     local.model.variant.set(value === "default" ? undefined : value)
                     restoreFocus()
                   }}
-                  class="h-7.5 px-2.5 flex items-center gap-2 rounded-[6px] border border-border/40 bg-surface-raised-base hover:bg-surface-raised-base-hover text-[12px] font-mono text-text-base transition-colors cursor-pointer outline-none shrink-0"
+                  class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
                   valueClass="truncate"
                   triggerStyle={{ border: "none", background: "transparent", padding: 0, height: "100%", "font-family": "inherit" }}
                   triggerProps={{ "data-action": "prompt-model-variant" }}
@@ -1559,7 +1571,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             {/* Help Button (?) */}
             <button
               type="button"
-              class="size-7.5 flex items-center justify-center rounded-[6px] border border-border/40 bg-surface-raised-base hover:bg-surface-raised-base-hover text-text-base text-[12px] font-mono transition-colors cursor-pointer outline-none"
+              class="size-8 flex items-center justify-center rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground text-[12px] font-mono transition-colors duration-150 cursor-pointer outline-none backdrop-blur-sm"
               aria-label="Help"
             >
               ?

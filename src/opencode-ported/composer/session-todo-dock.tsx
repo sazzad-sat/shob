@@ -24,10 +24,10 @@ export function SessionTodoDock(props: {
   const [stuck, setStuck] = createSignal(false)
 
   return (
-    <DockTray data-component="session-todo-dock">
+    <DockTray data-component="session-todo-dock" class="todo-dock">
       <div
         data-action="session-todo-toggle"
-        class="pl-3 pr-2 py-2 flex items-center gap-2 overflow-visible"
+        class="todo-dock-header"
         role="button"
         tabIndex={0}
         onClick={props.onToggle}
@@ -37,61 +37,62 @@ export function SessionTodoDock(props: {
           props.onToggle()
         }}
       >
-        <span class="text-14-regular text-text-strong cursor-default inline-flex items-baseline shrink-0 overflow-visible">
-          {language.t("session.todo.progress", { done: done(), total: total() })}
-        </span>
-        <div data-slot="session-todo-preview" class="ml-1 min-w-0 overflow-hidden">
+        <div class="todo-dock-badge">
+          <span class="todo-dock-count">{done()}</span>
+          <span class="todo-dock-separator">/</span>
+          <span class="todo-dock-total">{total()}</span>
+        </div>
+        <div data-slot="session-todo-preview" class="todo-dock-preview">
           <Show when={props.collapsed}>
-            <span class="text-14-regular text-text-base truncate">{active()?.content ?? ""}</span>
+            <span class="todo-dock-active-text">{active()?.content ?? ""}</span>
           </Show>
         </div>
-        <div class="ml-auto">
-          <IconButton
-            data-action="session-todo-toggle-button"
-            data-collapsed={props.collapsed ? "true" : "false"}
-            icon="chevron-down"
-            size="normal"
-            variant="ghost"
-            style={{ transform: `rotate(${props.collapsed ? 180 : 0}deg)` }}
-            onMouseDown={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-            }}
-            onClick={(event) => {
-              event.stopPropagation()
-              props.onToggle()
-            }}
-            aria-label={props.collapsed ? props.expandLabel : props.collapseLabel}
-          />
-        </div>
+        <IconButton
+          data-action="session-todo-toggle-button"
+          data-collapsed={props.collapsed ? "true" : "false"}
+          icon="chevron-down"
+          size="small"
+          variant="ghost"
+          class="todo-dock-chevron"
+          style={{ transform: `rotate(${props.collapsed ? 180 : 0}deg)` }}
+          onMouseDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+          }}
+          onClick={(event) => {
+            event.stopPropagation()
+            props.onToggle()
+          }}
+          aria-label={props.collapsed ? props.expandLabel : props.collapseLabel}
+        />
       </div>
 
       <Show when={!props.collapsed}>
         <div
-          class="relative px-3 pb-11 flex flex-col gap-1.5 max-h-42 overflow-y-auto no-scrollbar"
+          class="todo-dock-list"
           onScroll={(e) => setStuck(e.currentTarget.scrollTop > 0)}
         >
           <For each={props.todos}>
             {(todo) => (
-              <Checkbox readOnly checked={todo.status === "completed"} indeterminate={todo.status === "in_progress"}>
-                <span
-                  class="text-14-regular min-w-0 break-words"
-                  classList={{
-                    "text-text-weak line-through": todo.status === "completed" || todo.status === "cancelled",
-                    "text-text-strong": todo.status !== "completed" && todo.status !== "cancelled",
-                  }}
-                >
-                  {todo.content}
-                </span>
-              </Checkbox>
+              <div class="todo-dock-item">
+                <Checkbox readOnly checked={todo.status === "completed"} indeterminate={todo.status === "in_progress"}>
+                  <span
+                    class="todo-dock-item-text"
+                    classList={{
+                      "todo-dock-item-done": todo.status === "completed" || todo.status === "cancelled",
+                      "todo-dock-item-active": todo.status === "in_progress",
+                      "todo-dock-item-pending": todo.status === "pending",
+                    }}
+                  >
+                    {todo.content}
+                  </span>
+                </Checkbox>
+              </div>
             )}
           </For>
           <div
-            class="pointer-events-none absolute top-0 left-0 right-0 h-4 transition-opacity duration-150"
-            style={{
-              background: "linear-gradient(to bottom, var(--background-base), transparent)",
-              opacity: stuck() ? 1 : 0,
-            }}
+            class="todo-dock-fade"
+            style={{ opacity: stuck() ? 1 : 0 }}
           />
         </div>
       </Show>

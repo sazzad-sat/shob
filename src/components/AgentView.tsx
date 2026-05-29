@@ -343,7 +343,7 @@ function AgentViewInner(props: AgentViewProps) {
   return (
     <DataProvider data={sync.data} directory={props.projectPath ?? ""}>
       <FileComponentProvider component={FilePreview}>
-        <div class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-x-hidden bg-background-stronger text-foreground">
+        <div class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground">
           <div class="relative min-h-0 flex-1 overflow-hidden">
             <div
               class="pointer-events-none absolute bottom-6 left-1/2 z-[60] -translate-x-1/2 transition-all duration-200 ease-out"
@@ -584,7 +584,7 @@ function AgentViewInner(props: AgentViewProps) {
           <Show when={!isNewSession()}>
             <div
               data-component="session-prompt-dock"
-              class="agent-terminal-dock pointer-events-none absolute inset-x-0 bottom-0 z-40 flex w-full flex-col items-center justify-center pb-3"
+              class="agent-terminal-dock pointer-events-none shrink-0 w-full flex flex-col items-center justify-center pb-3"
             >
               <div class="pointer-events-auto w-full px-2 md:px-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
                 <Show when={composerState.questionRequest()} keyed>
