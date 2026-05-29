@@ -205,12 +205,22 @@ export function SettingsAbout() {
               {status() === "checking" ? "Checking..." : status() === "downloading" ? "Downloading..." : status() === "installing" ? "Installing..." : "Check for updates"}
             </Button>
             <Show when={status() === "available" && !updateDownloaded()}>
-              <Button type="button" disabled={isBusy()} onClick={() => void downloadUpdate()}>
+              <Button
+                type="button"
+                class="bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                disabled={downloadInFlight() || status() === "downloading" || status() === "installing"}
+                onClick={() => void downloadUpdate()}
+              >
                 Download
               </Button>
             </Show>
             <Show when={updateDownloaded()}>
-              <Button type="button" disabled={installInFlight() || checkInFlight()} onClick={() => void installUpdate()}>
+              <Button
+                type="button"
+                class="bg-green-600 hover:bg-green-500 text-white font-medium transition-colors"
+                disabled={installInFlight() || status() === "installing"}
+                onClick={() => void installUpdate()}
+              >
                 Restart to install
               </Button>
             </Show>

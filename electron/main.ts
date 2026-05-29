@@ -901,11 +901,10 @@ app.setName("shob");
 app.whenReady().then(async () => {
   applyMacDockIcon();
   registerIpc();
-  try {
-    await ensureServerStarted();
-  } catch (err) {
-    console.error("[shob] failed to start server:", err);
-  }
+  // Start server asynchronously in the background so the window opens instantly
+  void ensureServerStarted().catch((err) => {
+    console.error("[shob] failed to start server in background:", err);
+  });
   await createWindow();
   setupAutoUpdater();
   app.on("activate", () => {
