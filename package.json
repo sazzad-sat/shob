@@ -3,7 +3,7 @@
   "private": true,
   "description": "Desktop app for running and organizing multiple CLI agent sessions in one workspace.",
   "author": "shobcoder",
-  "version": "0.0.27",
+  "version": "0.0.28",
   "type": "module",
   "packageManager": "bun@1.3.14",
   "workspaces": [
@@ -56,7 +56,8 @@
     "win": {
       "target": "nsis",
       "icon": "electron/icons/icon.ico",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "mac": {
       "target": "dmg",
