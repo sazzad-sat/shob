@@ -1,6 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
@@ -42,6 +43,7 @@ console.log(`[sidecar] loaded ${migrations.length} migrations`)
 const result = await Bun.build({
   entrypoints: [path.join(serverDir, "src", "index.ts")],
   conditions: ["browser"],
+  plugins: [createSolidTransformPlugin()],
   compile: {
     outfile: path.join(rootDir, "dist-server", "server"),
   },
