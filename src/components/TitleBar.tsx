@@ -130,36 +130,38 @@ export function TitleBar() {
           }}
         >
           <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" style={{ "-webkit-app-region": "no-drag" }}>
-            <Button
-              variant="ghost"
-              class="titlebar-icon"
-              onClick={() => window.dispatchEvent(new Event("gg-toggle-terminal-panel"))}
-              title={isTerminalPanelOpen() ? "Hide terminal panel" : "Show terminal panel"}
-              aria-label="Toggle terminal panel"
-              aria-pressed={isTerminalPanelOpen()}
-            >
-              <Icon name={isTerminalPanelOpen() ? "terminal-active" : "terminal"} size="small" />
-            </Button>
-            <Button
-              variant="ghost"
-              class="titlebar-icon"
-              onClick={() => window.dispatchEvent(new Event("gg-toggle-file-tree"))}
-              title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
-              aria-label="Toggle file tree"
-              aria-pressed={isFileTreeVisible()}
-            >
-              <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
-            </Button>
-            <Button
-              variant="ghost"
-              class="titlebar-icon"
-              onClick={() => window.dispatchEvent(new Event("gg-toggle-review-workspace"))}
-              title={isReviewVisible() || isFileTreeVisible() ? "Hide file tree and review panel" : "Show file tree and review panel"}
-              aria-label="Toggle review workspace"
-              aria-pressed={isReviewVisible() || isFileTreeVisible()}
-            >
-              <Icon name={isReviewVisible() || isFileTreeVisible() ? "review-active" : "review"} size="small" />
-            </Button>
+            <div class="glass-container flex items-center gap-1 p-1.5 rounded-2xl border">
+              <Button
+                variant="ghost"
+                class="titlebar-icon glass-button"
+                onClick={() => window.dispatchEvent(new Event("gg-toggle-terminal-panel"))}
+                title={isTerminalPanelOpen() ? "Hide terminal panel" : "Show terminal panel"}
+                aria-label="Toggle terminal panel"
+                aria-pressed={isTerminalPanelOpen()}
+              >
+                <Icon name={isTerminalPanelOpen() ? "terminal-active" : "terminal"} size="small" />
+              </Button>
+              <Button
+                variant="ghost"
+                class="titlebar-icon glass-button"
+                onClick={() => window.dispatchEvent(new Event("gg-toggle-file-tree"))}
+                title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
+                aria-label="Toggle file tree"
+                aria-pressed={isFileTreeVisible()}
+              >
+                <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
+              </Button>
+              <Button
+                variant="ghost"
+                class="titlebar-icon glass-button"
+                onClick={() => window.dispatchEvent(new Event("gg-toggle-review-workspace"))}
+                title={isReviewVisible() || isFileTreeVisible() ? "Hide file tree and review panel" : "Show file tree and review panel"}
+                aria-label="Toggle review workspace"
+                aria-pressed={isReviewVisible() || isFileTreeVisible()}
+              >
+                <Icon name={isReviewVisible() || isFileTreeVisible() ? "review-active" : "review"} size="small" />
+              </Button>
+            </div>
           </div>
           {windows() && <div class="shrink-0" style={{ width: `${WINDOWS_CONTROLS_BASE_WIDTH}px` }} />}
         </div>
