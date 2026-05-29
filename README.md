@@ -1,71 +1,67 @@
-# Shob - Run multiple CLI agents across sessions within a single project
+# Shob — The Open AI Agent Workspace
 
 <img width="1912" height="1025" alt="image" src="https://github.com/user-attachments/assets/54ae666c-ffcd-4711-9240-29310f558e34" />
 
-Shob is a desktop app for running and organizing multiple CLI agents in one workspace.
-It helps you keep parallel sessions focused, persistent, and easy to switch between.
+Build faster. Automate more. Stay in control.
 
-## Why Shob
+Shob is an AI agent workspace designed for developers who want to run multiple AI-powered workflows from a single environment. Instead of juggling conversations, terminals, and tools, Shob helps you manage everything in one place.
 
-- Run multiple CLI sessions side by side.
-- Keep session context inside the same project.
-- Switch quickly between tasks without losing flow.
-- Use a desktop-first experience powered by Electron.
+---
 
-## Tech Stack
+## Why Shob?
 
-- React 19 + TypeScript
-- Vite
-- Electron
-- pnpm
+### Parallel AI Sessions
 
-## Project Structure
+Run multiple AI agents simultaneously within the same project. Work on bug fixes, testing, documentation, refactoring, and feature development—all at the same time.
 
-- `src/`: React UI and client logic
-- `src/components/`: UI components and app views
-- `electron/`: Electron main/preload process code
-- `.github/workflows/`: Build and release workflow
+### Smart Permission System
 
-## Requirements
+Every action remains under your control. Review and approve commands, file access, and code changes before they happen.
 
-- Node.js 22+
-- pnpm
+### Deep Git Integration
 
-## Quick Start
+Shob understands your repository, active branch, and local changes, helping AI agents work safely within your development workflow.
 
-```bash
-pnpm install
-pnpm electron
-```
+### Subagent Delegation
 
-## Build
+Break large tasks into smaller pieces. Delegate work to specialized subagents and receive consolidated results from a single workspace.
 
-```bash
-pnpm build
-pnpm build:electron
-```
+### Live Task Tracking
 
-## Scripts
+Monitor progress in real time. Watch agents create plans, execute tasks, and complete objectives step by step.
 
-- `pnpm dev`: Start Vite dev server
-- `pnpm electron`: Run Electron app in development
-- `pnpm build`: Type-check and build frontend
-- `pnpm build:electron`: Build desktop installers with electron-builder
-- `pnpm lint`: Run ESLint
-- `pnpm preview`: Preview production frontend build
+### Terminal & Diff Preview
 
-## Release
+See exactly what agents are doing. Review terminal output and inspect code changes before accepting them.
 
-GitHub Actions builds desktop installers when you push a version tag.
+---
 
-```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
+## Our Vision
 
-Workflow output includes platform builds for Windows, macOS, and Linux.
+We believe powerful AI agents should be accessible to everyone—not just large organizations.
 
-## License
+Our mission is to make AI-powered development and automation affordable, practical, and available to developers, students, freelancers, startups, and teams everywhere.
 
-Proprietary or internal use by default unless you add a license file.
+---
 
+## Current Status
+
+Shob is currently in **Beta**.
+
+We are actively improving the platform and building new capabilities based on community feedback. Every suggestion, issue report, and contribution helps shape the future of the project.
+
+---
+
+## Get Started
+
+**GitHub Repository**
+
+https://github.com/shobcoder/shob
+
+If you find the project useful, consider giving it a star and sharing your feedback.
+
+---
+
+## Tags
+
+#Shob #OpenSource #AIAgents #DeveloperTools #Automation #AI #SoftwareDevelopment #Git #Productivity #Engineering #BuildInPublic #Coding #Developers #Tech
