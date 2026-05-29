@@ -1,7 +1,7 @@
 import { createSignal, onMount, onCleanup, Show, Match, Switch } from "solid-js"
 import { Button } from "@/components/ui/button"
 import { nativeApi } from "@/services/native"
-import { CheckCircle2, AlertCircle, Loader2, Download, RotateCcw, Info, ExternalLink } from "lucide-solid"
+import { CheckCircle2, AlertCircle, Loader2, Download, RotateCcw, Info } from "lucide-solid"
 import { Ico } from "@/components/Ico"
 
 type AboutStatus = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "error" | "installing" | "dev"
@@ -331,31 +331,6 @@ export function SettingsAbout() {
         <Show when={lastCheckedAt()}>
           <p class="text-[11px] text-muted-foreground">Last checked: {lastCheckedAt()}</p>
         </Show>
-      </div>
-
-      {/* Links */}
-      <div class="rounded-xl border border-border/80 bg-card/40 p-5 backdrop-blur-xs space-y-3">
-        <h3 class="font-medium text-foreground text-sm">Links</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <a
-            href="https://github.com/shobcoder/shob"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-2 p-2.5 rounded-lg border border-border/40 bg-background/30 hover:bg-background/60 transition-colors text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ExternalLink class="h-3.5 w-3.5 shrink-0" />
-            <span>GitHub Repository</span>
-          </a>
-          <a
-            href="https://github.com/shobcoder/shob/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-2 p-2.5 rounded-lg border border-border/40 bg-background/30 hover:bg-background/60 transition-colors text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ExternalLink class="h-3.5 w-3.5 shrink-0" />
-            <span>Release Notes</span>
-          </a>
-        </div>
       </div>
 
       {/* Copyright */}
