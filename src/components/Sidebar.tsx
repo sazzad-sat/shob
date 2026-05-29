@@ -31,7 +31,7 @@ const formatSessionAge = (createdAt: number | null | undefined, now: number) => 
 const ChevronIcon = (props: { isOpen: boolean }) => (
   <svg
     viewBox="0 0 24 24"
-    class={`size-3 transition-transform duration-200 shrink-0 ${props.isOpen ? "rotate-90 text-foreground/80" : "text-muted-foreground/40"}`}
+    class={`size-3 transition-transform duration-200 shrink-0 ${props.isOpen ? "rotate-90 text-text-base" : "text-text-weaker"}`}
     fill="none"
     stroke="currentColor"
     stroke-width="3"
@@ -162,14 +162,14 @@ function FolderSection(props: {
       <div
         class={`group/session relative flex cursor-pointer items-center justify-between rounded-md py-[5.5px] pr-3 transition-all duration-150 ${
           props.activeSessionId === session.id
-            ? "bg-secondary/70 text-foreground font-semibold shadow-xs"
-            : "hover:bg-sidebar-accent/50 text-foreground/80 hover:text-foreground"
+            ? "bg-surface-raised-base text-text-strong font-semibold shadow-xs"
+            : "hover:bg-surface-raised-base-hover text-text-base hover:text-text-strong"
         }`}
         style={{ "padding-left": `${12 + level * 14}px` }}
         onClick={() => props.onSelectSession(props.project.id, session.id)}
       >
         <Show when={props.activeSessionId === session.id}>
-          <div class="absolute left-0 top-[20%] bottom-[20%] w-[3px] rounded-r-md bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-in slide-in-from-left duration-200" />
+          <div class="absolute left-0 top-[20%] bottom-[20%] w-[3px] rounded-r-md bg-surface-brand-base shadow-[0_0_8px_var(--surface-brand-base)] animate-in slide-in-from-left duration-200" />
         </Show>
         <div class="min-w-0 flex flex-1 items-center gap-1.5">
           <div class="flex size-4 items-center justify-center">
@@ -195,7 +195,7 @@ function FolderSection(props: {
             fallback={
               <span
                 class={`truncate text-[13px] ${
-                  props.activeSessionId === session.id ? "font-medium text-foreground" : "text-foreground/90"
+                  props.activeSessionId === session.id ? "font-medium text-text-strong" : "text-text-base"
                 }`}
                 onDblClick={(e) => {
                   e.stopPropagation()
@@ -210,7 +210,7 @@ function FolderSection(props: {
           >
             <input
               type="text"
-              class="min-w-0 flex-1 rounded border border-sidebar-border bg-sidebar-accent/50 px-1 py-0 text-[13px] text-foreground focus:border-sidebar-border/80 focus:bg-sidebar-accent focus:outline-none"
+              class="min-w-0 flex-1 rounded border border-border-weak-base bg-surface-raised-base px-1 py-0 text-[13px] text-text-strong focus:border-border-weak-hover focus:bg-surface-raised-base-hover focus:outline-none"
               value={editSessionValue()}
               onInput={(e) => setEditSessionValue(e.currentTarget.value)}
               onKeyDown={(e) => {
@@ -234,7 +234,7 @@ function FolderSection(props: {
         <div class="relative ml-3 flex h-5 w-6 shrink-0 items-center justify-end">
           <button
             type="button"
-            class="absolute right-0 z-10 rounded p-0.5 text-muted-foreground opacity-0 transition-all duration-150 hover:bg-accent hover:text-foreground group-hover/session:opacity-100"
+            class="absolute right-0 z-10 rounded p-0.5 text-text-weak opacity-0 transition-all duration-150 hover:bg-surface-raised-base-hover hover:text-text-strong group-hover/session:opacity-100"
             title="Archive session"
             onClick={(e) => {
               e.stopPropagation()
@@ -243,7 +243,7 @@ function FolderSection(props: {
           >
             <SessionDeleteIcon />
           </button>
-          <span class="pointer-events-none text-[12px] font-medium text-muted-foreground transition-opacity duration-150 group-hover/session:opacity-0">
+          <span class="pointer-events-none text-[12px] font-medium text-text-weak transition-opacity duration-150 group-hover/session:opacity-0">
             {formatSessionAge(session.lastActiveAt ?? session.createdAt, sortNow())}
           </span>
         </div>
@@ -279,25 +279,25 @@ function FolderSection(props: {
   return (
     <div class="flex flex-col">
       <div
-        class="group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent/60"
+        class="group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-surface-raised-base-hover"
         onClick={() => {
           props.onOpenWorkspacePage?.()
           props.onSelectProject(props.project.id)
           setIsOpen(!isOpen())
         }}
       >
-        <div class="flex items-center gap-2 text-muted-foreground select-none">
+        <div class="flex items-center gap-2 text-text-weak select-none">
           <ChevronIcon isOpen={isOpen()} />
-          <span class="text-amber-500/80 transition-colors group-hover:text-amber-500">
+          <span class="text-icon-warning-base transition-colors group-hover:text-icon-warning-hover">
             <ProjectFolderIcon />
           </span>
-          <span class="text-[13px] leading-none font-semibold text-foreground/80 group-hover:text-foreground transition-colors">{props.project.name}</span>
+          <span class="text-[13px] leading-none font-semibold text-text-base group-hover:text-text-strong transition-colors">{props.project.name}</span>
         </div>
 
         <div class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           <div class="relative flex items-center" ref={menuRef}>
             <button
-              class="rounded p-1 text-sidebar-foreground transition-colors hover:bg-accent"
+              class="rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(!showMenu())
@@ -307,9 +307,9 @@ function FolderSection(props: {
             </button>
 
             <Show when={showMenu()}>
-              <div class="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded border border-border bg-card py-1 text-[12px] text-sidebar-foreground shadow-xl">
+              <div class="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded border border-border-base bg-surface-raised-base py-1 text-[12px] text-text-strong shadow-xl">
                 <button
-                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-destructive transition-colors hover:bg-accent"
+                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-icon-critical-base transition-colors hover:bg-surface-raised-base-hover"
                   onClick={(e) => {
                     e.stopPropagation()
                     setShowMenu(false)
@@ -324,7 +324,7 @@ function FolderSection(props: {
           </div>
           <div class="relative flex items-center">
             <button
-              class="peer rounded p-1 text-sidebar-foreground transition-colors hover:bg-accent"
+              class="peer rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover"
               onClick={(e) => {
                 e.stopPropagation()
                 void props.onCreateSession(props.project.id)
@@ -333,7 +333,7 @@ function FolderSection(props: {
               <SquarePen size={14} />
             </button>
 
-            <div class="pointer-events-none absolute top-full right-0 z-50 mt-1.5 whitespace-nowrap rounded border border-border bg-card px-3 py-1.5 text-[12px] text-sidebar-foreground opacity-0 shadow-xl transition-opacity peer-hover:opacity-100">
+            <div class="pointer-events-none absolute top-full right-0 z-50 mt-1.5 whitespace-nowrap rounded border border-border-base bg-surface-raised-base px-3 py-1.5 text-[12px] text-text-strong opacity-0 shadow-xl transition-opacity peer-hover:opacity-100">
               Start new chat in {props.project.name}
             </div>
           </div>
@@ -345,7 +345,7 @@ function FolderSection(props: {
           <Show
             when={(sessionsByParent().map.get(sessionsByParent().ROOT) ?? []).length > 0}
             fallback={
-              <div class="py-2.5 pr-4 pl-3.5 text-[12px] text-muted-foreground/45 italic font-light select-none">
+              <div class="py-2.5 pr-4 pl-3.5 text-[12px] text-text-weaker italic font-light select-none">
                 No active chats
               </div>
             }
@@ -484,7 +484,7 @@ export function Sidebar(props: {
   return (
     <aside
       class={`relative h-full shrink-0 ${
-        isSidebarVisible() ? "border-r border-sidebar-border" : "w-0 border-r-0"
+        isSidebarVisible() ? "border-r border-border-weak-base" : "w-0 border-r-0"
       }`}
       style={isSidebarVisible() ? { width: `${sidebarWidth()}px` } : undefined}
     >
@@ -493,32 +493,32 @@ export function Sidebar(props: {
           edge="end"
           onResize={(clientX) => setSidebarWidth(Math.max(220, Math.min(520, clientX)))}
         />
-        <div class="relative flex h-full max-h-full flex-col bg-sidebar select-none">
-          <div class="sticky top-0 z-10 flex flex-col border-b border-sidebar-border/70 bg-sidebar select-none">
+        <div class="relative flex h-full max-h-full flex-col bg-background-stronger select-none">
+          <div class="sticky top-0 z-10 flex flex-col border-b border-border-weaker-base bg-background-stronger select-none">
             <div class="flex items-center justify-between px-4 pt-3.5 pb-2.5">
               <div class="flex items-center gap-2 select-none">
                 <span class="relative flex h-1.5 w-1.5">
                   <Show when={server.healthy() !== false}>
                     <span 
                       class={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                        server.healthy() === true ? "bg-green-400" : "bg-amber-400"
+                        server.healthy() === true ? "bg-icon-success-base" : "bg-icon-warning-base"
                       }`} 
                     />
                   </Show>
                   <span 
                     class={`relative inline-flex rounded-full h-1.5 w-1.5 ${
                       server.healthy() === true
-                        ? "bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]"
+                        ? "bg-icon-success-base shadow-[0_0_4px_var(--icon-success-base)]"
                         : server.healthy() === false
-                        ? "bg-red-500"
-                        : "bg-amber-500"
+                        ? "bg-icon-critical-base"
+                        : "bg-icon-warning-base"
                     }`} 
                   />
                 </span>
-                <span class="text-[12px] font-bold tracking-wide text-muted-foreground uppercase">Projects</span>
+                <span class="text-[12px] font-bold tracking-wide text-text-weak uppercase">Projects</span>
               </div>
               <button
-                class="flex items-center justify-center rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-sidebar-foreground"
+                class="flex items-center justify-center rounded-md p-0.5 text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
                 title="New Project"
                 onClick={() => void handleAddProject()}
               >
@@ -548,10 +548,10 @@ export function Sidebar(props: {
             </div>
           </div>
 
-          <div class="border-t border-sidebar-border p-2">
+          <div class="border-t border-border-weak-base p-2">
             <button
               type="button"
-              class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-foreground transition-colors hover:bg-sidebar-accent/80"
+              class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-text-strong transition-colors hover:bg-surface-raised-base-hover"
               title="Settings"
               onClick={() => {
                 props.onOpenSettingsPage?.()
