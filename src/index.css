@@ -1452,8 +1452,8 @@ button {
 
 .agent-terminal-view [data-component="context-tool-batch"] {
   border-left: 1px solid var(--terminal-agent-border-soft) !important;
-  margin: 8px 0 0 -18px !important;
-  padding: 6px 0 0 18px !important;
+  margin: 8px 0 0 -41px !important;
+  padding: 6px 0 0 19px !important;
   gap: 7px !important;
 }
 
