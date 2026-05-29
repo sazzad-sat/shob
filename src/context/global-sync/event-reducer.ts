@@ -9,6 +9,7 @@ import type {
   QuestionRequest,
   Session,
   SessionStatus,
+  EventSessionError,
   SnapshotFileDiff,
   Todo,
 } from "@opencode-ai/sdk/v2/client"
@@ -18,6 +19,15 @@ import { dropSessionCaches } from "./session-cache"
 import { diffs as list, message as clean } from "@/utils/diffs"
 
 const SKIP_PARTS = new Set(["patch", "step-start", "step-finish"])
+
+function clearSessionError(input: { setStore: SetStoreFunction<State>; sessionID: string }) {
+  input.setStore(
+    "session_error",
+    produce((draft) => {
+      delete draft[input.sessionID]
+    }),
+  )
+}
 
 export function applyGlobalEvent(input: {
   event: { type: string; properties?: unknown }
@@ -68,6 +78,7 @@ export function cleanupDroppedSessionCaches(
   const stale = [
     ...Object.keys(store.message),
     ...Object.keys(store.session_diff),
+    ...Object.keys(store.session_error),
     ...Object.keys(store.todo),
     ...Object.keys(store.permission),
     ...Object.keys(store.question),
@@ -176,10 +187,25 @@ export function applyDirectoryEvent(input: {
     case "session.status": {
       const props = event.properties as { sessionID: string; status: SessionStatus }
       input.setStore("session_status", props.sessionID, reconcile(props.status))
+      if (props.status.type === "busy") clearSessionError({ setStore: input.setStore, sessionID: props.sessionID })
+      break
+    }
+    case "session.error": {
+      const props = event.properties as EventSessionError["properties"]
+      if (!props.sessionID) break
+      if (props.error?.name === "MessageAbortedError" || props.error?.name === "ContextOverflowError") {
+        clearSessionError({ setStore: input.setStore, sessionID: props.sessionID })
+        break
+      }
+      input.setStore("session_status", props.sessionID, { type: "idle" })
+      input.setStore("session_error", props.sessionID, props.error)
       break
     }
     case "message.updated": {
       const info = clean((event.properties as { info: Message }).info)
+      if (info.role === "user" || (info.role === "assistant" && info.error)) {
+        clearSessionError({ setStore: input.setStore, sessionID: info.sessionID })
+      }
       const messages = input.store.message[info.sessionID]
       if (!messages) {
         input.setStore("message", info.sessionID, [info])

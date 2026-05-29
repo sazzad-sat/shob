@@ -12,6 +12,7 @@ import type {
   ProviderListResponse,
   QuestionRequest,
   Session,
+  EventSessionError,
   SessionStatus,
   SnapshotFileDiff,
   Todo,
@@ -46,6 +47,9 @@ export type State = {
   sessionTotal: number
   session_status: {
     [sessionID: string]: SessionStatus
+  }
+  session_error: {
+    [sessionID: string]: EventSessionError["properties"]["error"]
   }
   session_diff: {
     [sessionID: string]: SnapshotFileDiff[]

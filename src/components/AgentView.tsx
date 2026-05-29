@@ -14,7 +14,7 @@ import { SessionTodoDock } from "@/opencode-ported/composer/session-todo-dock"
 import { useLanguage } from "@/context/language"
 import { File as OpenCodeFile } from "@opencode-ai/ui/file"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
-import type { Message as ChatMessage, Part } from "@opencode-ai/sdk/v2/client"
+import type { EventSessionError, Message as ChatMessage, Part, SessionStatus } from "@opencode-ai/sdk/v2/client"
 import { useLocal } from "@/context/local"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { TextField } from "@opencode-ai/ui/text-field"
@@ -25,6 +25,11 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectModel } from "@/components/dialog-select-model"
 import { nativeApi } from "@/services/native"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
+import { Card, CardDescription, CardTitle } from "@opencode-ai/ui/card"
+import { SessionRetry } from "@opencode-ai/ui/session-retry"
+import { showToast } from "@opencode-ai/ui/toast"
+import { useSDK } from "@/context/sdk"
+import { formatServerError } from "@/utils/server-errors"
 
 interface AgentViewProps {
   sessionId: string
@@ -35,6 +40,37 @@ const basename = (path?: string | null) => {
   if (!path) return "No project"
   const parts = path.split(/[\\/]/).filter(Boolean)
   return parts[parts.length - 1] || path
+}
+
+const idleStatus: SessionStatus = { type: "idle" }
+
+function isAbortError(error: EventSessionError["properties"]["error"] | undefined) {
+  return error?.name === "MessageAbortedError"
+}
+
+function isRecoveringError(error: EventSessionError["properties"]["error"] | undefined) {
+  return error?.name === "ContextOverflowError"
+}
+
+function assistantMessageError(message: ChatMessage | undefined) {
+  if (!message || message.role !== "assistant") return
+  const error = (message as { error?: EventSessionError["properties"]["error"] }).error
+  if (isAbortError(error) || isRecoveringError(error)) return
+  return error
+}
+
+function AgentTurnError(props: { error: EventSessionError["properties"]["error"] | unknown }) {
+  const language = useLanguage()
+  const detail = createMemo(() =>
+    formatServerError(props.error, language.t, language.t("notification.session.error.fallbackDescription")),
+  )
+
+  return (
+    <Card variant="error" class="agent-terminal-error-card error-card">
+      <CardTitle variant="error">{language.t("notification.session.error.title")}</CardTitle>
+      <CardDescription>{detail()}</CardDescription>
+    </Card>
+  )
 }
 
 function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
@@ -72,6 +108,7 @@ function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
 
 function AgentViewInner(props: AgentViewProps) {
   const sync = useSync()
+  const sdk = useSDK()
   const params = useParams()
   const navigate = useNavigate()
   const activeSidebarSessionId = useStore((s) => s.activeSessionId)
@@ -114,11 +151,18 @@ function AgentViewInner(props: AgentViewProps) {
     const session = info() as { parentID?: string } | undefined
     return session?.parentID
   })
-  const status = createMemo(() => {
+  const statusInfo = createMemo<SessionStatus>(() => {
     const sessionID = activeSessionId()
-    return sessionID ? sync.data.session_status[sessionID]?.type ?? "idle" : "idle"
+    return sessionID ? sync.data.session_status[sessionID] ?? idleStatus : idleStatus
   })
+  const status = createMemo(() => statusInfo().type)
   const working = createMemo(() => status() !== "idle")
+  const sessionEventError = createMemo(() => {
+    const sessionID = activeSessionId()
+    const error = sessionID ? sync.data.session_error[sessionID] : undefined
+    if (isAbortError(error) || isRecoveringError(error)) return
+    return error
+  })
   const currentProjectName = createMemo(() => {
     const current = projects().find((project) => project.id === currentProjectId())
     return current?.name || basename(current?.path || props.projectPath)
@@ -206,6 +250,32 @@ function AgentViewInner(props: AgentViewProps) {
       rafId = undefined
     })
   }
+
+  createEffect(() => {
+    const sessionID = activeSessionId()
+    if (!sessionID) return
+
+    let lastToastID = ""
+    const unsub = sdk.event.on("session.error", (event) => {
+      const props = event.properties
+      if (props.sessionID && props.sessionID !== sessionID) return
+      if (isAbortError(props.error) || isRecoveringError(props.error)) return
+      if (event.id === lastToastID) return
+
+      lastToastID = event.id
+      showToast({
+        variant: "error",
+        title: language.t("notification.session.error.title"),
+        description: formatServerError(
+          props.error,
+          language.t,
+          language.t("notification.session.error.fallbackDescription"),
+        ),
+      })
+      queueMicrotask(scheduleJumpStateUpdate)
+    })
+    onCleanup(unsub)
+  })
 
   const jumpToBottom = () => {
     autoScroll.forceScrollToBottom()
@@ -344,6 +414,7 @@ function AgentViewInner(props: AgentViewProps) {
                       const assistantVisible = createMemo(() => {
                         let visible = 0
                         for (const msg of assistants()) {
+                          if (assistantMessageError(msg)) visible++
                           const parts = getParts(msg.id)
                           for (const part of parts) {
                             if (part.type === "text" && part.text?.trim()) visible++
@@ -352,6 +423,19 @@ function AgentViewInner(props: AgentViewProps) {
                         }
                         return visible
                       })
+                      const assistantError = createMemo(() => {
+                        for (const msg of assistants()) {
+                          const error = assistantMessageError(msg)
+                          if (error) return error
+                        }
+                      })
+                      const turnError = createMemo(() => assistantError() ?? (latestTurn() ? sessionEventError() : undefined))
+                      const showAssistantBlock = createMemo(
+                        () => assistants().length > 0 || !!turnError() || (latestTurn() && statusInfo().type === "retry"),
+                      )
+                      const showThinking = createMemo(
+                        () => working() && latestTurn() && assistantVisible() === 0 && !turnError() && statusInfo().type !== "retry",
+                      )
 
                       return (
                         <div
@@ -369,7 +453,7 @@ function AgentViewInner(props: AgentViewProps) {
                             </div>
                           </div>
 
-                          <Show when={assistants().length > 0}>
+                          <Show when={showAssistantBlock()}>
                             <div
                               data-message-id={message.id}
                               data-timeline-row="AssistantPart"
@@ -377,26 +461,34 @@ function AgentViewInner(props: AgentViewProps) {
                             >
                               <div data-component="session-turn" class="relative min-w-0 w-full">
                                 <div data-slot="session-turn-message-container" class="w-full">
-                                  <div
-                                    data-slot="session-turn-assistant-content"
-                                    aria-hidden={working() && latestTurn()}
-                                  >
-                                    <AssistantParts
-                                      messages={assistants() as any}
-                                      showReasoningSummaries={true}
-                                      working={working() && latestTurn()}
-                                      turnDurationMs={turnDurationMs(message, assistants())}
-                                      showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
-                                      shellToolDefaultOpen={false}
-                                      editToolDefaultOpen={false}
-                                    />
-                                  </div>
+                                  <Show when={assistants().length > 0}>
+                                    <div
+                                      data-slot="session-turn-assistant-content"
+                                      aria-hidden={working() && latestTurn()}
+                                    >
+                                      <AssistantParts
+                                        messages={assistants() as any}
+                                        showReasoningSummaries={true}
+                                        working={working() && latestTurn()}
+                                        turnDurationMs={turnDurationMs(message, assistants())}
+                                        showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
+                                        shellToolDefaultOpen={false}
+                                        editToolDefaultOpen={false}
+                                      />
+                                    </div>
+                                  </Show>
+                                  <Show when={latestTurn()}>
+                                    <SessionRetry status={statusInfo()} show={!turnError()} />
+                                  </Show>
+                                  <Show when={turnError()} keyed>
+                                    {(error) => <AgentTurnError error={error} />}
+                                  </Show>
                                 </div>
                               </div>
                             </div>
                           </Show>
 
-                          <Show when={working() && latestTurn() && assistantVisible() === 0}>
+                          <Show when={showThinking()}>
                             <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3">
                               <div data-component="session-turn" class="relative min-w-0 w-full">
                                 <div data-slot="session-turn-message-container" class="w-full">
@@ -420,6 +512,9 @@ function AgentViewInner(props: AgentViewProps) {
                             <div data-slot="session-turn-assistant-content">
                               <Message message={message} parts={getParts(message.id)} showReasoningSummaries={true} />
                             </div>
+                            <Show when={assistantMessageError(message)} keyed>
+                              {(error) => <AgentTurnError error={error} />}
+                            </Show>
                           </div>
                         </div>
                       </div>

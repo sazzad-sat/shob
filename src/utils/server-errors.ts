@@ -28,10 +28,23 @@ function tr(translator: Translator | undefined, key: string, text: string, vars?
 export function formatServerError(error: unknown, translate?: Translator, fallback?: string) {
   if (isConfigInvalidErrorLike(error)) return parseReadableConfigInvalidError(error, translate)
   if (isProviderModelNotFoundErrorLike(error)) return parseReadableProviderModelNotFoundError(error, translate)
+  const named = parseNamedErrorMessage(error)
+  if (named) return named
   if (error instanceof Error && error.message) return error.message
   if (typeof error === "string" && error) return error
   if (fallback) return fallback
   return tr(translate, "error.chain.unknown", "Unknown error")
+}
+
+function parseNamedErrorMessage(error: unknown) {
+  if (typeof error !== "object" || error === null) return
+  const record = error as Record<string, unknown>
+  const name = typeof record.name === "string" ? record.name : ""
+  const data = typeof record.data === "object" && record.data !== null ? (record.data as Record<string, unknown>) : undefined
+  const message = data && typeof data.message === "string" ? data.message.trim() : ""
+  if (message) return message
+  if (data && typeof data.responseBody === "string" && data.responseBody.trim()) return data.responseBody.trim()
+  if (name) return name.replace(/([a-z])([A-Z])/g, "$1 $2")
 }
 
 function isConfigInvalidErrorLike(error: unknown): error is ConfigInvalidError {

@@ -252,7 +252,6 @@ export const SettingsProviders: Component = () => {
                 <PopularRow
                   item={item}
                   note={note(item.id) ? language.t(note(item.id)!) : undefined}
-                  showRecommended={item.id === "opencode" || item.id === "opencode-go"}
                   onConnect={() => dialog.show(() => <DialogConnectProvider provider={item.id} />)}
                   connectLabel={language.t("common.connect")}
                   recommendedLabel={language.t("dialog.provider.tag.recommended")}

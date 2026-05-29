@@ -1517,6 +1517,27 @@ button {
   max-height: none !important;
 }
 
+.agent-terminal-view .agent-terminal-error-card {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--icon-critical-base) 28%, var(--terminal-agent-border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-critical-weak, #3b1111) 24%, transparent);
+  color: var(--text-strong);
+}
+
+.agent-terminal-view .agent-terminal-error-card [data-slot="card-title"] {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agent-terminal-view .agent-terminal-error-card [data-slot="card-description"] {
+  color: var(--text-base);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .agent-terminal-view [data-component="tool-part-wrapper"],
 .agent-terminal-view [data-component="task-tool-card"],
 .agent-terminal-view [data-component="tool-trigger"] {

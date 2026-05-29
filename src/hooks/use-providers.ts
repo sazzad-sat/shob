@@ -2,8 +2,6 @@ import { useGlobalSync } from "@/context/global-sync"
 import { createMemo } from "solid-js"
 
 export const popularProviders = [
-  "opencode",
-  "opencode-go",
   "anthropic",
   "github-copilot",
   "openai",
