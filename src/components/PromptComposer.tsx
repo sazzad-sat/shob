@@ -1,4 +1,4 @@
-import { createSignal, onMount } from 'solid-js'
+import { createSignal, onMount, Show } from 'solid-js'
 import { Send, CornerDownLeft, Plus, Globe } from 'lucide-solid'
 
 interface PromptComposerProps {
@@ -9,6 +9,7 @@ interface PromptComposerProps {
 
 export function PromptComposer(props: PromptComposerProps) {
   const [text, setText] = createSignal('')
+  const [isFocused, setIsFocused] = createSignal(false)
   let textareaRef: HTMLTextAreaElement | undefined
 
   const adjustHeight = () => {
@@ -38,63 +39,56 @@ export function PromptComposer(props: PromptComposerProps) {
     adjustHeight()
   })
 
+  const hasText = () => text().trim().length > 0
+
   return (
-    <div class="relative flex w-full flex-col font-sans transition-[box-shadow,margin] duration-300 rounded-xl bg-surface-base border border-border-base shadow-sm focus-within:ring-1 focus-within:ring-ring focus-within:border-ring">
-      <div class="group relative flex w-full flex-col overflow-hidden">
-        <div class="relative flex w-full min-w-0 flex-1 flex-col pb-0">
-          <div class="relative flex w-full min-w-0 flex-1 flex-col overflow-hidden py-1">
-            <textarea
-              ref={textareaRef}
-              class="w-full resize-none bg-transparent px-3 py-2 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none custom-scrollbar min-h-[44px] max-h-[40vh] leading-relaxed"
-              placeholder={props.placeholder || "Message Agent..."}
-              value={text()}
-              onInput={(e) => {
-                setText(e.currentTarget.value)
-                adjustHeight()
-              }}
-              onKeyDown={handleKeyDown}
-              disabled={props.disabled}
-              rows={1}
-            />
-          </div>
+    <div
+      class="prompt-shell"
+      data-focused={isFocused()}
+      data-has-text={hasText()}
+    >
+      <textarea
+        ref={textareaRef}
+        class="prompt-input"
+        placeholder={props.placeholder || "Message Agent..."}
+        value={text()}
+        onInput={(e) => {
+          setText(e.currentTarget.value)
+          adjustHeight()
+        }}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        disabled={props.disabled}
+        rows={1}
+      />
+
+      <div class="prompt-bar">
+        <div class="prompt-actions-left">
+          <button class="prompt-btn-icon" title="Attach File">
+            <Plus size={15} />
+          </button>
+          <button class="prompt-btn-text" title="Add Context">
+            <Globe size={13} />
+            <span>Context</span>
+          </button>
         </div>
-      </div>
 
-      <div class="relative flex w-full shrink-0 flex-col overflow-hidden">
-        <div class="flex min-h-11 w-full flex-row items-end justify-between px-2 pb-2">
-          {/* Left tools (Attach, Context, etc.) */}
-          <div class="flex items-center gap-1.5 pb-0.5">
-            <button
-              class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-base-hover hover:text-foreground transition-colors"
-              title="Attach File"
-            >
-              <Plus size={16} />
-            </button>
-            <button
-              class="flex h-8 items-center gap-1.5 px-2 rounded-md text-muted-foreground hover:bg-surface-base-hover hover:text-foreground transition-colors text-xs font-medium"
-              title="Add Context"
-            >
-              <Globe size={14} />
-              <span>Context</span>
-            </button>
-          </div>
-
-          {/* Right tools (Submit) */}
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] text-muted-foreground select-none pointer-events-none hidden sm:flex items-center gap-1 opacity-60 font-medium pb-1">
-              <CornerDownLeft size={12} />
-              Return to send
+        <div class="prompt-actions-right">
+          <Show when={!hasText()}>
+            <span class="prompt-hint">
+              <CornerDownLeft size={11} />
+              <span>Enter to send</span>
             </span>
-            <button
-              onClick={handleSubmit}
-              disabled={!text().trim() || props.disabled}
-              class="flex h-8 items-center justify-center gap-2 px-3 rounded-md bg-sidebar-primary text-sidebar-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm text-sm font-medium"
-              title="Send message"
-            >
-              <span>Send</span>
-              <Send size={14} class="ml-0.5" />
-            </button>
-          </div>
+          </Show>
+          <button
+            class="prompt-submit"
+            onClick={handleSubmit}
+            disabled={!hasText() || props.disabled}
+            title="Send message"
+          >
+            <Send size={14} />
+          </button>
         </div>
       </div>
     </div>

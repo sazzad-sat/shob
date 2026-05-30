@@ -1,0 +1,168 @@
+/* ═══════════════════════════════════════════════════
+   PROMPT SHELL — minimal glass input
+   ═══════════════════════════════════════════════════ */
+
+.prompt-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+  overflow: hidden;
+}
+
+.prompt-shell:hover {
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+
+.prompt-shell[data-focused="true"] {
+  border-color: color-mix(in srgb, var(--ring) 40%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 15%, transparent);
+  background: color-mix(in srgb, var(--card) 75%, transparent);
+}
+
+/* ── Input area ──────────────────────────────────── */
+
+.prompt-input {
+  width: 100%;
+  min-height: 44px;
+  max-height: 40vh;
+  padding: 12px 14px 4px;
+  resize: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  caret-color: var(--foreground);
+}
+
+.prompt-input::placeholder {
+  color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+}
+
+.prompt-input::selection {
+  background-color: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* ── Bottom bar ──────────────────────────────────── */
+
+.prompt-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 8px;
+  gap: 8px;
+}
+
+.prompt-actions-left,
+.prompt-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Buttons ─────────────────────────────────────── */
+
+.prompt-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.prompt-btn-icon:hover {
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--foreground);
+}
+
+.prompt-btn-text {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.prompt-btn-text:hover {
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--foreground);
+}
+
+/* ── Hint text ───────────────────────────────────── */
+
+.prompt-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  color: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── Submit button ───────────────────────────────── */
+
+.prompt-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: none;
+  background: var(--foreground);
+  color: var(--background);
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
+}
+
+.prompt-submit:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.prompt-submit:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.prompt-submit:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
