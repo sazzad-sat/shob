@@ -4,6 +4,22 @@ import { iife } from "@/util/iife"
 import type { ProviderID } from "./schema"
 
 export namespace ProviderError {
+  export class HeaderTimeoutError extends Error {
+    public override readonly name = "ProviderHeaderTimeoutError"
+
+    constructor(public readonly ms: number) {
+      super(`Provider response headers timed out after ${ms}ms`)
+    }
+  }
+
+  export class ResponseStreamError extends Error {
+    public override readonly name = "ProviderResponseStreamError"
+
+    constructor(message: string, options?: ErrorOptions) {
+      super(message, options)
+    }
+  }
+
   // Adapted from overflow detection patterns in:
   // https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/utils/overflow.ts
   const OVERFLOW_PATTERNS = [

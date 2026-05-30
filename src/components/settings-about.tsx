@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button"
 import { nativeApi } from "@/services/native"
 import { CheckCircle2, AlertCircle, Loader2, Download, RotateCcw, Info } from "lucide-solid"
 import { Ico } from "@/components/Ico"
+import { useSettings } from "@/context/settings"
 
 type AboutStatus = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "error" | "installing" | "dev"
 
 export function SettingsAbout() {
+  const settings = useSettings()
   const [appName, setAppName] = createSignal("shob")
   const [version, setVersion] = createSignal("")
   const [platform, setPlatform] = createSignal("")
@@ -208,8 +210,21 @@ export function SettingsAbout() {
       <div class="rounded-xl border border-border/80 bg-card/40 p-5 backdrop-blur-xs space-y-4">
         <div>
           <h3 class="font-medium text-foreground text-sm">Updates</h3>
-          <p class="text-xs text-muted-foreground mt-0.5">Check for new versions and manage updates.</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Check for new versions, download updates in the background, and restart when ready.</p>
         </div>
+
+        <label class="flex items-center justify-between gap-4 rounded-lg border border-border/40 bg-background/50 p-3">
+          <span class="min-w-0">
+            <span class="block text-sm text-foreground">Check on startup</span>
+            <span class="block text-xs text-muted-foreground">Shob checks shortly after launch and downloads available updates automatically.</span>
+          </span>
+          <input
+            type="checkbox"
+            class="h-4 w-4 shrink-0 accent-primary"
+            checked={settings.updates.startup()}
+            onChange={(event) => settings.updates.setStartup(event.currentTarget.checked)}
+          />
+        </label>
 
         {/* Status Display */}
         <div class="flex items-start gap-3 p-3 rounded-lg bg-background/50 border border-border/40">
@@ -310,7 +325,7 @@ export function SettingsAbout() {
               onClick={() => void downloadUpdate()}
             >
               <Download class="h-3.5 w-3.5 mr-1.5" />
-              Download
+              Download now
             </Button>
           </Show>
 

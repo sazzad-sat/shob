@@ -48,6 +48,8 @@ let serverInstance: ServerInstance | null = null;
 let serverStartPromise: Promise<ServerInstance> | null = null;
 const ptySessions = new Map<string, PtyRuntime>();
 let downloadedUpdateVersion: string | null = null;
+let availableUpdateVersion: string | null = null;
+let updateDownloadInFlight = false;
 const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
 const TITLEBAR_HEIGHT = 40;
@@ -122,17 +124,28 @@ function setupAutoUpdater() {
 
   autoUpdater.on("error", (error) => {
     console.warn("[shob] auto update failed:", error);
+    updateDownloadInFlight = false;
     sendUpdateEvent("error", error instanceof Error ? error.message : String(error));
   });
 
   autoUpdater.on("update-available", (info) => {
     console.log("[shob] update available:", info.version);
+    availableUpdateVersion = info.version;
     downloadedUpdateVersion = null;
+    updateDownloadInFlight = true;
     sendUpdateEvent("available", info);
+    autoUpdater.downloadUpdate().catch((error) => {
+      updateDownloadInFlight = false;
+      console.warn("[shob] failed to auto-download update:", error);
+      sendUpdateEvent("error", error instanceof Error ? error.message : String(error));
+    });
   });
 
   autoUpdater.on("update-not-available", (info) => {
     console.log("[shob] update not available:", info.version);
+    availableUpdateVersion = null;
+    downloadedUpdateVersion = null;
+    updateDownloadInFlight = false;
     sendUpdateEvent("not-available", info);
   });
 
@@ -148,16 +161,11 @@ function setupAutoUpdater() {
 
   autoUpdater.on("update-downloaded", (info) => {
     console.log("[shob] update downloaded:", info.version);
+    availableUpdateVersion = info.version;
     downloadedUpdateVersion = info.version;
+    updateDownloadInFlight = false;
     sendUpdateEvent("downloaded", info);
   });
-
-  // Delay the initial update check by 5 seconds so the window is fully loaded
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch((error) => {
-      console.warn("[shob] initial update check failed:", error);
-    });
-  }, 5000);
 }
 
 function getImageMimeType(filePath: string) {
@@ -563,6 +571,20 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
     packaged: app.isPackaged,
     platform: normalizeOs(),
   }),
+  get_update_status: async () => ({
+    status: !app.isPackaged
+      ? "dev"
+      : downloadedUpdateVersion
+        ? "downloaded"
+        : updateDownloadInFlight
+          ? "downloading"
+          : availableUpdateVersion
+            ? "available"
+            : "idle",
+    version: downloadedUpdateVersion ?? availableUpdateVersion,
+    downloaded: Boolean(downloadedUpdateVersion),
+    downloading: updateDownloadInFlight,
+  }),
   check_for_updates: async ({ manual } = {}) => {
     if (!app.isPackaged) {
       if (manual) {
@@ -609,10 +631,14 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
   },
   download_update: async () => {
     if (!app.isPackaged) return { status: "dev" };
+    if (downloadedUpdateVersion) return { status: "downloaded", version: downloadedUpdateVersion };
+    if (updateDownloadInFlight) return { status: "downloading" };
     try {
+      updateDownloadInFlight = true;
       await autoUpdater.downloadUpdate();
       return { status: "downloading" };
     } catch (error) {
+      updateDownloadInFlight = false;
       console.warn("[shob] failed to start update download:", error);
       return { status: "error", message: error instanceof Error ? error.message : String(error) };
     }

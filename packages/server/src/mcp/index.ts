@@ -208,6 +208,7 @@ export namespace MCP {
   // --- Effect Service ---
 
   interface State {
+    config: Record<string, Config.Mcp>
     status: Record<string, Status>
     clients: Record<string, MCPClient>
     defs: Record<string, MCPToolDef[]>
@@ -486,6 +487,7 @@ export namespace MCP {
           const cfg = yield* cfgSvc.get()
           const config = cfg.mcp ?? {}
           const s: State = {
+            config: {},
             status: {},
             clients: {},
             defs: {},
@@ -564,6 +566,10 @@ export namespace MCP {
           result[key] = s.status[key] ?? { status: "disabled" }
         }
 
+        for (const key of Object.keys(s.config)) {
+          result[key] = s.status[key] ?? { status: "disabled" }
+        }
+
         return result
       })
 
@@ -591,8 +597,9 @@ export namespace MCP {
       })
 
       const add = Effect.fn("MCP.add")(function* (name: string, mcp: Config.Mcp) {
-        yield* createAndStore(name, mcp)
         const s = yield* InstanceState.get(state)
+        s.config[name] = mcp
+        yield* createAndStore(name, mcp)
         return { status: s.status }
       })
 
@@ -629,7 +636,7 @@ export namespace MCP {
           ([clientName, client]) =>
             Effect.gen(function* () {
               const mcpConfig = config[clientName]
-              const entry = mcpConfig && isMcpConfigured(mcpConfig) ? mcpConfig : undefined
+              const entry = mcpConfig && isMcpConfigured(mcpConfig) ? mcpConfig : s.config[clientName]
 
               const listed = s.defs[clientName]
               if (!listed) {
@@ -708,6 +715,9 @@ export namespace MCP {
       })
 
       const getMcpConfig = Effect.fnUntraced(function* (mcpName: string) {
+        const s = yield* InstanceState.get(state)
+        if (s.config[mcpName]) return s.config[mcpName]
+
         const cfg = yield* cfgSvc.get()
         const mcpConfig = cfg.mcp?.[mcpName]
         if (!mcpConfig || !isMcpConfigured(mcpConfig)) return undefined

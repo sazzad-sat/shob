@@ -895,6 +895,21 @@ export namespace Config {
             .describe(
               "Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.",
             ),
+          headerTimeout: z
+            .union([
+              z
+                .number()
+                .int()
+                .positive()
+                .describe(
+                  "Timeout in milliseconds to wait for response headers from this provider. Set to false to disable header timeout.",
+                ),
+              z.literal(false).describe("Disable response header timeout for this provider."),
+            ])
+            .optional()
+            .describe(
+              "Timeout in milliseconds to wait for response headers from this provider. Set to false to disable header timeout.",
+            ),
         })
         .catchall(z.any())
         .optional(),

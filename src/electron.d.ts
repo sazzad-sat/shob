@@ -115,13 +115,22 @@ export interface NativeCommandMap {
     args: { manual?: boolean } | undefined
     result: { status: "dev" | "success" | "error"; updateAvailable?: boolean; version?: string; downloaded?: boolean }
   }
+  get_update_status: {
+    args: undefined
+    result: {
+      status: "idle" | "checking" | "available" | "downloading" | "downloaded" | "error" | "dev"
+      version?: string | null
+      downloaded?: boolean
+      downloading?: boolean
+    }
+  }
   install_update: {
     args: undefined
     result: { status: "dev" | "not-downloaded" | "installing"; version?: string | null }
   }
   download_update: {
     args: undefined
-    result: { status: "dev" | "downloading" | "error"; message?: string }
+    result: { status: "dev" | "downloading" | "downloaded" | "error"; version?: string | null; message?: string }
   }
   opencode_server_start: { args: undefined; result: string }
   get_projects: { args: undefined; result: Project[] }

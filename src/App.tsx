@@ -6,9 +6,11 @@ import { useStore } from './store'
 import { getThemeById, resolveAppThemeTokens } from './theme'
 import { ErrorPage } from './pages/error'
 import { showToast } from '@opencode-ai/ui/toast'
+import { useSettings } from './context/settings'
 
 function App() {
   const { loadProjects, loadCliTools, loadAvailableShells } = useStore()
+  const settings = useSettings()
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
   const [isBooting, setIsBooting] = createSignal(true)
@@ -29,17 +31,11 @@ function App() {
         unlistenAvailable = await nativeApi.listen<{ version: string }>("update:available", (event) => {
           showToast({
             title: "Update Available",
-            description: `A new version of Shob (${event.payload.version}) is available.`,
+            description: `Shob ${event.payload.version} is downloading in the background.`,
             variant: "default",
             duration: 15000,
             icon: "download",
             actions: [
-              {
-                label: "Download Now",
-                onClick: () => {
-                  void nativeApi.invoke("download_update")
-                },
-              },
               {
                 label: "Dismiss",
                 onClick: "dismiss",
@@ -95,6 +91,23 @@ function App() {
       unlistenProgress?.()
       unlistenDownloaded?.()
       unlistenError?.()
+    })
+  })
+
+  onMount(() => {
+    let timeoutId: number | null = null
+
+    const runStartupUpdateCheck = () => {
+      if (!window.shob || !settings.updates.startup()) return
+      void nativeApi.invoke("check_for_updates", { manual: false }).catch((error) => {
+        console.warn("Startup update check failed:", error)
+      })
+    }
+
+    timeoutId = window.setTimeout(runStartupUpdateCheck, 5000)
+
+    onCleanup(() => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId)
     })
   })
 

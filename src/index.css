@@ -1247,6 +1247,37 @@ button {
   color: var(--foreground) !important;
 }
 
+.titlebar-update-ready[data-variant="ghost"] {
+  color: var(--accent-foreground, var(--foreground)) !important;
+  background-color: color-mix(in srgb, var(--primary) 18%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent) !important;
+}
+
+.titlebar-update-ready[data-variant="ghost"]:hover:not(:disabled) {
+  color: var(--primary-foreground, var(--foreground)) !important;
+  background-color: var(--primary) !important;
+}
+
+.titlebar-update-downloading[data-variant="ghost"] {
+  color: var(--muted-foreground) !important;
+  opacity: 0.85 !important;
+}
+
+.titlebar-update-downloading [data-component="icon"] {
+  animation: titlebar-update-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes titlebar-update-pulse {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(1px);
+    opacity: 1;
+  }
+}
+
 /* Agent timeline: terminal-style animated dots spinner for subagent task rows. */
 [data-component="task-tool-card"] [data-component="task-tool-spinner"] {
   display: inline-flex !important;

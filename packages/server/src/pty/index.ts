@@ -63,7 +63,7 @@ export namespace Pty {
       args: z.array(z.string()),
       cwd: z.string(),
       status: z.enum(["running", "exited"]),
-      pid: z.number(),
+      pid: z.number().min(0),
     })
     .meta({ ref: "Pty" })
 

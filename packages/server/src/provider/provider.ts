@@ -60,6 +60,7 @@ import { ModelID, ProviderID } from "./schema"
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })
+  const OPENAI_HEADER_TIMEOUT_DEFAULT = 10_000
   let cachedKiloModels: Record<string, Model> | null = null
 
   function shouldUseCopilotResponsesApi(modelID: string): boolean {
@@ -78,7 +79,7 @@ export namespace Provider {
       async pull(ctrl) {
         const part = await new Promise<Awaited<ReturnType<typeof reader.read>>>((resolve, reject) => {
           const id = setTimeout(() => {
-            const err = new Error("SSE read timed out")
+            const err = new ProviderError.ResponseStreamError("SSE read timed out")
             ctl.abort(err)
             void reader.cancel(err)
             reject(err)
@@ -114,6 +115,15 @@ export namespace Provider {
       status: res.status,
       statusText: res.statusText,
     })
+  }
+
+  function timeoutController(ms: number) {
+    const ctl = new AbortController()
+    const id = setTimeout(() => ctl.abort(new ProviderError.HeaderTimeoutError(ms)), ms)
+    return {
+      signal: ctl.signal,
+      clear: () => clearTimeout(id),
+    }
   }
 
   function e2eURL() {
@@ -211,7 +221,7 @@ export namespace Provider {
           async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
             return sdk.responses(modelID)
           },
-          options: {},
+          options: { headerTimeout: OPENAI_HEADER_TIMEOUT_DEFAULT },
         }),
       xai: () =>
         Effect.succeed({
@@ -1583,17 +1593,23 @@ export namespace Provider {
 
           const customFetch = options["fetch"]
           const chunkTimeout = options["chunkTimeout"]
+          const headerTimeout = options["headerTimeout"]
           delete options["chunkTimeout"]
+          delete options["headerTimeout"]
 
           options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
             const fetchFn = customFetch ?? fetch
             const opts = init ?? {}
             const chunkAbortCtl =
               typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
+            const headerTimeoutMs = headerTimeout === false ? undefined : headerTimeout
+            const headerTimeoutCtl =
+              typeof headerTimeoutMs === "number" ? timeoutController(headerTimeoutMs) : undefined
             const signals: AbortSignal[] = []
 
             if (opts.signal) signals.push(opts.signal)
             if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
+            if (headerTimeoutCtl) signals.push(headerTimeoutCtl.signal)
             if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false)
               signals.push(AbortSignal.timeout(options["timeout"]))
 
@@ -1619,7 +1635,7 @@ export namespace Provider {
               ...opts,
               // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
               timeout: false,
-            })
+            }).finally(() => headerTimeoutCtl?.clear())
 
             if (!chunkAbortCtl) return res
             return wrapSSE(res, chunkTimeout, chunkAbortCtl)
