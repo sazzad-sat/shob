@@ -6,6 +6,7 @@ import FileTree from "@/components/file-tree"
 import { useFile } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
+import { SessionContextTab } from "@/components/session/session-context-tab"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
 
@@ -22,6 +23,8 @@ type SidePanelProps = {
   activeDiff?: string
   focusReviewDiff: (path: string) => void
   openFile: (path: string) => void
+  contextSessionId?: () => string | null
+  onContextClose?: () => void
 }
 
 export function SessionSidePanel(props: SidePanelProps) {
@@ -29,7 +32,7 @@ export function SessionSidePanel(props: SidePanelProps) {
   const file = useFile()
   const language = useLanguage()
 
-  const open = createMemo(() => props.reviewOpen() || props.fileTreeOpen())
+  const open = createMemo(() => props.reviewOpen() || props.fileTreeOpen() || !!props.contextSessionId?.())
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((diff) => diff.file))
   const reviewCount = createMemo(() => diffFiles().length)
@@ -95,14 +98,14 @@ export function SessionSidePanel(props: SidePanelProps) {
       <Show when={open()}>
         <div class="size-full flex border-l border-border-weaker-base">
           <div
-            aria-hidden={!props.reviewOpen()}
-            inert={!props.reviewOpen()}
+            aria-hidden={!props.reviewOpen() && !props.contextSessionId?.()}
+            inert={!props.reviewOpen() && !props.contextSessionId?.()}
             class="relative min-w-0 h-full flex-1 overflow-hidden bg-background-base"
-            classList={{ "pointer-events-none": !props.reviewOpen() }}
+            classList={{ "pointer-events-none": !props.reviewOpen() && !props.contextSessionId?.() }}
           >
             <div class="size-full min-w-0 h-full bg-background-base">
-              <Tabs value="review" onChange={() => undefined}>
-                <div class="sticky top-0 shrink-0 flex">
+              <Tabs value={props.contextSessionId?.() ? "context" : "review"} onChange={() => undefined}>
+                <div class="sticky top-0 z-10 shrink-0 flex bg-background-base border-b border-border-weaker-base">
                   <Tabs.List>
                     <Tabs.Trigger value="review">
                       <div class="flex items-center gap-1.5">
@@ -112,10 +115,34 @@ export function SessionSidePanel(props: SidePanelProps) {
                         </Show>
                       </div>
                     </Tabs.Trigger>
+                    <Show when={props.contextSessionId?.()}>
+                      <Tabs.Trigger value="context">
+                        <div class="flex items-center gap-1.5">
+                          <div>{language.t("session.tab.context")}</div>
+                          <button
+                            type="button"
+                            class="ml-1 size-4 flex items-center justify-center rounded hover:bg-surface-raised-base-hover text-text-weak"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              props.onContextClose?.()
+                            }}
+                          >
+                            <svg viewBox="0 0 16 16" class="size-3" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 4l8 8M12 4l-8 8" />
+                            </svg>
+                          </button>
+                        </div>
+                      </Tabs.Trigger>
+                    </Show>
                   </Tabs.List>
                 </div>
                 <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">
                   <Show when={props.reviewOpen()}>{props.reviewPanel()}</Show>
+                </Tabs.Content>
+                <Tabs.Content value="context" class="flex flex-col h-full overflow-hidden contain-strict">
+                  <Show when={props.contextSessionId?.()}>
+                    <SessionContextTab sessionId={props.contextSessionId!()!} />
+                  </Show>
                 </Tabs.Content>
               </Tabs>
             </div>

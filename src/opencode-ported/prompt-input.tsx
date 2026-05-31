@@ -48,6 +48,7 @@ import {
   promptLength,
 } from "./prompt-input/history"
 import { createPromptSubmit, type FollowupDraft } from "./prompt-input/submit"
+import { SessionContextUsage } from "@/components/session-context-usage"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
@@ -1568,6 +1569,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
+            <Show when={params.sessionId}>
+              <SessionContextUsage
+                sessionId={params.sessionId!}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("gg-open-context-tab", { detail: { sessionId: params.sessionId } }))
+                }}
+              />
+            </Show>
             {/* Help Button (?) */}
             <button
               type="button"

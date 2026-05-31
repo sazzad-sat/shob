@@ -405,7 +405,7 @@ export const dict = {
   "error.page.action.checking": "جارٍ التحقق...",
   "error.page.action.checkUpdates": "التحقق من وجود تحديثات",
   "error.page.action.updateTo": "تحديث إلى {{version}}",
-  "error.page.report.prefix": "يرجى الإبلاغ عن هذا الخطأ لفريق OpenCode",
+  "error.page.report.prefix": "يرجى الإبلاغ عن هذا الخطأ لفريق Shob",
   "error.page.report.discord": "على Discord",
   "error.page.version": "الإصدار: {{version}}",
   "error.dev.rootNotFound":

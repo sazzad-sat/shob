@@ -13,6 +13,7 @@ import { ResizeHandle } from '@/opencode-ported/resize-handle'
 import { useGlobalSDK } from '@/context/global-sdk'
 import { useGlobalSync } from '@/context/global-sync'
 import { SDKProvider } from '@/context/sdk'
+import { SyncProvider } from '@/context/sync'
 import { LayoutProvider, useLayout } from '@/context/layout'
 import type { VcsFileDiff } from '@opencode-ai/sdk/v2'
 import { SessionReviewTab } from '@/pages/session/review-tab'
@@ -61,6 +62,8 @@ function OpenCodeReviewContent(props: {
   gitDiffLoading: () => boolean
   isReviewVisible: () => boolean
   isFileTreeVisible: () => boolean
+  contextSessionId?: () => string | null
+  onContextClose?: () => void
 }) {
   const layout = useLayout()
   const sessionViewKey = createMemo(() => `${props.projectPath()}::workspace`)
@@ -112,6 +115,8 @@ function OpenCodeReviewContent(props: {
       activeDiff={props.activeFilePath() ?? undefined}
       focusReviewDiff={openReviewPath}
       openFile={openReviewPath}
+      contextSessionId={props.contextSessionId}
+      onContextClose={props.onContextClose}
       reviewPanel={() => (
         <FileComponentProvider component={FilePreview}>
           <Show
@@ -152,6 +157,7 @@ export function MainView() {
   const [reviewFiles, setReviewFiles] = createSignal<string[]>([])
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
+  const [contextTabSessionId, setContextTabSessionId] = createSignal<string | null>(null)
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
   const [reviewWidth, setReviewWidth] = createSignal(840)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
@@ -350,6 +356,19 @@ export function MainView() {
     return () => window.removeEventListener('gg-toggle-file-tree', handleFileTreeToggleRequest)
   })
 
+  createEffect(() => {
+    const handleOpenContextTab = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      const sessionId = detail?.sessionId
+      if (!sessionId) return
+      setContextTabSessionId(sessionId)
+      setIsReviewVisible(true)
+    }
+
+    window.addEventListener('gg-open-context-tab', handleOpenContextTab as EventListener)
+    return () => window.removeEventListener('gg-open-context-tab', handleOpenContextTab as EventListener)
+  })
+
   const handleFileSelect = (filePath: string | null) => {
     setActiveFilePath(filePath)
     if (!filePath) return
@@ -450,7 +469,7 @@ export function MainView() {
                     </div>
                   )}
 
-                  <Show when={isReviewVisible() || isFileTreeVisible()}>
+                  <Show when={isReviewVisible() || isFileTreeVisible() || contextTabSessionId()}>
                     <div
                       class="relative min-h-0 shrink-0 overflow-hidden border-l border-border/60"
                       style={{ width: `${reviewWidth()}px` }}
@@ -461,17 +480,21 @@ export function MainView() {
                       />
                       <Suspense fallback={null}>
                         <SDKProvider directory={projectPath}>
-                          <fileCtx.FileProvider>
-                            <OpenCodeReviewContent
-                              projectPath={projectPath}
-                              reviewDiffs={reviewDiffs}
-                              activeFilePath={activeFilePath}
-                              onSelectFile={handleFileSelect}
-                              gitDiffLoading={gitDiffLoading}
-                              isReviewVisible={isReviewVisible}
-                              isFileTreeVisible={isFileTreeVisible}
-                            />
-                          </fileCtx.FileProvider>
+                          <SyncProvider>
+                            <fileCtx.FileProvider>
+                              <OpenCodeReviewContent
+                                projectPath={projectPath}
+                                reviewDiffs={reviewDiffs}
+                                activeFilePath={activeFilePath}
+                                onSelectFile={handleFileSelect}
+                                gitDiffLoading={gitDiffLoading}
+                                isReviewVisible={isReviewVisible}
+                                isFileTreeVisible={isFileTreeVisible}
+                                contextSessionId={contextTabSessionId}
+                                onContextClose={() => setContextTabSessionId(null)}
+                              />
+                            </fileCtx.FileProvider>
+                          </SyncProvider>
                         </SDKProvider>
                       </Suspense>
                     </div>
