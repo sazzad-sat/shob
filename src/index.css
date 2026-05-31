@@ -1074,6 +1074,7 @@ button {
   opacity: 1;
   transition: opacity 360ms var(--ease-out-expo);
   pointer-events: all;
+  -webkit-app-region: drag;
 }
 
 .boot-splash-hidden,
@@ -1088,6 +1089,7 @@ button {
   object-fit: contain;
   animation: splash-breathe 1500ms var(--ease-out-expo) infinite;
   will-change: opacity, transform;
+  pointer-events: none;
 }
 
 @keyframes splash-breathe {

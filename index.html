@@ -29,6 +29,7 @@
         background: var(--background-base, #101010);
         opacity: 1;
         transition: opacity 320ms ease;
+        -webkit-app-region: drag;
       }
 
       #boot-splash.boot-splash-hidden {
@@ -41,6 +42,7 @@
         height: clamp(72px, 12vw, 124px);
         object-fit: contain;
         animation: boot-splash-pulse 1400ms ease-in-out infinite;
+        pointer-events: none;
       }
 
       @keyframes boot-splash-pulse {
