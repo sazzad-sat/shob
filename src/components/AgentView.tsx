@@ -248,12 +248,14 @@ function AgentViewInner(props: AgentViewProps) {
 
   // Keep global sidebar/terminal active session in sync with in-view route changes
   // (e.g. opening a subagent session from inside the agent timeline).
-  createEffect(() => {
-    const routeSessionID = params.id
-    if (!routeSessionID?.startsWith("ses")) return
-    if (activeSidebarSessionId() === routeSessionID) return
-    setActiveSidebarSession(routeSessionID)
-  })
+  // NOTE: Disabled for store-based navigation — the sidebar sets activeSessionId
+  // directly, and the router params lag behind causing reverts.
+  // createEffect(() => {
+  //   const routeSessionID = params.id
+  //   if (!routeSessionID?.startsWith("ses")) return
+  //   if (activeSidebarSessionId() === routeSessionID) return
+  //   setActiveSidebarSession(routeSessionID)
+  // })
 
   const updateJumpState = () => {
     if (!scrollRef) return

@@ -1,8 +1,9 @@
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
 import { MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucide-solid"
 import { nativeApi } from "../services/native"
-import { useStore } from "../store"
+import { useStore, setStore } from "../store"
 import type { Project } from "../types"
+import { api } from "../services/api"
 import { ResizeHandle } from "@/opencode-ported/resize-handle"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
@@ -63,6 +64,7 @@ function FolderSection(props: {
   const [showMenu, setShowMenu] = createSignal(false)
   let menuRef: HTMLDivElement | undefined
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
+  const openCodeSessions = createMemo(() => projectStore().session)
 
   // Periodic sortNow signal to dynamically recalculate session ages and keep sorting stable/reactive.
   const [sortNow, setSortNow] = createSignal(Date.now())
@@ -259,9 +261,9 @@ function FolderSection(props: {
   })
 
   createEffect(() => {
-    const store = projectStore()
-    if (store.status === "loading" && store.session.length === 0) return
-    props.onSyncOpenCodeSessions(props.project.id, store.session)
+    const sessions = openCodeSessions()
+    if (projectStore().status === "loading" && sessions.length === 0) return
+    props.onSyncOpenCodeSessions(props.project.id, sessions)
   })
 
   const handleMenuClick = (e: MouseEvent) => {
@@ -369,6 +371,7 @@ export function Sidebar(props: {
   const currentProjectId = useStore((s) => s.currentProjectId)
   const activeSessionId = useStore((s) => s.activeSessionId)
   const setCurrentProject = useStore((s) => s.setCurrentProject)
+  const setCurrentProjectId = useStore((s) => s.setCurrentProjectId)
   const setActiveSession = useStore((s) => s.setActiveSession)
   const addProject = useStore((s) => s.addProject)
   const removeSession = useStore((s) => s.removeSession)
@@ -423,15 +426,40 @@ export function Sidebar(props: {
 
   const handleCreateSession = async (projectId: string) => {
     props.onOpenWorkspacePage?.()
+    setCurrentProjectId(projectId)
     const project = projects().find((item) => item.id === projectId)
     if (!project) return
     const client = globalSDK.createClient({ directory: project.path, throwOnError: true })
     const created = await client.session.create().then((response) => response.data)
     if (!created) return
-    const [projectStore] = globalSync.child(project.path)
-    await syncOpenCodeSessions(projectId, [created, ...projectStore.session])
-    setCurrentProject(projectId)
+
+    // Insert into store immediately for instant UI
+    const now = Date.now()
+    const localSession = {
+      id: created.id,
+      name: created.title || "New session",
+      parentSessionId: created.parentID ?? null,
+      shell: "powershell.exe",
+      cliTool: "opencode" as const,
+      pendingLaunchCommand: null,
+      createdAt: created.time?.created ?? now,
+      lastActiveAt: created.time?.updated ?? now,
+      commandCount: 0,
+      startupDurationMs: null,
+    }
+
+    const currentProject = projects().find((p) => p.id === projectId)
+    if (currentProject) {
+      const exists = currentProject.sessions.some((s) => s.id === created.id)
+      if (!exists) {
+        const updated = { ...currentProject, sessions: [localSession, ...currentProject.sessions] }
+        setStore("projects", (prev) => prev.map((p) => (p.id === projectId ? updated : p)))
+        api.saveProject(updated).catch(() => undefined)
+      }
+    }
     setActiveSession(created.id)
+
+    // Background refresh — the API will return the session on next sync
     void globalSync.project.loadSessions(project.path)
   }
 
@@ -466,8 +494,8 @@ export function Sidebar(props: {
   }
 
   const handleSyncOpenCodeSessions = (projectId: string, sessions: OpenCodeSession[]) => {
-    const pending = pendingDeleteSessionIDs()
-    const filtered = pending.size > 0 ? sessions.filter((session) => !pending.has(session.id)) : sessions
+    const pendingDelete = pendingDeleteSessionIDs()
+    let filtered = pendingDelete.size > 0 ? sessions.filter((s) => !pendingDelete.has(s.id)) : sessions
     void syncOpenCodeSessions(projectId, filtered)
   }
 

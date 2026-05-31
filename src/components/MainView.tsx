@@ -395,7 +395,7 @@ export function MainView() {
     const created = await client.session.create().then((response) => response.data)
     if (!created) return
     const [projectStore] = globalSync.child(project.path)
-    await appStore.syncOpenCodeSessions(cpid, [created, ...projectStore.session])
+    void appStore.syncOpenCodeSessions(cpid, [created, ...projectStore.session])
     if (currentProjectId() !== cpid) appStore.setCurrentProject(cpid)
     appStore.setActiveSession(created.id)
     void globalSync.project.loadSessions(project.path)

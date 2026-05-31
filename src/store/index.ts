@@ -1,3 +1,4 @@
+import { batch } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { nativeApi } from '../services/native';
 import { api } from '../services/api';
@@ -106,6 +107,7 @@ interface AppActions {
   updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   setCurrentProject: (id: string | null) => void;
+  setCurrentProjectId: (id: string | null) => void;
   addSession: (projectId: string, shell: string) => Promise<Session>;
   launchCliSession: (projectId: string, cliId?: string | null) => Promise<Session>;
   renameSession: (projectId: string, sessionId: string, name: string) => Promise<void>;
@@ -244,10 +246,20 @@ export const actions: AppActions = {
   setCurrentProject: (id: string | null) => {
     if (store.currentProjectId === id) return;
     const project = store.projects.find((item) => item.id === id);
-    const nextSessionId = project?.sessions[0]?.id ?? null;
+    const currentSessionInProject =
+      project?.sessions.some((session) => session.id === store.activeSessionId) ?? false;
+    const nextSessionId = currentSessionInProject ? store.activeSessionId : project?.sessions[0]?.id ?? null;
     setStoredValue(STORAGE_KEYS.currentProjectId, id);
     setStoredValue(STORAGE_KEYS.activeSessionId, nextSessionId);
-    setStore({ currentProjectId: id, activeSessionId: nextSessionId });
+    batch(() => {
+      setStore({ currentProjectId: id, activeSessionId: nextSessionId });
+    });
+  },
+
+  setCurrentProjectId: (id: string | null) => {
+    if (store.currentProjectId === id) return;
+    setStoredValue(STORAGE_KEYS.currentProjectId, id);
+    setStore({ currentProjectId: id });
   },
 
   addSession: async (projectId: string, shell: string) => {
@@ -510,15 +522,10 @@ export const actions: AppActions = {
       sessions: normalized,
     };
 
-    const activeSessionStillExists = normalized.some((session) => session.id === store.activeSessionId);
-    const nextActiveSessionId = activeSessionStillExists ? store.activeSessionId : normalized[0]?.id ?? null;
-
-    setStoredValue(STORAGE_KEYS.activeSessionId, nextActiveSessionId);
-
-    setStore({
-      projects: store.projects.map((item) => (item.id === projectId ? updatedProject : item)),
-      activeSessionId: nextActiveSessionId,
-    });
+    setStore(
+      "projects",
+      store.projects.map((item) => (item.id === projectId ? updatedProject : item)),
+    );
 
     api.saveProject(updatedProject).catch(() => undefined);
   },
@@ -532,9 +539,11 @@ export const actions: AppActions = {
       setStoredValue(STORAGE_KEYS.preferredCliId, activeSession.cliTool);
     }
 
-    setStore({
-      activeSessionId: resolvedSessionId,
-      preferredCliId: activeSession?.cliTool ?? store.preferredCliId,
+    batch(() => {
+      setStore({
+        activeSessionId: resolvedSessionId,
+        preferredCliId: activeSession?.cliTool ?? store.preferredCliId,
+      });
     });
   },
 
