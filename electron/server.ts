@@ -3,21 +3,18 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import net from "node:net"
 import fs from "node:fs"
+import { app, utilityProcess } from "electron"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const projectRoot = path.resolve(__dirname, "..")
 const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
-const defaultPackagedServerEntry = path.resolve(
-  resourcesPath ?? path.resolve(projectRoot, ".."),
-  "dist-server",
-  process.platform === "win32" ? "server.exe" : "server",
-)
 
 const START_TIMEOUT_MS = 120000
 const HEALTH_POLL_INTERVAL_MS = 100
 const HEALTH_TIMEOUT_MS = 30000
 const HEALTH_FETCH_TIMEOUT_MS = 3000
+const SIDECAR_SERVICE_NAME = "shob-server"
 
 type StartServerOptions = {
   packaged?: boolean
@@ -29,12 +26,6 @@ export interface ServerInstance {
   port: number
   hostname: string
   stop: () => Promise<void>
-}
-
-function getServerEntry(packaged: boolean, override?: string): string {
-  if (override) return override
-  if (packaged) return defaultPackagedServerEntry
-  return path.resolve(projectRoot, "packages", "server", "src", "index.ts")
 }
 
 function resolveBun(): string {
@@ -95,49 +86,174 @@ async function waitForHealth(url: string, timeoutMs = HEALTH_TIMEOUT_MS): Promis
   throw new Error(`Server health check timed out after ${timeoutMs}ms`)
 }
 
-export async function startServer(options: StartServerOptions = {}): Promise<ServerInstance> {
-  const hostname = "127.0.0.1"
-  const port = await findFreePort(hostname)
-  const packaged = options.packaged ?? projectRoot.endsWith("app.asar")
-  const serverEntry = getServerEntry(packaged, options.serverEntry)
-  let proc;
-  if (packaged) {
-    if (!fs.existsSync(serverEntry)) {
-      throw new Error(`Packaged server executable was not found at ${serverEntry}`)
+function getSidecarScript(): string {
+  return path.join(__dirname, "sidecar.js")
+}
+
+function getServerBundlePath(): string {
+  return path.join(resourcesPath ?? path.resolve(projectRoot, ".."), "dist-server", "node.js")
+}
+
+async function startPackagedServer(
+  hostname: string,
+  port: number,
+  options: StartServerOptions,
+): Promise<ServerInstance> {
+  const sidecarScript = getSidecarScript()
+  const serverBundlePath = getServerBundlePath()
+
+  if (!fs.existsSync(sidecarScript)) {
+    throw new Error(`Sidecar script not found at ${sidecarScript}`)
+  }
+  if (!fs.existsSync(serverBundlePath)) {
+    throw new Error(`Server bundle not found at ${serverBundlePath}`)
+  }
+
+  console.log(`[shob] starting packaged server on ${hostname}:${port}`)
+  console.log(`[shob] sidecar: ${sidecarScript}`)
+  console.log(`[shob] server bundle: ${serverBundlePath}`)
+
+  // Ensure externalized deps (like @lydell/node-pty) can be resolved from the
+  // server bundle by pointing NODE_PATH at the asar's node_modules.
+  const appPath = app.getAppPath()
+  const nodePath = [
+    path.join(appPath, "node_modules"),
+    process.env.NODE_PATH,
+  ].filter(Boolean).join(path.delimiter)
+
+  const child = utilityProcess.fork(sidecarScript, [], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      NODE_PATH: nodePath,
+      OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
+    },
+    serviceName: SIDECAR_SERVICE_NAME,
+    stdio: "pipe",
+  })
+
+  let exited = false
+  let exitCode: number | null = null
+
+  child.stdout?.on("data", (chunk: Buffer) => {
+    const msg = chunk.toString("utf8").trimEnd()
+    if (msg) console.log("[sidecar:stdout]", msg)
+  })
+  child.stderr?.on("data", (chunk: Buffer) => {
+    const msg = chunk.toString("utf8").trimEnd()
+    if (msg) console.warn("[sidecar:stderr]", msg)
+  })
+
+  child.once("exit", (code) => {
+    exited = true
+    exitCode = code
+    console.warn(`[shob] sidecar exited with code ${code}`)
+  })
+
+  child.on("error", (error) => {
+    console.error("[shob] sidecar error:", error)
+  })
+
+  const url = await new Promise<string>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      if (!exited) child.kill()
+      reject(new Error(`Server start timed out after ${START_TIMEOUT_MS}ms`))
+    }, START_TIMEOUT_MS)
+
+    let resolved = false
+
+    const onMessage = (event: { data: unknown }) => {
+      const msg = event.data as { type: string; hostname?: string; port?: number; error?: { message: string } } | undefined
+      if (!msg) return
+
+      if (msg.type === "ready" && msg.port) {
+        if (resolved) return
+        resolved = true
+        clearTimeout(timeout)
+        child.off("message", onMessage)
+        resolve(`http://${msg.hostname ?? hostname}:${msg.port}`)
+      }
+
+      if (msg.type === "error") {
+        if (resolved) return
+        resolved = true
+        clearTimeout(timeout)
+        child.off("message", onMessage)
+        reject(new Error(msg.error?.message ?? "Unknown sidecar error"))
+      }
     }
 
-    console.log(`[shob] starting packaged server on ${hostname}:${port} at ${serverEntry}`)
-    proc = spawn(serverEntry, [
-      "serve",
-      `--hostname=${hostname}`,
-      `--port=${port}`,
-    ], {
-      cwd: path.dirname(serverEntry),
-      env: {
-        ...process.env,
-        OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-    })
-  } else {
-    const bunPath = resolveBun()
-    console.log(`[shob] starting server on ${hostname}:${port} with ${bunPath}`)
+    child.on("message", onMessage)
 
-    proc = spawn(bunPath, [
-      "--conditions=browser",
-      serverEntry,
-      "serve",
-      `--hostname=${hostname}`,
-      `--port=${port}`,
-    ], {
-      cwd: projectRoot,
-      env: {
-        ...process.env,
-        OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
-      },
-      stdio: ["ignore", "pipe", "pipe"],
+    child.postMessage({
+      type: "start",
+      hostname,
+      port,
+      password: "",
+      serverModulePath: serverBundlePath,
     })
+  })
+
+  console.log(`[shob] server listening at ${url}`)
+
+  try {
+    await waitForHealth(url)
+    console.log(`[shob] server health check passed`)
+  } catch (err) {
+    if (!exited) child.kill()
+    throw err
   }
+
+  const actualPort = Number(new URL(url).port)
+
+  return {
+    url,
+    port: actualPort,
+    hostname,
+    stop: async () => {
+      if (exited) return
+      return new Promise<void>((resolve) => {
+        const onExit = () => resolve()
+        child.once("exit", onExit)
+
+        child.postMessage({ type: "stop" })
+
+        setTimeout(() => {
+          if (!exited) {
+            child.off("exit", onExit)
+            child.kill()
+            resolve()
+          }
+        }, 5000)
+      })
+    },
+  }
+}
+
+async function startDevServer(
+  hostname: string,
+  port: number,
+  options: StartServerOptions,
+): Promise<ServerInstance> {
+  const bunPath = resolveBun()
+  const serverEntry = options.serverEntry ?? path.resolve(projectRoot, "packages", "server", "src", "index.ts")
+
+  console.log(`[shob] starting server on ${hostname}:${port} with ${bunPath}`)
+
+  const proc = spawn(bunPath, [
+    "--conditions=browser",
+    serverEntry,
+    "serve",
+    `--hostname=${hostname}`,
+    `--port=${port}`,
+  ], {
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  })
 
   const url = await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -218,4 +334,15 @@ export async function startServer(options: StartServerOptions = {}): Promise<Ser
       })
     },
   }
+}
+
+export async function startServer(options: StartServerOptions = {}): Promise<ServerInstance> {
+  const hostname = "127.0.0.1"
+  const port = await findFreePort(hostname)
+  const packaged = options.packaged ?? projectRoot.endsWith("app.asar")
+
+  if (packaged) {
+    return startPackagedServer(hostname, port, options)
+  }
+  return startDevServer(hostname, port, options)
 }

@@ -39,12 +39,21 @@ async function loadMigrations() {
 const migrations = await loadMigrations()
 console.log(`[sidecar] loaded ${migrations.length} migrations`)
 
+const outdir = path.join(rootDir, "dist-server")
+await fs.rm(outdir, { recursive: true, force: true })
+await fs.mkdir(outdir, { recursive: true })
+
 const result = await Bun.build({
-  entrypoints: [path.join(serverDir, "src", "index.ts")],
-  conditions: ["browser"],
-  compile: {
-    outfile: path.join(rootDir, "dist-server", "server"),
-  },
+  target: "node",
+  entrypoints: [path.join(serverDir, "src", "node.ts")],
+  outdir,
+  format: "esm",
+  sourcemap: "linked",
+  external: [
+    "@lydell/node-pty",
+    "@parcel/watcher",
+    "jsonc-parser",
+  ],
   define: {
     OPENCODE_MIGRATIONS: JSON.stringify(migrations),
   },
@@ -54,3 +63,5 @@ if (!result.success) {
   for (const log of result.logs) console.error(log)
   process.exit(1)
 }
+
+console.log(`[sidecar] built server bundle → ${outdir}`)
