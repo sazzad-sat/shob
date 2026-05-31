@@ -67,9 +67,24 @@ function AgentTurnError(props: { error: EventSessionError["properties"]["error"]
   )
 
   return (
-    <Card variant="error" class="agent-terminal-error-card error-card">
-      <CardTitle variant="error">{language.t("notification.session.error.title")}</CardTitle>
-      <CardDescription>{detail()}</CardDescription>
+    <Card variant="error" class="premium-error-card">
+      <div class="flex items-start gap-3 w-full">
+        {/* Simple crisp error warning icon */}
+        <div class="flex-shrink-0 mt-0.5 text-[var(--card-accent,var(--icon-critical-base,var(--destructive,#ed4831)))] animate-pulse-slow">
+          <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <div class="text-[13px] font-semibold text-text-strong tracking-wide">
+            {language.t("notification.session.error.title")}
+          </div>
+          <div class="text-[12px] text-text-weak font-medium leading-relaxed break-words whitespace-pre-wrap">
+            {detail()}
+          </div>
+        </div>
+      </div>
     </Card>
   )
 }
