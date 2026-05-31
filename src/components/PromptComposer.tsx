@@ -1,5 +1,6 @@
-import { createSignal, onMount, Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { Send, CornerDownLeft, Plus, Globe } from 'lucide-solid'
+import { createGithubPill, parseTextWithGithubLinks } from '../opencode-ported/prompt-input/github-pill'
 
 interface PromptComposerProps {
   onSubmit: (text: string) => void
@@ -10,12 +11,40 @@ interface PromptComposerProps {
 export function PromptComposer(props: PromptComposerProps) {
   const [text, setText] = createSignal('')
   const [isFocused, setIsFocused] = createSignal(false)
-  let textareaRef: HTMLTextAreaElement | undefined
+  let editorRef: HTMLDivElement | undefined
 
-  const adjustHeight = () => {
-    if (!textareaRef) return
-    textareaRef.style.height = 'auto'
-    textareaRef.style.height = `${Math.min(textareaRef.scrollHeight, 200)}px`
+
+
+  const parseFromDOM = (): string => {
+    if (!editorRef) return ""
+    let buffer = ""
+    const visit = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        buffer += node.textContent ?? ""
+        return
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return
+      const el = node as HTMLElement
+      if (el.dataset.type === "github-link") {
+        buffer += el.dataset.url ?? ""
+        return
+      }
+      if (el.tagName === "BR") {
+        buffer += "\n"
+        return
+      }
+      for (const child of Array.from(el.childNodes)) {
+        visit(child)
+      }
+    }
+    Array.from(editorRef.childNodes).forEach((child) => {
+      visit(child)
+    })
+    return buffer
+  }
+
+  const handleInput = () => {
+    setText(parseFromDOM())
   }
 
   const handleSubmit = () => {
@@ -23,8 +52,8 @@ export function PromptComposer(props: PromptComposerProps) {
     if (!value || props.disabled) return
     props.onSubmit(value)
     setText('')
-    if (textareaRef) {
-      textareaRef.style.height = 'auto'
+    if (editorRef) {
+      editorRef.innerHTML = ''
     }
   }
 
@@ -35,9 +64,36 @@ export function PromptComposer(props: PromptComposerProps) {
     }
   }
 
-  onMount(() => {
-    adjustHeight()
-  })
+  const handlePaste = (e: ClipboardEvent) => {
+    const clipboardData = e.clipboardData
+    if (!clipboardData) return
+
+    const plainText = clipboardData.getData("text/plain") ?? ""
+    if (!plainText) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
+    const range = selection.getRangeAt(0)
+    if (!editorRef?.contains(range.startContainer)) return
+
+    const fragment = parseTextWithGithubLinks(plainText)
+    const last = fragment.lastChild
+    range.deleteContents()
+    range.insertNode(fragment)
+
+    if (last) {
+      range.setStartAfter(last)
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+
+    handleInput()
+  }
 
   const hasText = () => text().trim().length > 0
 
@@ -47,21 +103,27 @@ export function PromptComposer(props: PromptComposerProps) {
       data-focused={isFocused()}
       data-has-text={hasText()}
     >
-      <textarea
-        ref={textareaRef}
+      <div
+        ref={editorRef}
         class="prompt-input"
-        placeholder={props.placeholder || "Message Agent..."}
-        value={text()}
-        onInput={(e) => {
-          setText(e.currentTarget.value)
-          adjustHeight()
+        classList={{
+          "w-full focus:outline-none whitespace-pre-wrap select-text": true,
         }}
+        contenteditable={!props.disabled ? "true" : "false"}
+        role="textbox"
+        aria-multiline="true"
+        aria-label={props.placeholder || "Message Agent..."}
+        onInput={handleInput}
+        onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        disabled={props.disabled}
-        rows={1}
       />
+      <Show when={!hasText()}>
+        <div class="prompt-composer-placeholder">
+          {props.placeholder || "Message Agent..."}
+        </div>
+      </Show>
 
       <div class="prompt-bar">
         <div class="prompt-actions-left">

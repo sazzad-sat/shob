@@ -36,6 +36,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSessionLayout, createSessionTabs } from "./mock-session-layout"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
+import { createGithubPill, parseTextWithGithubLinks } from "./prompt-input/github-pill"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES } from "./prompt-input/files"
 import {
@@ -668,6 +669,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     onSelect: handleSlashSelect,
   })
 
+
+
   const createPill = (part: FileAttachmentPart | AgentPart) => {
     const pill = document.createElement("span")
     pill.textContent = part.content
@@ -696,6 +699,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const el = node as HTMLElement
       if (el.dataset.type === "file") return true
       if (el.dataset.type === "agent") return true
+      if (el.dataset.type === "github-link") return true
       return el.tagName === "BR"
     })
 
@@ -703,7 +707,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     clearEditor()
     for (const part of parts) {
       if (part.type === "text") {
-        editorRef.appendChild(createTextFragment(part.content))
+        editorRef.appendChild(parseTextWithGithubLinks(part.content))
         continue
       }
       if (part.type === "file" || part.type === "agent") {
@@ -828,6 +832,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         pushAgent(el)
         return
       }
+      if (el.dataset.type === "github-link") {
+        buffer += el.dataset.url ?? ""
+        return
+      }
       if (el.tagName === "BR") {
         buffer += "\n"
         return
@@ -946,7 +954,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
 
     if (part.type === "text") {
-      const fragment = createTextFragment(part.content)
+      const fragment = parseTextWithGithubLinks(part.content)
       const last = fragment.lastChild
       range.deleteContents()
       range.insertNode(fragment)

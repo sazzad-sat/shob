@@ -155,7 +155,9 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
       return input.addPart({ type: "text", content: text, start: 0, end: 0 })
     }
 
-    if (pasteMode(text) === "manual") {
+    const hasGithub = /(https?:\/\/(?:www\.)?github\.com\/\S+)/.test(text)
+
+    if (pasteMode(text) === "manual" || hasGithub) {
       put()
       return
     }
