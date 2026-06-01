@@ -9,6 +9,7 @@ import { SettingsPage } from './SettingsPage'
 import { useStore } from '../store'
 import { createFileContext } from '@/context/file'
 import type { FileNode } from '@/types/file-node'
+import type { Session } from '@/types'
 import { ResizeHandle } from '@/opencode-ported/resize-handle'
 import { useGlobalSDK } from '@/context/global-sdk'
 import { useGlobalSync } from '@/context/global-sync'
@@ -93,7 +94,7 @@ function OpenCodeReviewContent(props: {
   onSelectTab: (id: string) => void
   fileTabs: () => string[]
   onCloseFile: (path: string) => void
-  terminalTabs: () => Array<{ id: string; sessionId: string }>
+  terminalTabs: () => Array<{ id: string; session: Session }>
   onCloseTerminal: (id: string) => void
 }) {
   const layout = useLayout()
@@ -189,7 +190,7 @@ export function MainView() {
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
   const [contextTabSessionId, setContextTabSessionId] = createSignal<string | null>(null)
   const [activeTabId, setActiveTabId] = createSignal<string>("review")
-  const [terminalTabs, setTerminalTabs] = createSignal<Array<{ id: string; sessionId: string }>>([])
+  const [terminalTabs, setTerminalTabs] = createSignal<Array<{ id: string; session: Session }>>([])
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
   const [reviewWidth, setReviewWidth] = createSignal(840)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
@@ -421,7 +422,7 @@ export function MainView() {
           ''
         const session = await appStore.addIsolatedSession(projectId, shell)
         const id = `terminal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-        setTerminalTabs((tabs) => [...tabs, { id, sessionId: session.id }])
+        setTerminalTabs((tabs) => [...tabs, { id, session }])
         setActiveTabId(`terminal:${id}`)
         setIsReviewVisible(true)
       } catch (err) {

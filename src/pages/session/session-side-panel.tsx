@@ -35,7 +35,7 @@ type SidePanelProps = {
   onSelectTab: (id: string) => void
   fileTabs: () => string[]
   onCloseFile: (path: string) => void
-  terminalTabs: () => Array<{ id: string; sessionId: string }>
+  terminalTabs: () => Array<{ id: string; session: any }>
   onCloseTerminal: (id: string) => void
   renderFileTab: (filePath: string) => JSX.Element
 }
@@ -259,7 +259,8 @@ export function SessionSidePanel(props: SidePanelProps) {
                     >
                       <div class="absolute inset-0">
                         <Terminal
-                          sessionId={tab.sessionId}
+                          sessionId={tab.session.id}
+                          session={tab.session}
                           isActiveOverride={() => isActive(`terminal:${tab.id}`)}
                         />
                       </div>

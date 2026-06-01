@@ -11,10 +11,12 @@ import { Search, X, ArrowUp, ArrowDown, Save, Trash2 } from "lucide-solid"
 import { CLI_ALIAS_TO_ID } from "../config/check"
 import { store, useStore } from "../store"
 import { api } from "../services/api"
+import type { Session } from "../types"
 import "@xterm/xterm/css/xterm.css"
 
 interface TerminalProps {
   sessionId: string
+  session?: Session | null
   isActiveOverride?: () => boolean
 }
 
@@ -354,15 +356,32 @@ export function Terminal(props: TerminalProps) {
     }
     return null
   })
-  const sessionProjectId = () => sessionProject()?.id ?? null
-  const sessionProjectPath = () => sessionProject()?.path ?? null
-  const session = useStore((state) => {
+  const sessionFromStore = useStore((state) => {
     for (const project of state.projects) {
       const match = project.sessions.find((item) => item.id === sessionId)
       if (match) return match
     }
     return null
   })
+  const session = () => props.session ?? sessionFromStore()
+  const sessionProjectId = () => {
+    if (props.session) {
+      for (const project of (store as any).projects) {
+        if (project.sessions.some((s: Session) => s.id === sessionId)) return project.id
+      }
+      return null
+    }
+    return sessionProject()?.id ?? null
+  }
+  const sessionProjectPath = () => {
+    if (props.session) {
+      for (const project of (store as any).projects) {
+        if (project.sessions.some((s: Session) => s.id === sessionId)) return project.path
+      }
+      return null
+    }
+    return sessionProject()?.path ?? null
+  }
   const renameSession = useStore((state) => state.renameSession)
   const updateSession = useStore((state) => state.updateSession)
   const recordSessionActivity = useStore((state) => state.recordSessionActivity)
@@ -1288,7 +1307,7 @@ export function Terminal(props: TerminalProps) {
 
       <Show when={!xtermRef}>
         <div class="absolute inset-0 flex items-center justify-center text-12-regular text-text-weak pointer-events-none">
-          {session() ? "Starting terminal..." : "Loading session..."}
+          Starting terminal...
         </div>
       </Show>
 
