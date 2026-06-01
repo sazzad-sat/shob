@@ -1,12 +1,16 @@
 import { Match, Show, Switch, createMemo, type JSX } from "solid-js"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
+import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import FileTree from "@/components/file-tree"
 import { useFile } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { SessionContextTab } from "@/components/session/session-context-tab"
+import { DialogAddTab } from "@/components/dialog-add-tab"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
 
@@ -31,6 +35,11 @@ export function SessionSidePanel(props: SidePanelProps) {
   const layout = useLayout()
   const file = useFile()
   const language = useLanguage()
+  const dialog = useDialog()
+
+  const openAddTabDialog = () => {
+    dialog.show(() => <DialogAddTab />)
+  }
 
   const open = createMemo(() => props.reviewOpen() || props.fileTreeOpen() || !!props.contextSessionId?.())
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
@@ -135,6 +144,16 @@ export function SessionSidePanel(props: SidePanelProps) {
                       </Tabs.Trigger>
                     </Show>
                   </Tabs.List>
+                  <div class="flex items-center pr-2">
+                    <Tooltip value={language.t("session.tab.add")} placement="bottom">
+                      <IconButton
+                        icon="plus-small"
+                        variant="ghost"
+                        aria-label={language.t("session.tab.add")}
+                        onClick={openAddTabDialog}
+                      />
+                    </Tooltip>
+                  </div>
                 </div>
                 <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">
                   <Show when={props.reviewOpen()}>{props.reviewPanel()}</Show>
