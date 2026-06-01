@@ -6,6 +6,7 @@ import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import FileTree from "@/components/file-tree"
+import { Terminal } from "@/components/Terminal"
 import { useFile } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
@@ -29,6 +30,10 @@ type SidePanelProps = {
   openFile: (path: string) => void
   contextSessionId?: () => string | null
   onContextClose?: () => void
+  projectPath: () => string
+  terminalOpen: () => boolean
+  terminalSessionId: () => string | null
+  onTerminalClose: () => void
 }
 
 export function SessionSidePanel(props: SidePanelProps) {
@@ -38,10 +43,22 @@ export function SessionSidePanel(props: SidePanelProps) {
   const dialog = useDialog()
 
   const openAddTabDialog = () => {
-    dialog.show(() => <DialogAddTab />)
+    dialog.show(() => (
+      <DialogAddTab
+        projectPath={props.projectPath}
+        onOpenFile={(path) => props.openFile(path)}
+        onOpenTerminal={() => {
+          if (!props.terminalOpen()) {
+            window.dispatchEvent(new CustomEvent("shob-open-terminal-tab"))
+          }
+        }}
+      />
+    ))
   }
 
-  const open = createMemo(() => props.reviewOpen() || props.fileTreeOpen() || !!props.contextSessionId?.())
+  const open = createMemo(
+    () => props.reviewOpen() || props.fileTreeOpen() || !!props.contextSessionId?.() || props.terminalOpen(),
+  )
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((diff) => diff.file))
   const reviewCount = createMemo(() => diffFiles().length)
@@ -107,13 +124,20 @@ export function SessionSidePanel(props: SidePanelProps) {
       <Show when={open()}>
         <div class="size-full flex border-l border-border-weaker-base">
           <div
-            aria-hidden={!props.reviewOpen() && !props.contextSessionId?.()}
-            inert={!props.reviewOpen() && !props.contextSessionId?.()}
+            aria-hidden={!props.reviewOpen() && !props.contextSessionId?.() && !props.terminalOpen()}
+            inert={!props.reviewOpen() && !props.contextSessionId?.() && !props.terminalOpen()}
             class="relative min-w-0 h-full flex-1 overflow-hidden bg-background-base"
-            classList={{ "pointer-events-none": !props.reviewOpen() && !props.contextSessionId?.() }}
+            classList={{
+              "pointer-events-none": !props.reviewOpen() && !props.contextSessionId?.() && !props.terminalOpen(),
+            }}
           >
             <div class="size-full min-w-0 h-full bg-background-base">
-              <Tabs value={props.contextSessionId?.() ? "context" : "review"} onChange={() => undefined}>
+              <Tabs
+                value={
+                  props.terminalOpen() ? "terminal" : props.contextSessionId?.() ? "context" : "review"
+                }
+                onChange={() => undefined}
+              >
                 <div class="sticky top-0 z-10 shrink-0 flex bg-background-base border-b border-border-weaker-base">
                   <Tabs.List>
                     <Tabs.Trigger value="review">
@@ -143,6 +167,25 @@ export function SessionSidePanel(props: SidePanelProps) {
                         </div>
                       </Tabs.Trigger>
                     </Show>
+                    <Show when={props.terminalOpen()}>
+                      <Tabs.Trigger value="terminal">
+                        <div class="flex items-center gap-1.5">
+                          <div>{language.t("session.tab.terminal")}</div>
+                          <button
+                            type="button"
+                            class="ml-1 size-4 flex items-center justify-center rounded hover:bg-surface-raised-base-hover text-text-weak"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              props.onTerminalClose()
+                            }}
+                          >
+                            <svg viewBox="0 0 16 16" class="size-3" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 4l8 8M12 4l-8 8" />
+                            </svg>
+                          </button>
+                        </div>
+                      </Tabs.Trigger>
+                    </Show>
                     <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center pr-3">
                       <Tooltip value={language.t("session.tab.add")} placement="bottom">
                         <IconButton
@@ -163,6 +206,11 @@ export function SessionSidePanel(props: SidePanelProps) {
                 <Tabs.Content value="context" class="flex flex-col h-full overflow-hidden contain-strict">
                   <Show when={props.contextSessionId?.()}>
                     <SessionContextTab sessionId={props.contextSessionId!()!} />
+                  </Show>
+                </Tabs.Content>
+                <Tabs.Content value="terminal" class="flex flex-col h-full overflow-hidden contain-strict">
+                  <Show when={props.terminalOpen() && props.terminalSessionId()}>
+                    <Terminal sessionId={props.terminalSessionId()!} />
                   </Show>
                 </Tabs.Content>
               </Tabs>

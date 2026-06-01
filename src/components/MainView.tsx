@@ -64,6 +64,9 @@ function OpenCodeReviewContent(props: {
   isFileTreeVisible: () => boolean
   contextSessionId?: () => string | null
   onContextClose?: () => void
+  terminalOpen: () => boolean
+  terminalSessionId: () => string | null
+  onTerminalClose: () => void
 }) {
   const layout = useLayout()
   const sessionViewKey = createMemo(() => `${props.projectPath()}::workspace`)
@@ -117,6 +120,10 @@ function OpenCodeReviewContent(props: {
       openFile={openReviewPath}
       contextSessionId={props.contextSessionId}
       onContextClose={props.onContextClose}
+      projectPath={props.projectPath}
+      terminalOpen={props.terminalOpen}
+      terminalSessionId={props.terminalSessionId}
+      onTerminalClose={props.onTerminalClose}
       reviewPanel={() => (
         <FileComponentProvider component={FilePreview}>
           <Show
@@ -158,6 +165,8 @@ export function MainView() {
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
   const [contextTabSessionId, setContextTabSessionId] = createSignal<string | null>(null)
+  const [terminalTabOpen, setTerminalTabOpen] = createSignal(false)
+  const activeSessionId = useStore((s) => s.activeSessionId)
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
   const [reviewWidth, setReviewWidth] = createSignal(840)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
@@ -369,6 +378,20 @@ export function MainView() {
     return () => window.removeEventListener('gg-open-context-tab', handleOpenContextTab as EventListener)
   })
 
+  createEffect(() => {
+    const handleOpenTerminalTab = () => {
+      setTerminalTabOpen(true)
+      setIsReviewVisible(true)
+    }
+
+    window.addEventListener('shob-open-terminal-tab', handleOpenTerminalTab)
+    return () => window.removeEventListener('shob-open-terminal-tab', handleOpenTerminalTab)
+  })
+
+  const handleTerminalClose = () => {
+    setTerminalTabOpen(false)
+  }
+
   const handleFileSelect = (filePath: string | null) => {
     setActiveFilePath(filePath)
     if (!filePath) return
@@ -492,6 +515,9 @@ export function MainView() {
                                 isFileTreeVisible={isFileTreeVisible}
                                 contextSessionId={contextTabSessionId}
                                 onContextClose={() => setContextTabSessionId(null)}
+                                terminalOpen={terminalTabOpen}
+                                terminalSessionId={activeSessionId}
+                                onTerminalClose={handleTerminalClose}
                               />
                             </fileCtx.FileProvider>
                           </SyncProvider>
