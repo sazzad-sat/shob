@@ -95,7 +95,6 @@ function OpenCodeReviewContent(props: {
   onCloseFile: (path: string) => void
   terminalTabs: () => Array<{ id: string; sessionId: string }>
   onCloseTerminal: (id: string) => void
-  terminalSessionId: () => string | null
 }) {
   const layout = useLayout()
   const sessionViewKey = createMemo(() => `${props.projectPath()}::workspace`)
@@ -156,7 +155,6 @@ function OpenCodeReviewContent(props: {
       onCloseFile={props.onCloseFile}
       terminalTabs={props.terminalTabs}
       onCloseTerminal={props.onCloseTerminal}
-      terminalSessionId={props.terminalSessionId}
       reviewPanel={() => (
         <div class="h-full min-h-0 overflow-auto">
           <FileComponentProvider component={FilePreview}>
@@ -192,7 +190,6 @@ export function MainView() {
   const [contextTabSessionId, setContextTabSessionId] = createSignal<string | null>(null)
   const [activeTabId, setActiveTabId] = createSignal<string>("review")
   const [terminalTabs, setTerminalTabs] = createSignal<Array<{ id: string; sessionId: string }>>([])
-  const activeSessionId = useStore((s) => s.activeSessionId)
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
   const [reviewWidth, setReviewWidth] = createSignal(840)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
@@ -405,17 +402,25 @@ export function MainView() {
   })
 
   createEffect(() => {
-    const handleOpenTerminalTab = () => {
-      const sessionId = activeSessionId()
-      if (!sessionId) return
+    const handleOpenTerminalTab = async () => {
+      const project = currentProject()
+      if (!project) return
+      const projectId = currentProjectId() ?? projects()[0]?.id ?? null
+      if (!projectId) return
+      const shell =
+        appStore.availableShells.find((s) => s === appStore.preferredShell) ??
+        appStore.availableShells[0] ??
+        appStore.preferredShell ??
+        ''
+      const session = await appStore.addIsolatedSession(projectId, shell)
       const id = `terminal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      setTerminalTabs((tabs) => [...tabs, { id, sessionId }])
+      setTerminalTabs((tabs) => [...tabs, { id, sessionId: session.id }])
       setActiveTabId(`terminal:${id}`)
       setIsReviewVisible(true)
     }
 
-    window.addEventListener('shob-open-terminal-tab', handleOpenTerminalTab)
-    return () => window.removeEventListener('shob-open-terminal-tab', handleOpenTerminalTab)
+    window.addEventListener('shob-open-terminal-tab', handleOpenTerminalTab as EventListener)
+    return () => window.removeEventListener('shob-open-terminal-tab', handleOpenTerminalTab as EventListener)
   })
 
   const handleFileSelect = (filePath: string | null) => {
@@ -561,7 +566,6 @@ export function MainView() {
                                 onCloseFile={handleCloseReviewFile}
                                 terminalTabs={terminalTabs}
                                 onCloseTerminal={handleCloseTerminalTab}
-                                terminalSessionId={activeSessionId}
                               />
                             </fileCtx.FileProvider>
                           </SyncProvider>

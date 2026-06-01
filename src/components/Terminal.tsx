@@ -15,6 +15,7 @@ import "@xterm/xterm/css/xterm.css"
 
 interface TerminalProps {
   sessionId: string
+  isActiveOverride?: () => boolean
 }
 
 interface RerunCliEventDetail {
@@ -308,7 +309,7 @@ function parseCliInvocation(input: string): { cliTool: string; promptText: strin
 
 export function Terminal(props: TerminalProps) {
   const sessionId = props.sessionId
-  const isActive = () => store.activeSessionId === sessionId
+  const isActive = () => (props.isActiveOverride ? props.isActiveOverride() : store.activeSessionId === sessionId)
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
   const availableShells = useStore((s) => s.availableShells)

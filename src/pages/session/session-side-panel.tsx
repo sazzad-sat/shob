@@ -37,7 +37,6 @@ type SidePanelProps = {
   onCloseFile: (path: string) => void
   terminalTabs: () => Array<{ id: string; sessionId: string }>
   onCloseTerminal: (id: string) => void
-  terminalSessionId: () => string | null
   renderFileTab: (filePath: string) => JSX.Element
 }
 
@@ -230,13 +229,13 @@ export function SessionSidePanel(props: SidePanelProps) {
                 </div>
                 <Tabs.Content
                   value="review"
-                  class="flex-1 min-h-0 overflow-y-auto contain-strict"
+                  class="flex-1 min-h-0 overflow-y-auto flex flex-col"
                 >
                   <Show when={props.reviewOpen()}>{props.reviewPanel()}</Show>
                 </Tabs.Content>
                 <Tabs.Content
                   value="context"
-                  class="flex-1 min-h-0 overflow-y-auto contain-strict"
+                  class="flex-1 min-h-0 overflow-y-auto flex flex-col"
                 >
                   <Show when={hasContext()}>
                     <SessionContextTab sessionId={props.contextSessionId!()!} />
@@ -246,7 +245,7 @@ export function SessionSidePanel(props: SidePanelProps) {
                   {(filePath) => (
                     <Tabs.Content
                       value={`file:${filePath}`}
-                      class="flex-1 min-h-0 overflow-y-auto contain-strict"
+                      class="flex-1 min-h-0 overflow-y-auto flex flex-col"
                     >
                       {isActive(`file:${filePath}`) ? props.renderFileTab(filePath) : null}
                     </Tabs.Content>
@@ -256,10 +255,13 @@ export function SessionSidePanel(props: SidePanelProps) {
                   {(tab) => (
                     <Tabs.Content
                       value={`terminal:${tab.id}`}
-                      class="flex-1 min-h-0 overflow-y-auto contain-strict"
+                      class="flex-1 min-h-0 overflow-y-auto flex flex-col"
                     >
                       <Show when={isActive(`terminal:${tab.id}`)}>
-                        <Terminal sessionId={tab.sessionId} />
+                        <Terminal
+                          sessionId={tab.sessionId}
+                          isActiveOverride={() => isActive(`terminal:${tab.id}`)}
+                        />
                       </Show>
                     </Tabs.Content>
                   )}
