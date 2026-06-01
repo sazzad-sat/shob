@@ -472,7 +472,7 @@ export const dict = {
   "error.page.action.updateTo": "Update to {{version}}",
   "error.page.circular": "[Circular]",
   "error.page.report.prefix": "Please report this error to the Shob team",
-  "error.page.report.discord": "on Discord",
+  "error.page.report.github": "on Github",
   "error.page.version": "Version: {{version}}",
 
   "error.dev.rootNotFound":
