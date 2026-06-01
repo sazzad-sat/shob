@@ -403,20 +403,30 @@ export function MainView() {
 
   createEffect(() => {
     const handleOpenTerminalTab = async () => {
-      const project = currentProject()
-      if (!project) return
-      const projectId = currentProjectId() ?? projects()[0]?.id ?? null
-      if (!projectId) return
-      const shell =
-        appStore.availableShells.find((s) => s === appStore.preferredShell) ??
-        appStore.availableShells[0] ??
-        appStore.preferredShell ??
-        ''
-      const session = await appStore.addIsolatedSession(projectId, shell)
-      const id = `terminal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      setTerminalTabs((tabs) => [...tabs, { id, sessionId: session.id }])
-      setActiveTabId(`terminal:${id}`)
-      setIsReviewVisible(true)
+      try {
+        const project = currentProject()
+        if (!project) {
+          console.warn("[shob-open-terminal-tab] no current project")
+          return
+        }
+        const projectId = currentProjectId() ?? projects()[0]?.id ?? null
+        if (!projectId) {
+          console.warn("[shob-open-terminal-tab] no project id")
+          return
+        }
+        const shell =
+          appStore.availableShells.find((s) => s === appStore.preferredShell) ??
+          appStore.availableShells[0] ??
+          appStore.preferredShell ??
+          ''
+        const session = await appStore.addIsolatedSession(projectId, shell)
+        const id = `terminal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+        setTerminalTabs((tabs) => [...tabs, { id, sessionId: session.id }])
+        setActiveTabId(`terminal:${id}`)
+        setIsReviewVisible(true)
+      } catch (err) {
+        console.error("[shob-open-terminal-tab] failed:", err)
+      }
     }
 
     window.addEventListener('shob-open-terminal-tab', handleOpenTerminalTab as EventListener)

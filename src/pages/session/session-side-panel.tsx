@@ -255,16 +255,14 @@ export function SessionSidePanel(props: SidePanelProps) {
                   {(tab) => (
                     <Tabs.Content
                       value={`terminal:${tab.id}`}
-                      class="flex-1 min-h-0 overflow-hidden"
+                      class="relative flex-1 min-h-0 overflow-hidden"
                     >
-                      <Show when={isActive(`terminal:${tab.id}`)}>
-                        <div class="relative h-full w-full overflow-hidden">
-                          <Terminal
-                            sessionId={tab.sessionId}
-                            isActiveOverride={() => isActive(`terminal:${tab.id}`)}
-                          />
-                        </div>
-                      </Show>
+                      <div class="absolute inset-0">
+                        <Terminal
+                          sessionId={tab.sessionId}
+                          isActiveOverride={() => isActive(`terminal:${tab.id}`)}
+                        />
+                      </div>
                     </Tabs.Content>
                   )}
                 </For>
