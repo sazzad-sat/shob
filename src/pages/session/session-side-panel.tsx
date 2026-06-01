@@ -1,12 +1,17 @@
-import { Match, Show, Switch, createMemo, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createMemo, type JSX } from "solid-js"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
+import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import FileTree from "@/components/file-tree"
+import { Terminal } from "@/components/Terminal"
 import { useFile } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { SessionContextTab } from "@/components/session/session-context-tab"
+import { DialogAddTab } from "@/components/dialog-add-tab"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
 
@@ -25,14 +30,49 @@ type SidePanelProps = {
   openFile: (path: string) => void
   contextSessionId?: () => string | null
   onContextClose?: () => void
+  projectPath: () => string
+  activeTabId: () => string
+  onSelectTab: (id: string) => void
+  fileTabs: () => string[]
+  onCloseFile: (path: string) => void
+  terminalTabs: () => Array<{ id: string; session: any }>
+  onCloseTerminal: (id: string) => void
+  renderFileTab: (filePath: string) => JSX.Element
+}
+
+function basename(path: string): string {
+  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"))
+  return idx >= 0 ? path.slice(idx + 1) : path
 }
 
 export function SessionSidePanel(props: SidePanelProps) {
   const layout = useLayout()
   const file = useFile()
   const language = useLanguage()
+  const dialog = useDialog()
 
-  const open = createMemo(() => props.reviewOpen() || props.fileTreeOpen() || !!props.contextSessionId?.())
+  const openAddTabDialog = () => {
+    dialog.show(() => (
+      <DialogAddTab
+        projectPath={props.projectPath}
+        onOpenFile={(path) => props.openFile(path)}
+        onOpenTerminal={() => {
+          window.dispatchEvent(new CustomEvent("shob-open-terminal-tab"))
+        }}
+      />
+    ))
+  }
+
+  const terminalCount = () => props.terminalTabs().length
+  const hasDynamicTab = () => props.fileTabs().length > 0 || terminalCount() > 0
+  const hasContext = () => !!props.contextSessionId?.()
+
+  const open = createMemo(
+    () => props.reviewOpen() || props.fileTreeOpen() || hasContext() || hasDynamicTab(),
+  )
+
+  const isActive = (id: string) => props.activeTabId() === id
+  const selectTab = (id: string) => props.onSelectTab(id)
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((diff) => diff.file))
   const reviewCount = createMemo(() => diffFiles().length)
@@ -86,6 +126,21 @@ export function SessionSidePanel(props: SidePanelProps) {
     </div>
   )
 
+  const CloseButton = (closeProps: { onClick: (e: MouseEvent) => void }) => (
+    <button
+      type="button"
+      class="ml-1 size-4 flex items-center justify-center rounded hover:bg-surface-raised-base-hover text-text-weak"
+      onClick={(e) => {
+        e.stopPropagation()
+        closeProps.onClick(e)
+      }}
+    >
+      <svg viewBox="0 0 16 16" class="size-3" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 4l8 8M12 4l-8 8" />
+      </svg>
+    </button>
+  )
+
   return (
     <aside
       id="review-panel"
@@ -98,16 +153,22 @@ export function SessionSidePanel(props: SidePanelProps) {
       <Show when={open()}>
         <div class="size-full flex border-l border-border-weaker-base">
           <div
-            aria-hidden={!props.reviewOpen() && !props.contextSessionId?.()}
-            inert={!props.reviewOpen() && !props.contextSessionId?.()}
+            aria-hidden={!props.reviewOpen() && !hasContext() && !hasDynamicTab()}
+            inert={!props.reviewOpen() && !hasContext() && !hasDynamicTab()}
             class="relative min-w-0 h-full flex-1 overflow-hidden bg-background-base"
-            classList={{ "pointer-events-none": !props.reviewOpen() && !props.contextSessionId?.() }}
+            classList={{
+              "pointer-events-none": !props.reviewOpen() && !hasContext() && !hasDynamicTab(),
+            }}
           >
-            <div class="size-full min-w-0 h-full bg-background-base">
-              <Tabs value={props.contextSessionId?.() ? "context" : "review"} onChange={() => undefined}>
+            <div class="size-full min-w-0 h-full min-h-0 bg-background-base flex flex-col">
+              <Tabs
+                value={props.activeTabId()}
+                onChange={(value) => selectTab(value.toString())}
+                class="h-full min-h-0"
+              >
                 <div class="sticky top-0 z-10 shrink-0 flex bg-background-base border-b border-border-weaker-base">
                   <Tabs.List>
-                    <Tabs.Trigger value="review">
+                    <Tabs.Trigger value="review" onClick={() => selectTab("review")}>
                       <div class="flex items-center gap-1.5">
                         <div>{language.t("session.tab.review")}</div>
                         <Show when={hasReview()}>
@@ -115,35 +176,97 @@ export function SessionSidePanel(props: SidePanelProps) {
                         </Show>
                       </div>
                     </Tabs.Trigger>
-                    <Show when={props.contextSessionId?.()}>
-                      <Tabs.Trigger value="context">
+                    <Show when={hasContext()}>
+                      <Tabs.Trigger value="context" onClick={() => selectTab("context")}>
                         <div class="flex items-center gap-1.5">
                           <div>{language.t("session.tab.context")}</div>
-                          <button
-                            type="button"
-                            class="ml-1 size-4 flex items-center justify-center rounded hover:bg-surface-raised-base-hover text-text-weak"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              props.onContextClose?.()
-                            }}
-                          >
-                            <svg viewBox="0 0 16 16" class="size-3" fill="none" stroke="currentColor" stroke-width="2">
-                              <path d="M4 4l8 8M12 4l-8 8" />
-                            </svg>
-                          </button>
+                          <CloseButton onClick={() => props.onContextClose?.()} />
                         </div>
                       </Tabs.Trigger>
                     </Show>
+                    <For each={props.fileTabs()}>
+                      {(filePath) => (
+                        <Tabs.Trigger
+                          value={`file:${filePath}`}
+                          onClick={() => selectTab(`file:${filePath}`)}
+                        >
+                          <div class="flex items-center gap-1.5">
+                            <div class="truncate max-w-32">{basename(filePath)}</div>
+                            <CloseButton onClick={() => props.onCloseFile(filePath)} />
+                          </div>
+                        </Tabs.Trigger>
+                      )}
+                    </For>
+                    <For each={props.terminalTabs()}>
+                      {(tab, index) => (
+                        <Tabs.Trigger
+                          value={`terminal:${tab.id}`}
+                          onClick={() => selectTab(`terminal:${tab.id}`)}
+                        >
+                          <div class="flex items-center gap-1.5">
+                            <div>
+                              {language.t("session.tab.terminal")}
+                              {terminalCount() > 1 ? ` ${index() + 1}` : ""}
+                            </div>
+                            <CloseButton onClick={() => props.onCloseTerminal(tab.id)} />
+                          </div>
+                        </Tabs.Trigger>
+                      )}
+                    </For>
+                    <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center pr-3">
+                      <Tooltip value={language.t("session.tab.add")} placement="bottom">
+                        <IconButton
+                          icon="plus-small"
+                          variant="ghost"
+                          iconSize="large"
+                          class="!rounded-md"
+                          aria-label={language.t("session.tab.add")}
+                          onClick={openAddTabDialog}
+                        />
+                      </Tooltip>
+                    </div>
                   </Tabs.List>
                 </div>
-                <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">
+                <Tabs.Content
+                  value="review"
+                  class="flex-1 min-h-0 overflow-y-auto"
+                >
                   <Show when={props.reviewOpen()}>{props.reviewPanel()}</Show>
                 </Tabs.Content>
-                <Tabs.Content value="context" class="flex flex-col h-full overflow-hidden contain-strict">
-                  <Show when={props.contextSessionId?.()}>
+                <Tabs.Content
+                  value="context"
+                  class="flex-1 min-h-0 overflow-y-auto"
+                >
+                  <Show when={hasContext()}>
                     <SessionContextTab sessionId={props.contextSessionId!()!} />
                   </Show>
                 </Tabs.Content>
+                <For each={props.fileTabs()}>
+                  {(filePath) => (
+                    <Tabs.Content
+                      value={`file:${filePath}`}
+                      class="flex-1 min-h-0 overflow-y-auto"
+                    >
+                      {isActive(`file:${filePath}`) ? props.renderFileTab(filePath) : null}
+                    </Tabs.Content>
+                  )}
+                </For>
+                <For each={props.terminalTabs()}>
+                  {(tab) => (
+                    <Tabs.Content
+                      value={`terminal:${tab.id}`}
+                      class="relative flex-1 min-h-0 overflow-hidden"
+                    >
+                      <div class="absolute inset-0">
+                        <Terminal
+                          sessionId={tab.session.id}
+                          session={tab.session}
+                          isActiveOverride={() => isActive(`terminal:${tab.id}`)}
+                        />
+                      </div>
+                    </Tabs.Content>
+                  )}
+                </For>
               </Tabs>
             </div>
           </div>

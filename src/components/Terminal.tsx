@@ -11,10 +11,13 @@ import { Search, X, ArrowUp, ArrowDown, Save, Trash2 } from "lucide-solid"
 import { CLI_ALIAS_TO_ID } from "../config/check"
 import { store, useStore } from "../store"
 import { api } from "../services/api"
+import type { Session } from "../types"
 import "@xterm/xterm/css/xterm.css"
 
 interface TerminalProps {
   sessionId: string
+  session?: Session | null
+  isActiveOverride?: () => boolean
 }
 
 interface RerunCliEventDetail {
@@ -308,7 +311,7 @@ function parseCliInvocation(input: string): { cliTool: string; promptText: strin
 
 export function Terminal(props: TerminalProps) {
   const sessionId = props.sessionId
-  const isActive = () => store.activeSessionId === sessionId
+  const isActive = () => (props.isActiveOverride ? props.isActiveOverride() : store.activeSessionId === sessionId)
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
   const availableShells = useStore((s) => s.availableShells)
@@ -353,15 +356,32 @@ export function Terminal(props: TerminalProps) {
     }
     return null
   })
-  const sessionProjectId = () => sessionProject()?.id ?? null
-  const sessionProjectPath = () => sessionProject()?.path ?? null
-  const session = useStore((state) => {
+  const sessionFromStore = useStore((state) => {
     for (const project of state.projects) {
       const match = project.sessions.find((item) => item.id === sessionId)
       if (match) return match
     }
     return null
   })
+  const session = () => props.session ?? sessionFromStore()
+  const sessionProjectId = () => {
+    if (props.session) {
+      for (const project of (store as any).projects) {
+        if (project.sessions.some((s: Session) => s.id === sessionId)) return project.id
+      }
+      return null
+    }
+    return sessionProject()?.id ?? null
+  }
+  const sessionProjectPath = () => {
+    if (props.session) {
+      for (const project of (store as any).projects) {
+        if (project.sessions.some((s: Session) => s.id === sessionId)) return project.path
+      }
+      return null
+    }
+    return sessionProject()?.path ?? null
+  }
   const renameSession = useStore((state) => state.renameSession)
   const updateSession = useStore((state) => state.updateSession)
   const recordSessionActivity = useStore((state) => state.recordSessionActivity)
@@ -462,11 +482,11 @@ export function Terminal(props: TerminalProps) {
   })
 
   onMount(() => {
-    if (!terminalRef || !session()) return
+    if (!terminalRef) return
 
-    const bootSession = session()!
-    const bootProjectId = sessionProjectId()
-    const bootProjectPath = sessionProjectPath()
+    const getBootSession = () => session()
+    const getBootProjectId = () => sessionProjectId()
+    const getBootProjectPath = () => sessionProjectPath()
 
     let cancelled = false
     const fitTimeouts: number[] = []
@@ -684,8 +704,10 @@ export function Terminal(props: TerminalProps) {
 
       if (cancelled) return
 
+      const bootSessionForPty = getBootSession()
+      if (!bootSessionForPty) return
 
-      const resolvedShell = resolveShell(bootSession.shell, availableShells())
+      const resolvedShell = resolveShell(bootSessionForPty.shell, availableShells())
 
       spawnInFlightRef = true
       try {
@@ -717,7 +739,7 @@ export function Terminal(props: TerminalProps) {
         const pty = await spawnNativePty({
           sessionId,
           shell: resolvedShell,
-          cwd: bootProjectPath || undefined,
+          cwd: getBootProjectPath() || undefined,
           rows: spawnRows,
           cols: spawnCols,
           cursor: restoredOutput.length,
@@ -772,12 +794,13 @@ export function Terminal(props: TerminalProps) {
           queueTerminalWrite(data)
         })
 
-        if (bootSession.pendingLaunchCommand && !hasFlushedPendingLaunchRef) {
+        const bootSession = getBootSession()
+        if (bootSession && bootSession.pendingLaunchCommand && !hasFlushedPendingLaunchRef) {
           const pendingLaunchKey = `${sessionId}:${bootSession.pendingLaunchCommand}`
           if (launchedPendingCommandKeys.has(pendingLaunchKey)) {
             hasFlushedPendingLaunchRef = true
-            if (bootProjectId) {
-              await updateSession(bootProjectId, sessionId, { pendingLaunchCommand: null })
+            if (getBootProjectId()) {
+              await updateSession(getBootProjectId()!, sessionId, { pendingLaunchCommand: null })
             }
             return
           }
@@ -785,8 +808,8 @@ export function Terminal(props: TerminalProps) {
           launchedPendingCommandKeys.add(pendingLaunchKey)
           hasFlushedPendingLaunchRef = true
           awaitingPromptTitleRef = true
-          if (bootProjectId) {
-            await updateSession(bootProjectId, sessionId, { pendingLaunchCommand: null })
+          if (getBootProjectId()) {
+            await updateSession(getBootProjectId()!, sessionId, { pendingLaunchCommand: null })
           }
           if (!ptyKilledRef) {
             try { pty.write(`${bootSession.pendingLaunchCommand}\r`) } catch { /* ignore */ }
@@ -991,14 +1014,15 @@ export function Terminal(props: TerminalProps) {
     const tryBoot = () => {
       if (hasBooted || cancelled) return
       if (!isActive()) return
+      if (!session()) return
       hasBooted = true
       void bootTerminal()
     }
 
-    // Boot now if active, or defer until first activation
+    // Boot now if active, or defer until first activation or session availability
     tryBoot()
     createEffect(() => {
-      if (isActive() && !hasBooted) {
+      if (isActive() && session() && !hasBooted) {
         tryBoot()
       }
     })
@@ -1278,6 +1302,12 @@ export function Terminal(props: TerminalProps) {
               <X class="h-3.5 w-3.5" />
             </button>
           </div>
+        </div>
+      </Show>
+
+      <Show when={!xtermRef}>
+        <div class="absolute inset-0 flex items-center justify-center text-12-regular text-text-weak pointer-events-none">
+          Starting terminal...
         </div>
       </Show>
 

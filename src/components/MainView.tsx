@@ -9,6 +9,7 @@ import { SettingsPage } from './SettingsPage'
 import { useStore } from '../store'
 import { createFileContext } from '@/context/file'
 import type { FileNode } from '@/types/file-node'
+import type { Session } from '@/types'
 import { ResizeHandle } from '@/opencode-ported/resize-handle'
 import { useGlobalSDK } from '@/context/global-sdk'
 import { useGlobalSync } from '@/context/global-sync'
@@ -54,6 +55,31 @@ type GitStatusSummary = {
   }>
 }
 
+function FileTabContent(props: { projectPath: () => string; filePath: string }) {
+  const [content] = createResource(() => props.filePath, async (filePath) => {
+    const root = props.projectPath()
+    const absolute = toPosix(`${root}/${filePath}`)
+    const contents = await nativeApi.invoke("read_text_file", { path: absolute })
+    return {
+      name: filePath.split("/").pop() ?? filePath,
+      contents,
+      cacheKey: filePath,
+    }
+  })
+
+  const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
+
+  return (
+    <div class="h-full min-h-0 overflow-auto bg-background-base">
+      <FileComponentProvider component={FilePreview}>
+        <Show when={content()} fallback={<div class="p-4 text-12-regular text-text-weak">Loading…</div>}>
+          {(file) => <OpenCodeFile mode="text" file={file()} class="h-full" />}
+        </Show>
+      </FileComponentProvider>
+    </div>
+  )
+}
+
 function OpenCodeReviewContent(props: {
   projectPath: () => string
   reviewDiffs: () => VcsFileDiff[]
@@ -64,6 +90,12 @@ function OpenCodeReviewContent(props: {
   isFileTreeVisible: () => boolean
   contextSessionId?: () => string | null
   onContextClose?: () => void
+  activeTabId: () => string
+  onSelectTab: (id: string) => void
+  fileTabs: () => string[]
+  onCloseFile: (path: string) => void
+  terminalTabs: () => Array<{ id: string; session: Session }>
+  onCloseTerminal: (id: string) => void
 }) {
   const layout = useLayout()
   const sessionViewKey = createMemo(() => `${props.projectPath()}::workspace`)
@@ -117,29 +149,28 @@ function OpenCodeReviewContent(props: {
       openFile={openReviewPath}
       contextSessionId={props.contextSessionId}
       onContextClose={props.onContextClose}
+      projectPath={props.projectPath}
+      activeTabId={props.activeTabId}
+      onSelectTab={props.onSelectTab}
+      fileTabs={props.fileTabs}
+      onCloseFile={props.onCloseFile}
+      terminalTabs={props.terminalTabs}
+      onCloseTerminal={props.onCloseTerminal}
       reviewPanel={() => (
-        <FileComponentProvider component={FilePreview}>
-          <Show
-            when={selectedPlainFile() && plainFileContent()}
-            fallback={
-              <SessionReviewTab
-                diffs={props.reviewDiffs}
-                view={view}
-                diffStyle={layout.review.diffStyle()}
-                onDiffStyleChange={layout.review.setDiffStyle}
-                onViewFile={openReviewPath}
-                focusedFile={activeDiffPath() ?? props.activeFilePath() ?? undefined}
-              />
-            }
-          >
-            {(file) => (
-              <div class="h-full min-h-0 overflow-hidden bg-background-base">
-                <OpenCodeFile mode="text" file={file()} class="h-full" />
-              </div>
-            )}
-          </Show>
-        </FileComponentProvider>
+        <div class="h-full min-h-0 overflow-auto">
+          <FileComponentProvider component={FilePreview}>
+            <SessionReviewTab
+              diffs={props.reviewDiffs}
+              view={view}
+              diffStyle={layout.review.diffStyle()}
+              onDiffStyleChange={layout.review.setDiffStyle}
+              onViewFile={openReviewPath}
+              focusedFile={activeDiffPath() ?? props.activeFilePath() ?? undefined}
+            />
+          </FileComponentProvider>
+        </div>
       )}
+      renderFileTab={(filePath) => <FileTabContent projectPath={props.projectPath} filePath={filePath} />}
     />
   )
 }
@@ -158,6 +189,8 @@ export function MainView() {
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
   const [contextTabSessionId, setContextTabSessionId] = createSignal<string | null>(null)
+  const [activeTabId, setActiveTabId] = createSignal<string>("review")
+  const [terminalTabs, setTerminalTabs] = createSignal<Array<{ id: string; session: Session }>>([])
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
   const [reviewWidth, setReviewWidth] = createSignal(840)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
@@ -369,10 +402,43 @@ export function MainView() {
     return () => window.removeEventListener('gg-open-context-tab', handleOpenContextTab as EventListener)
   })
 
+  createEffect(() => {
+    const handleOpenTerminalTab = async () => {
+      try {
+        const project = currentProject()
+        if (!project) {
+          console.warn("[shob-open-terminal-tab] no current project")
+          return
+        }
+        const projectId = currentProjectId() ?? projects()[0]?.id ?? null
+        if (!projectId) {
+          console.warn("[shob-open-terminal-tab] no project id")
+          return
+        }
+        const shell =
+          appStore.availableShells.find((s) => s === appStore.preferredShell) ??
+          appStore.availableShells[0] ??
+          appStore.preferredShell ??
+          ''
+        const session = await appStore.addIsolatedSession(projectId, shell)
+        const id = `terminal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+        setTerminalTabs((tabs) => [...tabs, { id, session }])
+        setActiveTabId(`terminal:${id}`)
+        setIsReviewVisible(true)
+      } catch (err) {
+        console.error("[shob-open-terminal-tab] failed:", err)
+      }
+    }
+
+    window.addEventListener('shob-open-terminal-tab', handleOpenTerminalTab as EventListener)
+    return () => window.removeEventListener('shob-open-terminal-tab', handleOpenTerminalTab as EventListener)
+  })
+
   const handleFileSelect = (filePath: string | null) => {
     setActiveFilePath(filePath)
     if (!filePath) return
     setReviewFiles((files) => files.includes(filePath) ? files : [...files, filePath])
+    setActiveTabId(`file:${filePath}`)
     setIsReviewVisible(true)
   }
 
@@ -381,6 +447,19 @@ export function MainView() {
       const next = files.filter((file) => file !== filePath)
       if (activeFilePath() === filePath) {
         setActiveFilePath(next.at(-1) ?? null)
+      }
+      return next
+    })
+    if (activeTabId() === `file:${filePath}`) {
+      setActiveTabId("review")
+    }
+  }
+
+  const handleCloseTerminalTab = (id: string) => {
+    setTerminalTabs((tabs) => {
+      const next = tabs.filter((tab) => tab.id !== id)
+      if (activeTabId() === `terminal:${id}`) {
+        setActiveTabId(next.at(-1)?.id ? `terminal:${next.at(-1)!.id}` : "review")
       }
       return next
     })
@@ -492,6 +571,12 @@ export function MainView() {
                                 isFileTreeVisible={isFileTreeVisible}
                                 contextSessionId={contextTabSessionId}
                                 onContextClose={() => setContextTabSessionId(null)}
+                                activeTabId={activeTabId}
+                                onSelectTab={setActiveTabId}
+                                fileTabs={reviewFiles}
+                                onCloseFile={handleCloseReviewFile}
+                                terminalTabs={terminalTabs}
+                                onCloseTerminal={handleCloseTerminalTab}
                               />
                             </fileCtx.FileProvider>
                           </SyncProvider>

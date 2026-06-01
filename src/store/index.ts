@@ -109,6 +109,7 @@ interface AppActions {
   setCurrentProject: (id: string | null) => void;
   setCurrentProjectId: (id: string | null) => void;
   addSession: (projectId: string, shell: string) => Promise<Session>;
+  addIsolatedSession: (projectId: string, shell: string) => Promise<Session>;
   launchCliSession: (projectId: string, cliId?: string | null) => Promise<Session>;
   renameSession: (projectId: string, sessionId: string, name: string) => Promise<void>;
   updateSession: (projectId: string, sessionId: string, updates: Partial<Session>) => Promise<void>;
@@ -302,6 +303,55 @@ export const actions: AppActions = {
         const finalProject = {
           ...currentProject,
           sessions: currentProject.sessions.map(s => 
+            s.id === session.id ? { ...s, name: finalSessionName } : s
+          ),
+        };
+        api.saveProject(finalProject).catch(() => {});
+        setStore('projects', prev => prev.map(p => p.id === projectId ? finalProject : p));
+      }
+    }).catch(() => {
+      const currentProject = store.projects.find(p => p.id === projectId);
+      if (currentProject) api.saveProject(currentProject).catch(() => {});
+    });
+
+    return session;
+  },
+
+  addIsolatedSession: async (projectId: string, shell: string) => {
+    const createdAt = Date.now();
+    const project = store.projects.find((p) => p.id === projectId);
+    if (!project) throw new Error('Project not found');
+
+    const session: Session = {
+      id: crypto.randomUUID(),
+      name: 'Terminal',
+      shell,
+      cliTool: null,
+      pendingLaunchCommand: null,
+      createdAt,
+      lastActiveAt: createdAt,
+      commandCount: 0,
+      startupDurationMs: null,
+    };
+
+    const updatedProject = {
+      ...project,
+      sessions: [...project.sessions, session],
+    };
+
+    setStore({
+      projects: store.projects.map((p) =>
+        p.id === projectId ? updatedProject : p
+      ),
+    });
+
+    api.getGitBranch(project.path).then((branchInfo) => {
+      const finalSessionName = branchInfo?.head || 'Terminal';
+      const currentProject = store.projects.find(p => p.id === projectId);
+      if (currentProject) {
+        const finalProject = {
+          ...currentProject,
+          sessions: currentProject.sessions.map(s =>
             s.id === session.id ? { ...s, name: finalSessionName } : s
           ),
         };
