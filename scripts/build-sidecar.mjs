@@ -50,8 +50,6 @@ const result = await Bun.build({
   format: "esm",
   sourcemap: "linked",
   external: [
-    "@lydell/node-pty",
-    "@parcel/watcher",
     "jsonc-parser",
   ],
   define: {
@@ -63,5 +61,10 @@ if (!result.success) {
   for (const log of result.logs) console.error(log)
   process.exit(1)
 }
+
+const jsoncParserSrc = path.join(rootDir, "node_modules", "jsonc-parser")
+const jsoncParserDest = path.join(outdir, "node_modules", "jsonc-parser")
+await fs.mkdir(path.dirname(jsoncParserDest), { recursive: true })
+await fs.cp(jsoncParserSrc, jsoncParserDest, { recursive: true })
 
 console.log(`[sidecar] built server bundle → ${outdir}`)

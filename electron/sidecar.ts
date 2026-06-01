@@ -1,3 +1,7 @@
+import { writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { pathToFileURL } from "node:url"
+
 type StartCommand = {
   type: "start"
   hostname: string
@@ -31,10 +35,30 @@ function post(message: SidecarMessage) {
   parentPort.postMessage(message)
 }
 
+process.on("unhandledRejection", (reason) => {
+  try {
+    parentPort.postMessage({ type: "error", error: { message: String(reason), stack: "" } })
+  } catch {}
+  setTimeout(() => process.exit(1), 200)
+})
+
 function serializeError(error: unknown) {
-  if (error instanceof Error) return { message: error.message, stack: error.stack }
-  return { message: String(error) }
+  if (error instanceof Error) return { message: error.message, stack: error.stack, name: error.name }
+  return { message: String(error), stack: "", name: "Error" }
 }
+
+function writeCrashFile(reason: string) {
+  try {
+    const file = `${tmpdir()}/shob-sidecar-crash.log`
+    writeFileSync(file, `${new Date().toISOString()}\n${reason}\n`)
+    console.error("[sidecar] crash written:", file, reason.slice(0, 300))
+  } catch {}
+}
+
+process.on("uncaughtException", (error) => {
+  writeCrashFile(String(error?.stack ?? error))
+  setTimeout(() => process.exit(1), 500)
+})
 
 async function start(command: StartCommand) {
   try {
@@ -44,17 +68,18 @@ async function start(command: StartCommand) {
       OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
     })
 
-    const serverModule = await import(command.serverModulePath)
+    const serverUrl = pathToFileURL(command.serverModulePath).href
+    const serverModule = await import(serverUrl)
     const { Server, Log } = serverModule
 
-    await Log.init({ level: "WARN" })
+    await Log.init({ level: 'WARN' })
 
     const listener = await Server.listen({
       port: command.port,
       hostname: command.hostname,
     })
 
-    post({ type: "ready", hostname: command.hostname, port: listener.port })
+    post({ type: 'ready', hostname: command.hostname, port: listener.port })
 
     parentPort.on("message", (event: { data: unknown }) => {
       const msg = event.data as StopCommand | undefined
@@ -69,8 +94,10 @@ async function start(command: StartCommand) {
       }
     })
   } catch (error) {
+    console.error("[sidecar] start error:", error)
+    writeCrashFile(error instanceof Error ? (error.stack ?? error.message) : String(error))
     post({ type: "error", error: serializeError(error) })
-    process.exit(1)
+    setTimeout(() => process.exit(1), 500)
   }
 }
 

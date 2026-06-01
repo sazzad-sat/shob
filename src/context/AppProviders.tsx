@@ -24,7 +24,9 @@ async function resolveSidecarServerUrl() {
   const current = window.shob.getServerUrl()
   if (current) return current
 
-  return nativeApi.invoke("opencode_server_start")
+  const result = await nativeApi.invoke("opencode_server_start")
+
+  return result
 }
 
 function sidecarServer(url: string): ServerConnection.Sidecar {

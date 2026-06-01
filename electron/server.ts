@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import path from "node:path"
+import os from "node:os"
 import { fileURLToPath } from "node:url"
 import net from "node:net"
 import fs from "node:fs"
@@ -11,6 +12,18 @@ const projectRoot = path.resolve(__dirname, "..")
 const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
 
 const START_TIMEOUT_MS = 120000
+const SIDECAR_CRASH_FILE = path.join(os.tmpdir(), "shob-sidecar-crash.log")
+
+function readSidecarCrash(): string | null {
+  try {
+    if (fs.existsSync(SIDECAR_CRASH_FILE)) {
+      const content = fs.readFileSync(SIDECAR_CRASH_FILE, "utf8").trim()
+      fs.unlinkSync(SIDECAR_CRASH_FILE)
+      if (content) return content
+    }
+  } catch {}
+  return null
+}
 const HEALTH_POLL_INTERVAL_MS = 100
 const HEALTH_TIMEOUT_MS = 30000
 const HEALTH_FETCH_TIMEOUT_MS = 3000
@@ -134,6 +147,7 @@ async function startPackagedServer(
 
   let exited = false
   let exitCode: number | null = null
+  const stderrChunks: string[] = []
 
   child.stdout?.on("data", (chunk: Buffer) => {
     const msg = chunk.toString("utf8").trimEnd()
@@ -141,29 +155,49 @@ async function startPackagedServer(
   })
   child.stderr?.on("data", (chunk: Buffer) => {
     const msg = chunk.toString("utf8").trimEnd()
-    if (msg) console.warn("[sidecar:stderr]", msg)
-  })
-
-  child.once("exit", (code) => {
-    exited = true
-    exitCode = code
-    console.warn(`[shob] sidecar exited with code ${code}`)
-  })
-
-  child.on("error", (error) => {
-    console.error("[shob] sidecar error:", error)
+    if (msg) {
+      stderrChunks.push(msg)
+      console.warn("[sidecar:stderr]", msg)
+    }
   })
 
   const url = await new Promise<string>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      if (!exited) child.kill()
-      reject(new Error(`Server start timed out after ${START_TIMEOUT_MS}ms`))
-    }, START_TIMEOUT_MS)
-
     let resolved = false
 
-    const onMessage = (event: { data: unknown }) => {
-      const msg = event.data as { type: string; hostname?: string; port?: number; error?: { message: string } } | undefined
+    child.once("exit", (code) => {
+      exited = true
+      exitCode = code
+      console.warn(`[shob] sidecar exited with code ${code}`)
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        let detail = readSidecarCrash() ?? ""
+        if (!detail && stderrChunks.length > 0) {
+          detail = stderrChunks.join("\n")
+        }
+        const suffix = detail ? `\n${detail}` : ""
+        reject(new Error(`Sidecar exited unexpectedly with code ${code}${suffix}`))
+      }
+    })
+
+    child.on("error", (err: unknown) => {
+      console.error("[shob] sidecar error:", err)
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        reject(err instanceof Error ? err : new Error(String(err)))
+      }
+    })
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        if (!exited) child.kill()
+        reject(new Error(`Server start timed out after ${START_TIMEOUT_MS}ms`))
+      }
+    }, START_TIMEOUT_MS)
+
+    const onMessage = (msg: any) => {
       if (!msg) return
 
       if (msg.type === "ready" && msg.port) {
