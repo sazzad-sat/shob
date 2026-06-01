@@ -143,17 +143,19 @@ export function SessionSidePanel(props: SidePanelProps) {
                         </div>
                       </Tabs.Trigger>
                     </Show>
+                    <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center pr-3">
+                      <Tooltip value={language.t("session.tab.add")} placement="bottom">
+                        <IconButton
+                          icon="plus-small"
+                          variant="ghost"
+                          iconSize="large"
+                          class="!rounded-md"
+                          aria-label={language.t("session.tab.add")}
+                          onClick={openAddTabDialog}
+                        />
+                      </Tooltip>
+                    </div>
                   </Tabs.List>
-                  <div class="flex items-center pr-2">
-                    <Tooltip value={language.t("session.tab.add")} placement="bottom">
-                      <IconButton
-                        icon="plus-small"
-                        variant="ghost"
-                        aria-label={language.t("session.tab.add")}
-                        onClick={openAddTabDialog}
-                      />
-                    </Tooltip>
-                  </div>
                 </div>
                 <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">
                   <Show when={props.reviewOpen()}>{props.reviewPanel()}</Show>
