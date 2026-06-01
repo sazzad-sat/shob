@@ -160,11 +160,11 @@ export function SessionSidePanel(props: SidePanelProps) {
               "pointer-events-none": !props.reviewOpen() && !hasContext() && !hasDynamicTab(),
             }}
           >
-            <div class="size-full min-w-0 h-full bg-background-base flex flex-col">
+            <div class="size-full min-w-0 h-full min-h-0 bg-background-base flex flex-col">
               <Tabs
                 value={props.activeTabId()}
                 onChange={(value) => selectTab(value.toString())}
-                class="flex flex-col h-full min-h-0"
+                class="h-full min-h-0"
               >
                 <div class="sticky top-0 z-10 shrink-0 flex bg-background-base border-b border-border-weaker-base">
                   <Tabs.List>
@@ -229,13 +229,13 @@ export function SessionSidePanel(props: SidePanelProps) {
                 </div>
                 <Tabs.Content
                   value="review"
-                  class="flex-1 min-h-0 overflow-y-auto flex flex-col"
+                  class="flex-1 min-h-0 overflow-y-auto"
                 >
                   <Show when={props.reviewOpen()}>{props.reviewPanel()}</Show>
                 </Tabs.Content>
                 <Tabs.Content
                   value="context"
-                  class="flex-1 min-h-0 overflow-y-auto flex flex-col"
+                  class="flex-1 min-h-0 overflow-y-auto"
                 >
                   <Show when={hasContext()}>
                     <SessionContextTab sessionId={props.contextSessionId!()!} />
@@ -245,7 +245,7 @@ export function SessionSidePanel(props: SidePanelProps) {
                   {(filePath) => (
                     <Tabs.Content
                       value={`file:${filePath}`}
-                      class="flex-1 min-h-0 overflow-y-auto flex flex-col"
+                      class="flex-1 min-h-0 overflow-y-auto"
                     >
                       {isActive(`file:${filePath}`) ? props.renderFileTab(filePath) : null}
                     </Tabs.Content>
@@ -255,13 +255,15 @@ export function SessionSidePanel(props: SidePanelProps) {
                   {(tab) => (
                     <Tabs.Content
                       value={`terminal:${tab.id}`}
-                      class="flex-1 min-h-0 overflow-y-auto flex flex-col"
+                      class="flex-1 min-h-0 overflow-hidden"
                     >
                       <Show when={isActive(`terminal:${tab.id}`)}>
-                        <Terminal
-                          sessionId={tab.sessionId}
-                          isActiveOverride={() => isActive(`terminal:${tab.id}`)}
-                        />
+                        <div class="relative h-full w-full overflow-hidden">
+                          <Terminal
+                            sessionId={tab.sessionId}
+                            isActiveOverride={() => isActive(`terminal:${tab.id}`)}
+                          />
+                        </div>
                       </Show>
                     </Tabs.Content>
                   )}
