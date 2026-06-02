@@ -439,6 +439,156 @@ async function revealInFinder(targetPath: string) {
   shell.showItemInFolder(targetPath);
 }
 
+type OpenProjectTarget = "vscode" | "explorer" | "terminal" | "git-bash" | "wsl";
+
+function assertProjectDirectory(targetPath: string) {
+  if (!targetPath || !fsSync.existsSync(targetPath)) throw new Error("Project path does not exist");
+  const stats = fsSync.statSync(targetPath);
+  if (!stats.isDirectory()) throw new Error("Project path is not a directory");
+  return path.resolve(targetPath);
+}
+
+function launchDetached(command: string, args: string[], cwd: string) {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawnProcess(command, args, {
+      cwd,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: false,
+      shell: process.platform === "win32" && /\.(cmd|bat)$/i.test(command),
+    });
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
+    child.once("error", (error) => settle(() => reject(error)));
+    child.once("spawn", () => {
+      child.unref();
+      setTimeout(() => settle(resolve), 80);
+    });
+  });
+}
+
+function firstExistingPath(candidates: string[]) {
+  return candidates.find((candidate) => fsSync.existsSync(candidate)) || null;
+}
+
+function quotePowerShellString(value: string) {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+async function startWindowsProcess(command: string, args: string[], cwd: string) {
+  const powershell = resolveCommand("powershell.exe") || "powershell.exe";
+  const argumentList = args.length
+    ? ` -ArgumentList @(${args.map(quotePowerShellString).join(", ")})`
+    : "";
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    `Start-Process -FilePath ${quotePowerShellString(command)}${argumentList} -WorkingDirectory ${quotePowerShellString(cwd)}`,
+  ].join("; ");
+
+  await execFileAsync(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
+    cwd,
+    windowsHide: true,
+  });
+}
+
+function resolveVSCodeCommand() {
+  return (
+    firstExistingPath(
+      process.platform === "win32"
+        ? [
+            path.join(os.homedir(), "AppData", "Local", "Programs", "Microsoft VS Code", "Code.exe"),
+            path.join(os.homedir(), "AppData", "Local", "Programs", "Microsoft VS Code", "bin", "code.cmd"),
+            "C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd",
+            "C:\\Program Files\\Microsoft VS Code\\Code.exe",
+            "C:\\Program Files (x86)\\Microsoft VS Code\\bin\\code.cmd",
+            "C:\\Program Files (x86)\\Microsoft VS Code\\Code.exe",
+          ]
+        : [],
+    ) ||
+    resolveCommand("code.cmd") ||
+    resolveCommand("code.exe") ||
+    resolveCommand("code")
+  );
+}
+
+function resolveGitBashCommand() {
+  return (
+    resolveCommand("git-bash.exe") ||
+    firstExistingPath([
+      "C:\\Program Files\\Git\\git-bash.exe",
+      "C:\\Program Files (x86)\\Git\\git-bash.exe",
+      path.join(os.homedir(), "AppData", "Local", "Programs", "Git", "git-bash.exe"),
+    ])
+  );
+}
+
+function toWslPath(targetPath: string) {
+  const resolved = path.resolve(targetPath);
+  const match = /^([a-zA-Z]):[\\/](.*)$/.exec(resolved);
+  if (!match) return resolved.replace(/\\/g, "/");
+  return `/mnt/${match[1].toLowerCase()}/${match[2].replace(/\\/g, "/")}`;
+}
+
+async function openProjectWith(targetPath: string, target: OpenProjectTarget) {
+  const projectPath = assertProjectDirectory(targetPath);
+
+  if (target === "explorer") {
+    const error = await shell.openPath(projectPath);
+    if (error) throw new Error(error);
+    return;
+  }
+
+  if (target === "vscode") {
+    const command = resolveVSCodeCommand();
+    if (!command) throw new Error("VS Code command was not found");
+    await launchDetached(command, [projectPath], projectPath);
+    return;
+  }
+
+  if (target === "terminal") {
+    if (process.platform === "win32") {
+      const shellCommand = process.env.ComSpec || resolveCommand("cmd.exe") || "cmd.exe";
+      await startWindowsProcess(shellCommand, [], projectPath);
+      return;
+    }
+    if (process.platform === "darwin") {
+      await launchDetached("open", ["-a", "Terminal", projectPath], projectPath);
+      return;
+    }
+    const terminal = resolveCommand("gnome-terminal") || resolveCommand("konsole") || resolveCommand("x-terminal-emulator");
+    if (!terminal) throw new Error("Terminal application was not found");
+    if (terminal.includes("gnome-terminal")) await launchDetached(terminal, [`--working-directory=${projectPath}`], projectPath);
+    else if (terminal.includes("konsole")) await launchDetached(terminal, ["--workdir", projectPath], projectPath);
+    else await launchDetached(terminal, [], projectPath);
+    return;
+  }
+
+  if (target === "git-bash") {
+    if (process.platform !== "win32") throw new Error("Git Bash is only available on Windows");
+    const command = resolveGitBashCommand();
+    if (!command) throw new Error("Git Bash was not found");
+    await launchDetached(command, [`--cd=${projectPath}`], projectPath);
+    return;
+  }
+
+  if (target === "wsl") {
+    if (process.platform !== "win32") throw new Error("WSL is only available on Windows");
+    const wsl = resolveCommand("wsl.exe") || "wsl.exe";
+    const wt = resolveCommand("wt.exe") || resolveCommand("wt");
+    const wslPath = toWslPath(projectPath);
+    if (wt) await launchDetached(wt, [wsl, "--cd", wslPath], projectPath);
+    else await launchDetached(wsl, ["--cd", wslPath], projectPath);
+    return;
+  }
+
+  throw new Error("Unsupported open target");
+}
+
 async function getGitStatus(cwd: string) {
   let repoRoot = "";
   try {
@@ -752,6 +902,7 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
   is_window_maximized: async () => Boolean(mainWindow?.isMaximized()),
   close_window: async () => mainWindow?.close(),
   reveal_in_finder: async ({ path: targetPath }) => revealInFinder(targetPath),
+  open_project_with: async ({ path: targetPath, target }) => openProjectWith(targetPath, target),
   show_open_dialog: async (options) => {
     const result = await dialog.showOpenDialog(mainWindow!, {
       title: options?.title,

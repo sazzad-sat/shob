@@ -51,6 +51,8 @@ export interface ElectronOpenDialogOptions {
   }>
 }
 
+export type ElectronOpenWithTarget = "vscode" | "explorer" | "terminal" | "git-bash" | "wsl"
+
 export interface ElectronTerminalSpawnOptions {
   id?: string
   shell: string
@@ -155,6 +157,7 @@ export interface NativeCommandMap {
   set_window_background: { args: { color: string }; result: void }
   set_titlebar_theme: { args: { mode: "light" | "dark" }; result: void }
   reveal_in_finder: { args: { path: string }; result: void }
+  open_project_with: { args: { path: string; target: ElectronOpenWithTarget }; result: void }
   show_open_dialog: { args: ElectronOpenDialogOptions; result: string | string[] | null }
   open_external: { args: { url: string }; result: void }
 }

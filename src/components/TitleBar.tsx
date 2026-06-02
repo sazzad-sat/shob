@@ -29,9 +29,6 @@ function mapPlatform(value: string): OsPlatform {
 export function TitleBar() {
   const [platform, setPlatform] = createSignal<OsPlatform>("unknown")
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
-  const [isReviewVisible, setIsReviewVisible] = createSignal(false)
-  const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
-  const [isTerminalPanelOpen, setIsTerminalPanelOpen] = createSignal(false)
   const [isFullscreen, setIsFullscreen] = createSignal(false)
   const [updateState, setUpdateState] = createSignal<"idle" | "checking" | "available" | "downloading" | "downloaded" | "error" | "dev">("idle")
   const [updateVersion, setUpdateVersion] = createSignal<string | null>(null)
@@ -105,33 +102,6 @@ export function TitleBar() {
     }
     window.addEventListener("gg-sidebar-state", handleSidebarState as EventListener)
     onCleanup(() => window.removeEventListener("gg-sidebar-state", handleSidebarState as EventListener))
-  })
-
-  onMount(() => {
-    const handleReviewState = (event: Event) => {
-      const detail = (event as CustomEvent<{ isReviewVisible: boolean }>).detail
-      if (detail) setIsReviewVisible(Boolean(detail.isReviewVisible))
-    }
-    window.addEventListener("gg-review-state", handleReviewState as EventListener)
-    onCleanup(() => window.removeEventListener("gg-review-state", handleReviewState as EventListener))
-  })
-
-  onMount(() => {
-    const handleFileTreeState = (event: Event) => {
-      const detail = (event as CustomEvent<{ isFileTreeVisible: boolean }>).detail
-      if (detail) setIsFileTreeVisible(Boolean(detail.isFileTreeVisible))
-    }
-    window.addEventListener("gg-file-tree-state", handleFileTreeState as EventListener)
-    onCleanup(() => window.removeEventListener("gg-file-tree-state", handleFileTreeState as EventListener))
-  })
-
-  onMount(() => {
-    const handleTerminalPanelState = (event: Event) => {
-      const detail = (event as CustomEvent<{ isOpen: boolean }>).detail
-      if (detail) setIsTerminalPanelOpen(Boolean(detail.isOpen))
-    }
-    window.addEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener)
-    onCleanup(() => window.removeEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener))
   })
 
   const maximize = (e: MouseEvent) => {
@@ -208,40 +178,7 @@ export function TitleBar() {
             "pr-2": !windows(),
           }}
         >
-          <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" style={{ "-webkit-app-region": "no-drag" }}>
-            <div class="glass-container flex items-center gap-1 p-1.5 rounded-2xl border">
-              <Button
-                variant="ghost"
-                class="titlebar-icon glass-button"
-                onClick={() => window.dispatchEvent(new Event("gg-toggle-terminal-panel"))}
-                title={isTerminalPanelOpen() ? "Hide terminal panel" : "Show terminal panel"}
-                aria-label="Toggle terminal panel"
-                aria-pressed={isTerminalPanelOpen()}
-              >
-                <Icon name={isTerminalPanelOpen() ? "terminal-active" : "terminal"} size="small" />
-              </Button>
-              <Button
-                variant="ghost"
-                class="titlebar-icon glass-button"
-                onClick={() => window.dispatchEvent(new Event("gg-toggle-file-tree"))}
-                title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
-                aria-label="Toggle file tree"
-                aria-pressed={isFileTreeVisible()}
-              >
-                <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
-              </Button>
-              <Button
-                variant="ghost"
-                class="titlebar-icon glass-button"
-                onClick={() => window.dispatchEvent(new Event("gg-toggle-review-workspace"))}
-                title={isReviewVisible() || isFileTreeVisible() ? "Hide file tree and review panel" : "Show file tree and review panel"}
-                aria-label="Toggle review workspace"
-                aria-pressed={isReviewVisible() || isFileTreeVisible()}
-              >
-                <Icon name={isReviewVisible() || isFileTreeVisible() ? "review-active" : "review"} size="small" />
-              </Button>
-            </div>
-          </div>
+          <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" style={{ "-webkit-app-region": "no-drag" }} />
           {windows() && <div class="shrink-0" style={{ width: `${WINDOWS_CONTROLS_BASE_WIDTH}px` }} />}
         </div>
       </div>

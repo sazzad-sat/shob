@@ -1,10 +1,11 @@
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show } from "solid-js"
 import { PromptInput } from "../opencode-ported/prompt-input"
 import { MockSessionProviders } from "../opencode-ported/mock-session-layout"
 import { useSync } from "@/context/sync"
 import { useNavigate, useParams } from "@solidjs/router"
 import { AssistantParts, Message } from "@opencode-ai/ui/message-part"
 import { DataProvider, FileComponentProvider } from "@opencode-ai/ui/context"
+import { AppIcon } from "@opencode-ai/ui/app-icon"
 import { Icon } from "@opencode-ai/ui/icon"
 import { sessionTitle } from "@/utils/session-title"
 import { createSessionComposerState } from "@/opencode-ported/composer/session-composer-state"
@@ -26,7 +27,7 @@ import { SessionRetry } from "@opencode-ai/ui/session-retry"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useSDK } from "@/context/sdk"
 import { formatServerError } from "@/utils/server-errors"
-import { Check, Copy, MoreHorizontal, Pencil, Pin, X } from "lucide-solid"
+import { Check, ChevronDown, Copy, MoreHorizontal, Pencil, Pin, X } from "lucide-solid"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,27 @@ interface AgentViewProps {
   sessionId: string
   projectPath?: string
 }
+
+type OpenWithTarget = "vscode" | "explorer" | "terminal" | "git-bash" | "wsl"
+type OpenWithAppIcon = "vscode" | "file-explorer" | "terminal"
+
+const openWithOptions: Array<{
+  id: OpenWithTarget
+  label: string
+  icon?: OpenWithAppIcon
+  badge?: string
+  badgeClass?: string
+}> = [
+  { id: "vscode", label: "VS Code", icon: "vscode" },
+  { id: "explorer", label: "File Explorer", icon: "file-explorer" },
+  { id: "terminal", label: "Terminal", icon: "terminal" },
+  { id: "git-bash", label: "Git Bash", badge: "GB", badgeClass: "bg-[#12351e] text-[#74d680]" },
+  { id: "wsl", label: "WSL", badge: "WSL", badgeClass: "bg-[#102b46] text-[#7bc7ff]" },
+]
+
+const unknownNativeCommand = (error: unknown) => String(error instanceof Error ? error.message : error).includes("Unknown IPC command")
+
+const vscodeProjectUri = (projectPath: string) => `vscode://file/${encodeURI(projectPath.replace(/\\/g, "/"))}`
 
 const basename = (path?: string | null) => {
   if (!path) return "No project"
@@ -132,6 +154,179 @@ function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
           Try again
         </Button>
       </div>
+    </div>
+  )
+}
+
+function OpenWithOptionIcon(props: { option: (typeof openWithOptions)[number] }) {
+  if (props.option.icon) {
+    return <AppIcon id={props.option.icon} class="size-5 shrink-0 rounded-[4px]" />
+  }
+
+  return (
+    <span
+      class={`flex size-5 shrink-0 items-center justify-center rounded-[5px] text-[8px] font-bold leading-none ring-1 ring-white/10 ${props.option.badgeClass ?? "bg-surface-raised-base text-text-base"}`}
+    >
+      {props.option.badge}
+    </span>
+  )
+}
+
+function AgentHeaderPanelControls(props: { projectPath?: string }) {
+  const [isReviewVisible, setIsReviewVisible] = createSignal(false)
+  const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
+  const [isTerminalPanelOpen, setIsTerminalPanelOpen] = createSignal(false)
+  const [openWithMenuOpen, setOpenWithMenuOpen] = createSignal(false)
+  const [openingTarget, setOpeningTarget] = createSignal<OpenWithTarget | null>(null)
+  const reviewWorkspaceOpen = createMemo(() => isReviewVisible() || isFileTreeVisible())
+
+  const openProjectWith = (target: OpenWithTarget) => {
+    const projectPath = props.projectPath?.trim()
+    if (!projectPath) {
+      showToast({
+        variant: "error",
+        title: "No project open",
+        description: "Open a project before using Open with.",
+      })
+      return
+    }
+
+    if (openingTarget()) return
+    setOpeningTarget(target)
+    setOpenWithMenuOpen(false)
+
+    void nativeApi.invoke("open_project_with", { path: projectPath, target })
+      .catch((error) => {
+        if (target === "vscode") {
+          return nativeApi.invoke("open_external", { url: vscodeProjectUri(projectPath) })
+        }
+        if (target === "explorer" && unknownNativeCommand(error)) {
+          return nativeApi.invoke("reveal_in_finder", { path: projectPath })
+        }
+        throw error
+      })
+      .catch((error) => {
+        showToast({
+          variant: "error",
+          title: "Could not open project",
+          description: error instanceof Error ? error.message : String(error),
+        })
+      })
+      .finally(() => {
+        window.setTimeout(() => setOpeningTarget(null), 450)
+      })
+  }
+
+  onMount(() => {
+    const handleReviewState = (event: Event) => {
+      const detail = (event as CustomEvent<{ isReviewVisible: boolean }>).detail
+      if (detail) setIsReviewVisible(Boolean(detail.isReviewVisible))
+    }
+    const handleFileTreeState = (event: Event) => {
+      const detail = (event as CustomEvent<{ isFileTreeVisible: boolean }>).detail
+      if (detail) setIsFileTreeVisible(Boolean(detail.isFileTreeVisible))
+    }
+    const handleTerminalPanelState = (event: Event) => {
+      const detail = (event as CustomEvent<{ isOpen: boolean }>).detail
+      if (detail) setIsTerminalPanelOpen(Boolean(detail.isOpen))
+    }
+
+    window.addEventListener("gg-review-state", handleReviewState as EventListener)
+    window.addEventListener("gg-file-tree-state", handleFileTreeState as EventListener)
+    window.addEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener)
+
+    onCleanup(() => {
+      window.removeEventListener("gg-review-state", handleReviewState as EventListener)
+      window.removeEventListener("gg-file-tree-state", handleFileTreeState as EventListener)
+      window.removeEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener)
+    })
+  })
+
+  return (
+    <div class="flex shrink-0 items-center gap-1">
+      <div class="flex h-8 shrink-0 overflow-hidden rounded-lg border border-border-weak-base bg-surface-raised-base/70 shadow-sm backdrop-blur">
+        <button
+          type="button"
+          class="group/open-with flex h-8 w-9 items-center justify-center text-text-weak outline-none transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-60"
+          title="Open in VS Code"
+          aria-label="Open project in VS Code"
+          disabled={Boolean(openingTarget())}
+          onClick={(event) => {
+            event.stopPropagation()
+            openProjectWith("vscode")
+          }}
+        >
+          <Show
+            when={openingTarget() === "vscode"}
+            fallback={<AppIcon id="vscode" class="size-[18px] shrink-0 transition-transform group-hover/open-with:scale-105" />}
+          >
+            <span class="size-3.5 rounded-full border border-text-weaker border-t-text-strong animate-spin" />
+          </Show>
+        </button>
+        <div class="my-1.5 w-px bg-border-weaker-base" />
+        <DropdownMenu open={openWithMenuOpen()} onOpenChange={setOpenWithMenuOpen} placement="bottom-end" gutter={7}>
+          <DropdownMenuTrigger
+            class="flex h-8 w-7 shrink-0 items-center justify-center text-text-weaker outline-none transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40 data-expanded:bg-surface-raised-base-hover data-expanded:text-text-strong disabled:pointer-events-none disabled:opacity-60"
+            title="Open with"
+            aria-label="Choose app to open project"
+            disabled={Boolean(openingTarget())}
+            onClick={(event: MouseEvent) => event.stopPropagation()}
+          >
+            <ChevronDown size={13} class="shrink-0" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent class="w-[228px] rounded-xl border border-border-weak-base bg-surface-raised-base/95 p-1.5 text-[13px] shadow-2xl backdrop-blur">
+            <For each={openWithOptions}>
+              {(option) => (
+                <DropdownMenuItem
+                  class="min-h-9 gap-2.5 rounded-lg px-2 py-2 text-[13px] text-text-base focus:bg-surface-raised-base-hover"
+                  onClick={(event: MouseEvent) => {
+                    event.stopPropagation()
+                    openProjectWith(option.id)
+                  }}
+                >
+                  <Show
+                    when={openingTarget() === option.id}
+                    fallback={<OpenWithOptionIcon option={option} />}
+                  >
+                    <span class="size-5 shrink-0 rounded-full border border-text-weaker border-t-text-strong animate-spin" />
+                  </Show>
+                  <span class="truncate font-medium">{option.label}</span>
+                </DropdownMenuItem>
+              )}
+            </For>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <Button
+        variant="ghost"
+        class="size-8 rounded-lg border border-transparent px-0 text-text-weak hover:border-border-weaker-base hover:bg-surface-raised-base/70 hover:text-text-strong aria-pressed:border-border-weak-base aria-pressed:bg-surface-raised-base aria-pressed:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40"
+        onClick={() => window.dispatchEvent(new Event("gg-toggle-terminal-panel"))}
+        title={isTerminalPanelOpen() ? "Hide terminal panel" : "Show terminal panel"}
+        aria-label="Toggle terminal panel"
+        aria-pressed={isTerminalPanelOpen()}
+      >
+        <Icon name={isTerminalPanelOpen() ? "terminal-active" : "terminal"} size="small" />
+      </Button>
+      <Button
+        variant="ghost"
+        class="size-8 rounded-lg border border-transparent px-0 text-text-weak hover:border-border-weaker-base hover:bg-surface-raised-base/70 hover:text-text-strong aria-pressed:border-border-weak-base aria-pressed:bg-surface-raised-base aria-pressed:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40"
+        onClick={() => window.dispatchEvent(new Event("gg-toggle-file-tree"))}
+        title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
+        aria-label="Toggle file tree"
+        aria-pressed={isFileTreeVisible()}
+      >
+        <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
+      </Button>
+      <Button
+        variant="ghost"
+        class="size-8 rounded-lg border border-transparent px-0 text-text-weak hover:border-border-weaker-base hover:bg-surface-raised-base/70 hover:text-text-strong aria-pressed:border-border-weak-base aria-pressed:bg-surface-raised-base aria-pressed:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40"
+        onClick={() => window.dispatchEvent(new Event("gg-toggle-review-workspace"))}
+        title={reviewWorkspaceOpen() ? "Hide file tree and review panel" : "Show file tree and review panel"}
+        aria-label="Toggle review workspace"
+        aria-pressed={reviewWorkspaceOpen()}
+      >
+        <Icon name={reviewWorkspaceOpen() ? "review-active" : "review"} size="small" />
+      </Button>
     </div>
   )
 }
@@ -633,15 +828,18 @@ function AgentViewInner(props: AgentViewProps) {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    <Show when={parentSessionID()}>
-                      <button
-                        type="button"
-                        class="ml-auto shrink-0 rounded-[4px] border border-border px-2 py-1 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        onClick={goToParentSession}
-                      >
-                        Back to parent
-                      </button>
-                    </Show>
+                    <div class="ml-auto flex shrink-0 items-center gap-2">
+                      <AgentHeaderPanelControls projectPath={props.projectPath ?? currentProject()?.path} />
+                      <Show when={parentSessionID()}>
+                        <button
+                          type="button"
+                          class="shrink-0 rounded-[4px] border border-border px-2 py-1 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          onClick={goToParentSession}
+                        >
+                          Back to parent
+                        </button>
+                      </Show>
+                    </div>
                   </div>
                 </div>
 
