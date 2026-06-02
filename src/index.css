@@ -545,6 +545,30 @@ button {
   background-color: #555558;
 }
 
+.shob-sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-weaker) 72%, transparent) transparent;
+}
+
+.shob-sidebar-scrollbar::-webkit-scrollbar {
+  width: 9px;
+}
+
+.shob-sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shob-sidebar-scrollbar::-webkit-scrollbar-thumb {
+  min-height: 44px;
+  border: 3px solid var(--background-stronger, var(--background));
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--text-weaker) 72%, transparent);
+}
+
+.shob-sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--text-weak) 82%, transparent);
+}
+
 /* ═══════════════════════════════════════════════════
    WORKSPACE DIVIDER — expand line
    ═══════════════════════════════════════════════════ */

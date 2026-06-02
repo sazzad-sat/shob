@@ -54,7 +54,7 @@ const latestSessionTime = (session: Project["sessions"][number]) => session.last
 const PROJECT_SESSION_PREVIEW_LIMIT = 5
 
 const SidebarSectionTitle = (props: { children: string }) => (
-  <div class="px-3 pb-2 pt-4 text-[13px] leading-none text-text-weaker">
+  <div class="px-3 pb-2 pt-4 text-[13px] font-normal leading-4 text-text-weaker">
     {props.children}
   </div>
 )
@@ -72,21 +72,21 @@ const SidebarActionButton = (props: {
   return (
     <button
       type="button"
-      class={`group/action flex h-9 w-full items-center gap-3 rounded-md px-3 text-left text-[14px] font-medium transition-colors ${
+      aria-label={props.label}
+      class={`group/action flex h-8 w-full min-w-0 items-center justify-center rounded-[5px] border border-transparent text-text-weak transition-colors ${
         props.active
-          ? "bg-surface-raised-base text-text-strong ring-1 ring-border-weak-base"
-          : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
+          ? "border-border-weak-base bg-surface-raised-base text-text-strong"
+          : "hover:bg-surface-raised-base-hover hover:text-text-strong"
       }`}
       title={props.title ?? props.label}
       onClick={props.onClick}
     >
-      <span class="relative flex size-4 shrink-0 items-center justify-center text-text-weak group-hover/action:text-text-strong">
-        <Icon size={16} />
+      <span class="relative flex size-4 shrink-0 items-center justify-center">
+        <Icon size={15} />
         <Show when={props.mobileDot}>
           <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-text-interactive-base ring-2 ring-background-stronger" />
         </Show>
       </span>
-      <span class="min-w-0 truncate">{props.label}</span>
     </button>
   )
 }
@@ -96,21 +96,65 @@ const PinnedSessionRow = (props: {
   activeSessionId: string | null
   now: number
   onSelect: (projectId: string, sessionId: string) => void
-}) => (
-  <button
-    type="button"
-    class={`group/pinned grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md px-3 text-left transition-colors ${
-      props.activeSessionId === props.hit.session.id
-        ? "bg-surface-raised-base text-text-strong"
-        : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
-    }`}
-    title={`${props.hit.session.name} · ${props.hit.project.name}`}
-    onClick={() => props.onSelect(props.hit.project.id, props.hit.session.id)}
-  >
-    <span class="min-w-0 truncate text-[13px] leading-none">{props.hit.session.name}</span>
-    <span class="text-[12px] leading-5 text-text-weak">{formatSessionAge(latestSessionTime(props.hit.session), props.now)}</span>
-  </button>
-)
+}) => {
+  const globalSync = useGlobalSync()
+  const notification = useNotification()
+  const permission = usePermission()
+  const projectStore = createMemo(() => globalSync.child(props.hit.project.path)[0])
+
+  const isWorking = () => {
+    const status = (projectStore().session_status as Record<string, { type?: string } | undefined>)[props.hit.session.id]
+    return status?.type && status.type !== "idle"
+  }
+  const hasPermissions = () =>
+    !!sessionPermissionRequest(
+      projectStore().session,
+      projectStore().permission,
+      props.hit.session.id,
+      (item) => !permission.autoResponds(item, props.hit.project.path),
+    )
+  const unseenCount = () => notification.session.unseenCount(props.hit.session.id)
+  const hasError = () => notification.session.unseenHasError(props.hit.session.id)
+
+  return (
+    <button
+      type="button"
+      class={`group/pinned grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[5px] px-3 text-left transition-colors ${
+        props.activeSessionId === props.hit.session.id
+          ? "bg-surface-raised-base text-text-strong"
+          : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
+      }`}
+      title={`${props.hit.session.name} · ${props.hit.project.name}`}
+      onClick={() => props.onSelect(props.hit.project.id, props.hit.session.id)}
+    >
+      <span class="min-w-0 truncate text-[13px] font-normal leading-4">{props.hit.session.name}</span>
+      <span class="flex min-w-7 items-center justify-end">
+        <Switch
+          fallback={
+            <span class="text-[12px] font-normal leading-5 text-text-weak">
+              {formatSessionAge(latestSessionTime(props.hit.session), props.now)}
+            </span>
+          }
+        >
+          <Match when={isWorking()}>
+            <span class="flex h-5 w-5 items-center justify-center" title="Working">
+              <DotsSpinner class="font-mono text-[13px] leading-none text-icon-interactive-base" />
+            </span>
+          </Match>
+          <Match when={hasPermissions()}>
+            <span class="size-2 rounded-full bg-surface-warning-strong" title="Permission pending" />
+          </Match>
+          <Match when={hasError()}>
+            <span class="size-2 rounded-full bg-text-diff-delete-base" title="Error" />
+          </Match>
+          <Match when={unseenCount() > 0}>
+            <span class="size-2 rounded-full bg-text-interactive-base" title="Unread messages" />
+          </Match>
+        </Switch>
+      </span>
+    </button>
+  )
+}
 
 function SidebarSearchModal(props: {
   open: boolean
@@ -205,17 +249,18 @@ function SidebarSearchModal(props: {
 
 function FolderSection(props: {
   project: Project
+  currentProjectId: string | null
   activeSessionId: string | null
-  onSelectProject: (id: string) => void
   onSelectSession: (projectId: string, sessionId: string) => void
   onCreateSession: (projectId: string) => void
   onDeleteSession: (projectId: string, sessionId: string) => void
   onDeleteProject: (projectId: string) => void
   onSyncOpenCodeSessions: (projectId: string, sessions: OpenCodeSession[]) => void
-  onOpenWorkspacePage?: () => void
   onRenameSession: (projectId: string, sessionId: string, newName: string) => void
   onRenameProject: (projectId: string, name: string) => void | Promise<void>
   onToggleProjectPin: (projectId: string) => void | Promise<void>
+  isOpen: boolean
+  onToggleProjectOpen: (projectId: string) => void
   hidePinnedSessions?: boolean
 }) {
   const globalSync = useGlobalSync()
@@ -223,7 +268,6 @@ function FolderSection(props: {
   const notification = useNotification()
   const permission = usePermission()
 
-  const [isOpen, setIsOpen] = createSignal(true)
   const [showAllSessions, setShowAllSessions] = createSignal(false)
   const [projectMenuOpen, setProjectMenuOpen] = createSignal(false)
   const [renameProjectOpen, setRenameProjectOpen] = createSignal(false)
@@ -359,9 +403,8 @@ function FolderSection(props: {
     }
   }
 
-  const handleSelectProject = () => {
-    props.onOpenWorkspacePage?.()
-    props.onSelectProject(props.project.id)
+  const handleToggleProjectOpen = () => {
+    props.onToggleProjectOpen(props.project.id)
   }
 
   const runProjectMenuAction = (event: MouseEvent, action: () => void) => {
@@ -377,43 +420,49 @@ function FolderSection(props: {
     showAllSessions() ? rootSessions() : rootSessions().slice(0, PROJECT_SESSION_PREVIEW_LIMIT),
   )
   const hiddenRootSessionCount = createMemo(() => Math.max(0, rootSessions().length - PROJECT_SESSION_PREVIEW_LIMIT))
+  const renderSessionMeta = (session: Project["sessions"][number]) => (
+    <Switch
+      fallback={
+        <span class="text-[12px] font-normal leading-5 text-text-weak">
+          {formatSessionAge(session.lastActiveAt ?? session.createdAt, sortNow())}
+        </span>
+      }
+    >
+      <Match when={isSessionWorking(session.id)}>
+        <span class="flex h-5 w-5 items-center justify-center" title="Working">
+          <DotsSpinner class="font-mono text-[13px] leading-none text-icon-interactive-base" />
+        </span>
+      </Match>
+      <Match when={sessionHasPermissions(session.id)}>
+        <span class="size-2 rounded-full bg-surface-warning-strong" title="Permission pending" />
+      </Match>
+      <Match when={sessionHasError(session.id)}>
+        <span class="size-2 rounded-full bg-text-diff-delete-base" title="Error" />
+      </Match>
+      <Match when={sessionUnseenCount(session.id) > 0}>
+        <span class="size-2 rounded-full bg-text-interactive-base" title="Unread messages" />
+      </Match>
+    </Switch>
+  )
 
   const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
     <>
       <div
-        class={`group/session relative flex h-8 cursor-pointer items-center justify-between rounded-md pr-3 transition-colors ${
+        class={`group/session relative flex h-8 cursor-pointer items-center justify-between rounded-[5px] pr-3 transition-colors ${
           props.activeSessionId === session.id
             ? "bg-surface-raised-base text-text-strong"
-            : "hover:bg-surface-raised-base-hover text-text-base hover:text-text-strong"
+            : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
         }`}
-        style={{ "padding-left": `${24 + level * 14}px` }}
+        style={{ "padding-left": `${34 + level * 14}px` }}
         onClick={() => props.onSelectSession(props.project.id, session.id)}
       >
-        <div class="min-w-0 flex flex-1 items-center gap-2">
-          <div class="flex size-4 items-center justify-center">
-            <div class="relative flex size-4 items-center justify-center">
-              <Switch fallback={<span class="inline-block w-[1ch]" aria-hidden="true" />}>
-                <Match when={isSessionWorking(session.id)}>
-                  <DotsSpinner class="text-[14px] leading-none text-icon-interactive-base font-mono" />
-                </Match>
-                <Match when={sessionHasPermissions(session.id)}>
-                  <div class="size-1.5 rounded-full bg-surface-warning-strong animate-pulse" title="Permission pending" />
-                </Match>
-                <Match when={sessionHasError(session.id)}>
-                  <div class="size-1.5 rounded-full bg-text-diff-delete-base" title="Error" />
-                </Match>
-                <Match when={sessionUnseenCount(session.id) > 0}>
-                  <div class="size-1.5 rounded-full bg-text-interactive-base" title="Unread messages" />
-                </Match>
-              </Switch>
-            </div>
-          </div>
+        <div class="min-w-0 flex flex-1 items-center">
           <Show
             when={editingSessionId() === session.id}
             fallback={
               <span
-                class={`truncate text-[13px] ${
-                  props.activeSessionId === session.id ? "font-medium text-text-strong" : "text-text-base"
+                class={`truncate text-[13px] leading-4 ${
+                  props.activeSessionId === session.id ? "font-medium text-text-strong" : "font-normal text-current"
                 }`}
                 onDblClick={(e) => {
                   e.stopPropagation()
@@ -454,10 +503,10 @@ function FolderSection(props: {
           </Show>
         </div>
 
-        <div class="relative ml-3 flex h-5 w-6 shrink-0 items-center justify-end">
+        <div class="relative ml-3 flex h-5 min-w-7 shrink-0 items-center justify-end">
           <button
             type="button"
-            class="absolute right-0 z-10 rounded p-0.5 text-text-weak opacity-0 transition-all duration-150 hover:bg-surface-raised-base-hover hover:text-text-strong group-hover/session:opacity-100"
+            class="absolute right-0 z-10 rounded-[4px] p-0.5 text-text-weak opacity-0 transition-all duration-150 hover:bg-surface-raised-base-hover hover:text-text-strong group-hover/session:opacity-100"
             title="Archive session"
             onClick={(e) => {
               e.stopPropagation()
@@ -466,8 +515,8 @@ function FolderSection(props: {
           >
             <SessionDeleteIcon />
           </button>
-          <span class="pointer-events-none text-[12px] font-medium text-text-weak transition-opacity duration-150 group-hover/session:opacity-0">
-            {formatSessionAge(session.lastActiveAt ?? session.createdAt, sortNow())}
+          <span class="pointer-events-none flex min-w-7 items-center justify-end transition-opacity duration-150 group-hover/session:opacity-0">
+            {renderSessionMeta(session)}
           </span>
         </div>
       </div>
@@ -602,31 +651,32 @@ function FolderSection(props: {
       </Show>
 
       <div
-        class={`group/project flex h-8 items-center justify-between rounded-md px-3 transition-colors hover:bg-surface-raised-base-hover ${
-          props.activeSessionId === null ? "text-text-strong" : "text-text-base"
+        class={`group/project flex h-8 items-center justify-between rounded-[5px] pr-1 transition-colors hover:bg-surface-raised-base-hover ${
+          props.currentProjectId === props.project.id ? "text-text-strong" : "text-text-base"
         }`}
-        title={isOpen() ? "Collapse project" : "Expand project"}
-        onClick={() => {
-          handleSelectProject()
-          setIsOpen(!isOpen())
-        }}
+        title={props.isOpen ? "Collapse project" : "Expand project"}
       >
-        <div class="min-w-0 flex flex-1 items-center gap-2 text-text-weak select-none">
+        <button
+          type="button"
+          class="flex h-full min-w-0 flex-1 items-center gap-2 rounded-[5px] pl-3 pr-2 text-left text-text-weak select-none"
+          aria-expanded={props.isOpen}
+          onClick={handleToggleProjectOpen}
+        >
           <span class="text-text-weak transition-colors group-hover/project:text-text-strong">
             <ProjectFolderIcon />
           </span>
-          <span class="truncate text-[13px] leading-none text-text-base transition-colors group-hover/project:text-text-strong">
+          <span class="truncate text-[13px] font-normal leading-4 text-text-base transition-colors group-hover/project:text-text-strong">
             {props.project.name}
           </span>
           <Show when={props.project.pinned}>
             <Pin size={12} class="shrink-0 fill-current text-text-weaker" />
           </Show>
-        </div>
+        </button>
 
         <div class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/project:opacity-100">
           <DropdownMenu open={projectMenuOpen()} onOpenChange={setProjectMenuOpen} placement="bottom-end" gutter={4}>
             <DropdownMenuTrigger
-              class="rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover data-expanded:bg-surface-raised-base-hover"
+              class="rounded-[4px] p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover data-expanded:bg-surface-raised-base-hover"
               onPointerDown={(e) => {
                 e.stopPropagation()
               }}
@@ -672,7 +722,7 @@ function FolderSection(props: {
           </DropdownMenu>
           <div class="relative flex items-center">
             <button
-              class="peer rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover"
+              class="peer rounded-[4px] p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover"
               onClick={(e) => {
                 e.stopPropagation()
                 void props.onCreateSession(props.project.id)
@@ -688,12 +738,18 @@ function FolderSection(props: {
         </div>
       </div>
 
-      <Show when={isOpen()}>
-        <div class="flex flex-col gap-0.5 overflow-hidden transition-all duration-150 ease-out">
+      <div
+        class={`grid transition-[grid-template-rows,opacity] duration-150 ease-out ${
+          props.isOpen ? "grid-rows-[1fr] opacity-100" : "pointer-events-none grid-rows-[0fr] opacity-0"
+        }`}
+        aria-hidden={!props.isOpen}
+      >
+        <div class="min-h-0 overflow-hidden">
+          <div class="flex flex-col gap-0.5">
           <Show
             when={rootSessions().length > 0}
             fallback={
-              <div class="py-2 pl-8 text-[12px] text-text-weaker italic font-light select-none">
+              <div class="py-2 pl-[34px] text-[12px] font-light italic text-text-weaker select-none">
                 No active chats
               </div>
             }
@@ -704,7 +760,7 @@ function FolderSection(props: {
             <Show when={hiddenRootSessionCount() > 0}>
               <button
                 type="button"
-                class="h-8 rounded-md pl-8 pr-3 text-left text-[13px] text-text-weaker transition-colors hover:bg-surface-raised-base-hover hover:text-text-base"
+                class="h-8 rounded-[5px] pl-[34px] pr-3 text-left text-[13px] font-normal text-text-weaker transition-colors hover:bg-surface-raised-base-hover hover:text-text-base"
                 onClick={(e) => {
                   e.stopPropagation()
                   setShowAllSessions((current) => !current)
@@ -714,8 +770,9 @@ function FolderSection(props: {
               </button>
             </Show>
           </Show>
+          </div>
         </div>
-      </Show>
+      </div>
     </div>
   )
 }
@@ -744,6 +801,7 @@ export function Sidebar(props: {
   const [searchOpen, setSearchOpen] = createSignal(false)
   const [searchQuery, setSearchQuery] = createSignal("")
   const [sidebarNow, setSidebarNow] = createSignal(Date.now())
+  const [projectOpenById, setProjectOpenById] = createSignal<Record<string, boolean>>({})
 
   const allSessionHits = createMemo<SidebarSessionHit[]>(() =>
     projects().flatMap((project) => project.sessions.map((session) => ({ project, session }))),
@@ -754,6 +812,15 @@ export function Sidebar(props: {
       .filter((hit) => hit.session.pinned)
       .sort((left, right) => latestSessionTime(right.session) - latestSessionTime(left.session)),
   )
+
+  const isProjectOpen = (projectId: string) => projectOpenById()[projectId] ?? true
+
+  const handleToggleProjectOpen = (projectId: string) => {
+    setProjectOpenById((current) => ({
+      ...current,
+      [projectId]: !(current[projectId] ?? true),
+    }))
+  }
 
   const searchResults = createMemo<SidebarSearchResult[]>(() => {
     const query = searchQuery().trim().toLowerCase()
@@ -951,9 +1018,9 @@ export function Sidebar(props: {
           edge="end"
           onResize={(clientX) => setSidebarWidth(Math.max(240, Math.min(460, clientX)))}
         />
-        <div class="relative flex h-full max-h-full flex-col bg-background-stronger select-none">
-          <div class="sticky top-0 z-20 shrink-0 bg-background-stronger/95 px-2 py-2.5 backdrop-blur">
-            <nav class="flex flex-col gap-1">
+        <div class="relative flex h-full max-h-full flex-col bg-background-stronger text-text-base select-none">
+          <div class="sticky top-0 z-20 shrink-0 bg-background-stronger/95 px-2 pb-1.5 pt-2 backdrop-blur">
+            <nav class="grid grid-cols-3 gap-1">
               <SidebarActionButton
                 label="New chat"
                 title="Start a new chat"
@@ -975,8 +1042,8 @@ export function Sidebar(props: {
             </nav>
           </div>
 
-          <div class="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
-            <div class="flex flex-col gap-0.5 px-1.5 pb-4 pt-2">
+          <div class="shob-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto">
+            <div class="flex flex-col gap-0.5 px-1.5 pb-4 pt-1">
               <Show when={pinnedSessionHits().length > 0}>
                 <div class="mb-2">
                   <SidebarSectionTitle>Pinned</SidebarSectionTitle>
@@ -1001,7 +1068,7 @@ export function Sidebar(props: {
                 fallback={
                   <button
                     type="button"
-                    class="mx-1 flex h-8 items-center gap-2 rounded-md px-3 text-left text-[13px] text-text-base transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                    class="mx-1 flex h-8 items-center gap-2 rounded-[5px] px-3 text-left text-[13px] font-normal text-text-base transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
                     onClick={() => void handleAddProject()}
                   >
                     <Plus size={14} />
@@ -1014,17 +1081,18 @@ export function Sidebar(props: {
                     {(project) => (
                       <FolderSection
                         project={project}
+                        currentProjectId={currentProjectId()}
                         activeSessionId={activeSessionId()}
-                        onSelectProject={setCurrentProject}
                         onSelectSession={handleSelectSession}
                         onCreateSession={handleCreateSession}
                         onDeleteSession={handleDeleteSession}
                         onDeleteProject={handleDeleteProject}
                         onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
-                        onOpenWorkspacePage={props.onOpenWorkspacePage}
                         onRenameSession={renameSession}
                         onRenameProject={handleRenameProject}
                         onToggleProjectPin={handleToggleProjectPin}
+                        isOpen={isProjectOpen(project.id)}
+                        onToggleProjectOpen={handleToggleProjectOpen}
                         hidePinnedSessions
                       />
                     )}
