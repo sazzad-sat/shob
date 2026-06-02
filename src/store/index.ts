@@ -62,20 +62,29 @@ const normalizeProjects = (projects: Project[]): Project[] =>
     color: project.color ?? null,
     logoPath: project.logoPath ?? null,
     pinned: Boolean(project.pinned),
-    sessions: project.sessions.map((session) => ({
+    sessions: sortSessions(project.sessions.map((session) => ({
       ...session,
       name: sanitizeSessionName(session.name) || session.name,
+      pinned: Boolean(session.pinned),
       createdAt: inferSessionCreatedAt(session),
       lastActiveAt: inferSessionLastActiveAt(session),
       commandCount: normalizeSessionCounter(session.commandCount),
       startupDurationMs: normalizeOptionalDuration(session.startupDurationMs),
-    })),
+    }))),
   }));
 
 const sortProjects = (projects: Project[]): Project[] =>
   [...projects].sort((left, right) => {
     if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
     return 0;
+  });
+
+const sortSessions = (sessions: Session[]): Session[] =>
+  [...sessions].sort((left, right) => {
+    if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+    const leftUpdated = left.lastActiveAt ?? left.createdAt ?? 0;
+    const rightUpdated = right.lastActiveAt ?? right.createdAt ?? 0;
+    return rightUpdated - leftUpdated;
   });
 
 const findProjectBySessionId = (projects: Project[], sessionId: string | null) => {
@@ -457,11 +466,11 @@ export const actions: AppActions = {
 
     const updatedProject = {
       ...project,
-      sessions: project.sessions.map((session) =>
+      sessions: sortSessions(project.sessions.map((session) =>
         session.id === sessionId
           ? { ...session, name: trimmedName }
           : session
-      ),
+      )),
     };
 
     setStore('projects', (prev) =>
@@ -489,11 +498,11 @@ export const actions: AppActions = {
 
     const updatedProject = {
       ...project,
-      sessions: project.sessions.map((session) =>
+      sessions: sortSessions(project.sessions.map((session) =>
         session.id === sessionId
           ? { ...session, ...sanitizedUpdates }
           : session
-      ),
+      )),
     };
 
     setStore('projects', (prev) =>
@@ -512,7 +521,7 @@ export const actions: AppActions = {
 
     const updatedProject = {
       ...project,
-      sessions: project.sessions.filter((s) => s.id !== sessionId),
+      sessions: sortSessions(project.sessions.filter((s) => s.id !== sessionId)),
     };
 
     const activeSessionId =
@@ -537,6 +546,7 @@ export const actions: AppActions = {
     const project = store.projects.find((p) => p.id === projectId);
     if (!project) return;
 
+    const existingPinned = new Map(project.sessions.map((session) => [session.id, Boolean(session.pinned)]));
     const normalized = sessions
       .filter((session) => session.id?.startsWith('ses'))
       .filter((session) => !session.time?.archived)
@@ -552,13 +562,17 @@ export const actions: AppActions = {
             shell: store.preferredShell ?? (process.platform === 'win32' ? 'powershell.exe' : '/bin/sh'),
             cliTool: 'opencode',
             pendingLaunchCommand: null,
+            pinned: existingPinned.get(session.id) ?? false,
           createdAt,
           lastActiveAt,
           commandCount: 0,
           startupDurationMs: null,
         };
       })
-      .sort((left, right) => (right.lastActiveAt ?? 0) - (left.lastActiveAt ?? 0));
+      .sort((left, right) => {
+        if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+        return (right.lastActiveAt ?? 0) - (left.lastActiveAt ?? 0);
+      });
 
     const same =
       project.sessions.length === normalized.length &&
@@ -567,6 +581,7 @@ export const actions: AppActions = {
         return (
             session.id === next.id &&
             session.name === next.name &&
+            Boolean(session.pinned) === Boolean(next.pinned) &&
             (session.parentSessionId ?? null) === (next.parentSessionId ?? null) &&
             session.createdAt === next.createdAt &&
             session.lastActiveAt === next.lastActiveAt

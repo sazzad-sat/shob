@@ -106,6 +106,7 @@ function FolderSection(props: {
       filtered = filtered.filter((s) => s.name.toLowerCase().includes(query))
     }
     return filtered.sort((left, right) => {
+      if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
       const leftUpdated = left.lastActiveAt ?? left.createdAt ?? 0
       const rightUpdated = right.lastActiveAt ?? right.createdAt ?? 0
       const leftRecent = leftUpdated > oneMinuteAgo
@@ -261,7 +262,12 @@ function FolderSection(props: {
                 }}
                 title="Double click to rename"
               >
-                {session.name}
+                <span class="inline-flex min-w-0 items-center gap-1">
+                  <span class="truncate">{session.name}</span>
+                  <Show when={session.pinned}>
+                    <Pin size={11} class="shrink-0 fill-current text-text-weaker" />
+                  </Show>
+                </span>
               </span>
             }
           >

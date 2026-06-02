@@ -15,6 +15,7 @@ export interface Session {
   shell: string;
   cliTool?: string | null;
   pendingLaunchCommand?: string | null;
+  pinned?: boolean;
   createdAt?: number | null;
   lastActiveAt?: number | null;
   commandCount?: number | null;

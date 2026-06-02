@@ -30,6 +30,13 @@ import { SessionRetry } from "@opencode-ai/ui/session-retry"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useSDK } from "@/context/sdk"
 import { formatServerError } from "@/utils/server-errors"
+import { Check, Copy, MoreHorizontal, Pencil, Pin, X } from "lucide-solid"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 
 interface AgentViewProps {
@@ -41,6 +48,17 @@ const basename = (path?: string | null) => {
   if (!path) return "No project"
   const parts = path.split(/[\\/]/).filter(Boolean)
   return parts[parts.length - 1] || path
+}
+
+const messageTextAsMarkdown = (message: ChatMessage, parts: Part[]) => {
+  const text = parts
+    .filter((part): part is Extract<Part, { type: "text" }> => part.type === "text" && !part.ignored)
+    .map((part) => part.text?.trim())
+    .filter(Boolean)
+    .join("\n\n")
+  if (!text) return ""
+  const role = message.role === "user" ? "User" : "Assistant"
+  return `## ${role}\n\n${text}`
 }
 
 const idleStatus: SessionStatus = { type: "idle" }
@@ -132,10 +150,16 @@ function AgentViewInner(props: AgentViewProps) {
   const projects = useStore((s) => s.projects)
   const currentProjectId = useStore((s) => s.currentProjectId)
   const setCurrentProject = useStore((s) => s.setCurrentProject)
+  const renameSession = useStore((s) => s.renameSession)
+  const updateSession = useStore((s) => s.updateSession)
   const language = useLanguage()
   const local = useLocal()
   const dialog = useDialog()
   const [showJump, setShowJump] = createSignal(false)
+  const [sessionMenuOpen, setSessionMenuOpen] = createSignal(false)
+  const [renameOpen, setRenameOpen] = createSignal(false)
+  const [renameValue, setRenameValue] = createSignal("")
+  const [renameSaving, setRenameSaving] = createSignal(false)
   const [todoCollapsed, setTodoCollapsed] = createSignal(false)
   const [gitBranch, setGitBranch] = createSignal("")
   const [gitChanges, setGitChanges] = createSignal<number | null>(null)
@@ -166,7 +190,12 @@ function AgentViewInner(props: AgentViewProps) {
     const sessionID = activeSessionId()
     return sessionID ? sync.session.get(sessionID) : undefined
   })
-  const title = createMemo(() => sessionTitle(info()?.title) || "New session")
+  const currentProject = createMemo(() => projects().find((project) => project.id === currentProjectId()) ?? null)
+  const currentLocalSession = createMemo(() => {
+    const sessionID = activeSessionId()
+    return sessionID ? currentProject()?.sessions.find((session) => session.id === sessionID) ?? null : null
+  })
+  const title = createMemo(() => currentLocalSession()?.name || sessionTitle(info()?.title) || "New session")
   const parentSessionID = createMemo(() => {
     const session = info() as { parentID?: string } | undefined
     return session?.parentID
@@ -184,7 +213,7 @@ function AgentViewInner(props: AgentViewProps) {
     return error
   })
   const currentProjectName = createMemo(() => {
-    const current = projects().find((project) => project.id === currentProjectId())
+    const current = currentProject()
     return current?.name || basename(current?.path || props.projectPath)
   })
   const selectedModel = createMemo(() => local.model.current())
@@ -192,6 +221,11 @@ function AgentViewInner(props: AgentViewProps) {
   const selectedVariant = createMemo(() => local.model.variant.current() || "default")
   const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
   const sessionID = createMemo(() => activeSessionId() ?? "")
+  const renameValueTrimmed = createMemo(() => renameValue().trim())
+  const canRename = createMemo(() => {
+    const next = renameValueTrimmed()
+    return next.length > 0 && next !== title()
+  })
   const assistantByParent = createMemo(() => {
     const grouped = new Map<string, ChatMessage[]>()
     for (const message of messages()) {
@@ -208,6 +242,58 @@ function AgentViewInner(props: AgentViewProps) {
     messages().filter((message) => message.role !== "user" && (!("parentID" in message) || !message.parentID)),
   )
   const isNewSession = createMemo(() => messages().length === 0)
+
+  const runSessionMenuAction = (event: MouseEvent, action: () => void) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setSessionMenuOpen(false)
+    window.setTimeout(action, 0)
+  }
+
+  const togglePinChat = () => {
+    const project = currentProject()
+    const session = currentLocalSession()
+    if (!project || !session) return
+    void updateSession(project.id, session.id, { pinned: !session.pinned })
+  }
+
+  const openRenameDialog = () => {
+    setRenameValue(title())
+    setSessionMenuOpen(false)
+    window.setTimeout(() => setRenameOpen(true), 20)
+  }
+
+  const submitRename = async () => {
+    const next = renameValueTrimmed()
+    const project = currentProject()
+    const session = currentLocalSession()
+    if (!project || !session || !next || next === title() || renameSaving()) return
+
+    setRenameSaving(true)
+    try {
+      await renameSession(project.id, session.id, next)
+      await sdk.client.session.update({ sessionID: session.id, title: next }).catch(() => undefined)
+      void sync.session.sync(session.id)
+      setRenameOpen(false)
+    } finally {
+      setRenameSaving(false)
+    }
+  }
+
+  const copySessionAsMarkdown = async () => {
+    const blocks = messages()
+      .map((message) => messageTextAsMarkdown(message, getParts(message.id)))
+      .filter(Boolean)
+    const markdown = [`# ${title()}`, "", ...blocks].join("\n\n").trim()
+
+    if (!markdown) return
+    try {
+      await navigator.clipboard.writeText(markdown)
+      showToast({ title: "Copied as Markdown" })
+    } catch {
+      showToast({ variant: "error", title: "Copy failed", description: "Could not write session Markdown to clipboard." })
+    }
+  }
 
   createEffect(() => {
     const sessionID = activeSessionId()
@@ -360,6 +446,108 @@ function AgentViewInner(props: AgentViewProps) {
   return (
     <DataProvider data={sync.data} directory={props.projectPath ?? ""}>
       <FileComponentProvider component={FilePreview}>
+        <>
+        <Show when={renameOpen()}>
+          <div
+            class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-chat-title"
+            onClick={() => {
+              if (!renameSaving()) setRenameOpen(false)
+            }}
+          >
+            <form
+              class="grid w-full max-w-[420px] gap-0 overflow-hidden rounded-xl border border-border-weak-base bg-surface-raised-base shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={(e) => {
+                e.preventDefault()
+                void submitRename()
+              }}
+            >
+              <div class="border-b border-border-weak-base px-4 pt-4 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="flex size-8 items-center justify-center rounded-md bg-surface-raised-base-hover text-text-weaker">
+                    <Pencil size={15} />
+                  </span>
+                  <div class="min-w-0">
+                    <h2 id="rename-chat-title" class="text-[15px] font-semibold text-text-strong">Rename chat</h2>
+                    <p class="truncate text-[12px] text-text-weak">{currentProjectName()}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="ml-auto flex size-7 items-center justify-center rounded-md text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                    aria-label="Close rename chat dialog"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (!renameSaving()) setRenameOpen(false)
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid gap-2 px-4 py-4">
+                <label class="text-[12px] font-medium text-text-base" for={`rename-chat-${sessionID()}`}>
+                  Chat title
+                </label>
+                <input
+                  id={`rename-chat-${sessionID()}`}
+                  class="h-9 rounded-md border border-border-weak-base bg-background-stronger px-3 text-[13px] text-text-strong outline-none transition-colors placeholder:text-text-weaker focus:border-border-weak-hover focus:bg-surface-raised-base-hover"
+                  value={renameValue()}
+                  placeholder="Chat title"
+                  onInput={(e) => setRenameValue(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.stopPropagation()
+                      if (!renameSaving()) setRenameOpen(false)
+                    }
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      void submitRename()
+                    }
+                  }}
+                  ref={(el) =>
+                    setTimeout(() => {
+                      el.focus()
+                      el.select()
+                    }, 50)
+                  }
+                />
+                <Show when={!renameValueTrimmed()}>
+                  <div class="text-[12px] text-icon-critical-base">Chat title cannot be empty.</div>
+                </Show>
+              </div>
+
+              <div class="flex justify-end gap-2 border-t border-border-weak-base bg-background-stronger px-4 py-3">
+                <button
+                  type="button"
+                  class="inline-flex h-8 items-center justify-center rounded-lg border border-border-weak-base bg-background-stronger px-3 text-[13px] font-medium text-text-base transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!renameSaving()) setRenameOpen(false)
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!canRename() || renameSaving()}
+                  class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void submitRename()
+                  }}
+                >
+                  <Check size={14} />
+                  {renameSaving() ? "Saving..." : "Save title"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Show>
+
         <div class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground">
           <div class="relative min-h-0 flex-1 overflow-hidden">
             <div
@@ -404,18 +592,53 @@ function AgentViewInner(props: AgentViewProps) {
               <div onClick={autoScroll.handleInteraction}>
                 <div
                   data-session-title
-                  class="agent-terminal-title sticky top-0 z-30 w-full pb-4 pl-2 pr-3 md:mx-auto md:max-w-200 md:pl-4 md:pr-3 2xl:max-w-[1000px]"
+                  class="agent-terminal-title sticky top-0 z-30 w-full px-3 md:px-4"
                 >
-                  <div class="flex h-12 w-full items-center justify-between gap-2">
-                    <div class="flex min-w-0 flex-1 items-center gap-2 pr-3">
-                      <h1 data-slot="session-title-child" class="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-text-strong">
+                  <div class="flex w-full items-center gap-2.5">
+                    <div class="agent-session-title-cluster flex min-w-0 flex-1 items-center gap-2">
+                      <h1 data-slot="session-title-child" class="max-w-[min(56vw,620px)] truncate text-[13px] font-semibold text-text-strong">
                         {title()}
                       </h1>
+                      <Show when={currentLocalSession()?.pinned}>
+                        <Pin size={12} class="shrink-0 fill-current text-text-weaker" />
+                      </Show>
+                      <DropdownMenu open={sessionMenuOpen()} onOpenChange={setSessionMenuOpen} placement="bottom-start" gutter={4}>
+                        <DropdownMenuTrigger
+                          class="agent-session-menu-trigger flex size-7 shrink-0 items-center justify-center rounded-lg text-text-weak transition-colors hover:text-text-strong data-expanded:text-text-strong"
+                          title="Chat actions"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal size={15} />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent class="w-[210px] rounded-lg border border-border-weak-base bg-surface-raised-base/95 p-1.5 text-[13px] shadow-2xl backdrop-blur">
+                          <DropdownMenuItem
+                            class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-base focus:bg-surface-raised-base-hover"
+                            onClick={(e: MouseEvent) => runSessionMenuAction(e, togglePinChat)}
+                          >
+                            <Pin size={14} class={currentLocalSession()?.pinned ? "fill-current" : ""} />
+                            {currentLocalSession()?.pinned ? "Unpin chat" : "Pin chat"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-base focus:bg-surface-raised-base-hover"
+                            onClick={(e: MouseEvent) => runSessionMenuAction(e, openRenameDialog)}
+                          >
+                            <Pencil size={14} />
+                            Rename chat
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-base focus:bg-surface-raised-base-hover"
+                            onClick={(e: MouseEvent) => runSessionMenuAction(e, () => void copySessionAsMarkdown())}
+                          >
+                            <Copy size={14} />
+                            Copy as Markdown
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <Show when={parentSessionID()}>
                       <button
                         type="button"
-                        class="shrink-0 rounded-[4px] border border-border px-2 py-1 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        class="ml-auto shrink-0 rounded-[4px] border border-border px-2 py-1 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         onClick={goToParentSession}
                       >
                         Back to parent
@@ -638,6 +861,7 @@ function AgentViewInner(props: AgentViewProps) {
             </div>
           </Show>
         </div>
+        </>
       </FileComponentProvider>
     </DataProvider>
   )

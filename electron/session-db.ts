@@ -19,6 +19,7 @@ interface StoredSession {
   shell: string;
   cliTool?: string | null;
   pendingLaunchCommand?: string | null;
+  pinned?: boolean;
   createdAt?: number | null;
   lastActiveAt?: number | null;
   commandCount?: number | null;
@@ -44,6 +45,7 @@ type SessionRow = {
   shell: string;
   cli_tool: string | null;
   pending_launch_command: string | null;
+  pinned: number;
   created_at: number | null;
   last_active_at: number | null;
   command_count: number | null;
@@ -147,6 +149,7 @@ function createSchema(db: DatabaseSync) {
       shell TEXT NOT NULL,
       cli_tool TEXT,
       pending_launch_command TEXT,
+      pinned INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER,
       last_active_at INTEGER,
       command_count INTEGER NOT NULL DEFAULT 0,
@@ -172,6 +175,14 @@ function ensureProjectColumns(db: DatabaseSync) {
   const names = new Set(columns.map((column) => column.name));
   if (!names.has("pinned")) {
     db.exec("ALTER TABLE projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
+  }
+}
+
+function ensureSessionColumns(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
+  const names = new Set(columns.map((column) => column.name));
+  if (!names.has("pinned")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
   }
 }
 
@@ -225,19 +236,21 @@ function insertSession(db: DatabaseSync, projectId: string, session: StoredSessi
       shell,
       cli_tool,
       pending_launch_command,
+      pinned,
       created_at,
       last_active_at,
       command_count,
       startup_duration_ms,
       sort_order,
       time_updated
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       project_id = excluded.project_id,
       name = excluded.name,
       shell = excluded.shell,
       cli_tool = excluded.cli_tool,
       pending_launch_command = excluded.pending_launch_command,
+      pinned = excluded.pinned,
       created_at = excluded.created_at,
       last_active_at = excluded.last_active_at,
       command_count = excluded.command_count,
@@ -251,6 +264,7 @@ function insertSession(db: DatabaseSync, projectId: string, session: StoredSessi
     session.shell || "powershell.exe",
     optionalString(session.cliTool),
     optionalString(session.pendingLaunchCommand),
+    session.pinned ? 1 : 0,
     createdAt,
     lastActiveAt,
     counter(session.commandCount),
@@ -307,6 +321,7 @@ export function initSessionDatabase() {
   `);
   createSchema(db);
   ensureProjectColumns(db);
+  ensureSessionColumns(db);
   migrateLegacyJson(db);
   client = db;
   return db;
@@ -334,6 +349,7 @@ export function loadProjects(): StoredProject[] {
       shell: row.shell,
       cliTool: row.cli_tool,
       pendingLaunchCommand: row.pending_launch_command,
+      pinned: Boolean(row.pinned),
       createdAt: row.created_at,
       lastActiveAt: row.last_active_at,
       commandCount: row.command_count,
