@@ -15,14 +15,10 @@ import { useLanguage } from "@/context/language"
 import { File as OpenCodeFile } from "@opencode-ai/ui/file"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import type { EventSessionError, Message as ChatMessage, Part, SessionStatus } from "@opencode-ai/sdk/v2/client"
-import { useLocal } from "@/context/local"
-import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Button } from "@opencode-ai/ui/button"
 import { formatError } from "@/pages/error"
 import { useStore } from "../store"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { DialogSelectModel } from "@/components/dialog-select-model"
 import { nativeApi } from "@/services/native"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { Card, CardDescription, CardTitle } from "@opencode-ai/ui/card"
@@ -153,8 +149,6 @@ function AgentViewInner(props: AgentViewProps) {
   const renameSession = useStore((s) => s.renameSession)
   const updateSession = useStore((s) => s.updateSession)
   const language = useLanguage()
-  const local = useLocal()
-  const dialog = useDialog()
   const [showJump, setShowJump] = createSignal(false)
   const [sessionMenuOpen, setSessionMenuOpen] = createSignal(false)
   const [renameOpen, setRenameOpen] = createSignal(false)
@@ -216,9 +210,12 @@ function AgentViewInner(props: AgentViewProps) {
     const current = currentProject()
     return current?.name || basename(current?.path || props.projectPath)
   })
-  const selectedModel = createMemo(() => local.model.current())
-  const selectedAgent = createMemo(() => local.agent.current()?.name || "auto")
-  const selectedVariant = createMemo(() => local.model.variant.current() || "default")
+  const gitChangeLabel = createMemo(() => {
+    const count = gitChanges()
+    if (count === null) return ""
+    if (count === 0) return "Clean"
+    return count === 1 ? "1 change" : `${count} changes`
+  })
   const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
   const sessionID = createMemo(() => activeSessionId() ?? "")
   const renameValueTrimmed = createMemo(() => renameValue().trim())
@@ -593,6 +590,7 @@ function AgentViewInner(props: AgentViewProps) {
                 <div
                   data-session-title
                   class="agent-terminal-title sticky top-0 z-30 w-full px-3 md:px-4"
+                  style={{ display: isNewSession() ? "none" : undefined }}
                 >
                   <div class="flex w-full items-center gap-2.5">
                     <div class="agent-session-title-cluster flex min-w-0 flex-1 items-center gap-2">
@@ -788,26 +786,16 @@ function AgentViewInner(props: AgentViewProps) {
                               </select>
                             </label>
 
-                            <button
-                              type="button"
-                              class="agent-terminal-model-switch"
-                              onClick={() => dialog.show(() => <DialogSelectModel model={local.model} />)}
-                            >
-                              <Show when={selectedModel()?.provider?.id} fallback={<Icon name="models" class="size-3.5" />}>
-                                <ProviderIcon id={selectedModel()?.provider?.id ?? ""} class="size-3.5" />
-                              </Show>
-                              <span>{selectedModel()?.name || "Select model"}</span>
-                            </button>
-
                             <div class="agent-terminal-session-meta agent-terminal-session-meta-inline">
-                              <div class="agent-terminal-meta-chip">
-                                <Icon name="brain" class="size-3.5" />
-                                <span class="capitalize">{selectedAgent()}</span>
-                              </div>
                               <Show when={gitBranch()}>
                                 <div class="agent-terminal-meta-chip">
                                   <Icon name="branch" class="size-3.5" />
                                   <span>{gitBranch()}</span>
+                                </div>
+                              </Show>
+                              <Show when={gitChangeLabel()}>
+                                <div class="agent-terminal-meta-chip" data-warn={gitChanges() !== 0}>
+                                  <span>{gitChangeLabel()}</span>
                                 </div>
                               </Show>
                             </div>

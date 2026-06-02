@@ -26,6 +26,8 @@ import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
+import { Spinner } from "@opencode-ai/ui/spinner"
+import { showToast } from "@opencode-ai/ui/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectModel } from "@/components/dialog-select-model"
 import { useProviders } from "@/hooks/use-providers"
@@ -99,6 +101,22 @@ const EXAMPLES = [
   "prompt.example.24",
   "prompt.example.25",
 ] as const
+
+const PromptImproveMark: Component<{ class?: string }> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    x="0px"
+    y="0px"
+    viewBox="0 0 48 48"
+    aria-hidden="true"
+    class={props.class}
+  >
+    <path
+      fill="#3098de"
+      d="M45.963,23.959C34.056,23.489,24.51,13.944,24.041,2.037L24,1l-0.041,1.037C23.49,13.944,13.944,23.489,2.037,23.959L1,24l1.037,0.041c11.907,0.47,21.452,10.015,21.922,21.922L24,47l0.041-1.037c0.47-11.907,10.015-21.452,21.922-21.922L47,24L45.963,23.959z"
+    />
+  </svg>
+)
 
 export const PromptInput: Component<PromptInputProps> = (props) => {
   const sdk = useSDK()
@@ -287,6 +305,20 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       .map((part) => ("content" in part ? part.content : ""))
       .join("")
     return text.trim().length === 0 && imageAttachments().length === 0 && commentCount() === 0
+  })
+  const promptText = createMemo(() =>
+    prompt
+      .current()
+      .map((part) => ("content" in part ? part.content : ""))
+      .join(""),
+  )
+  const [improvingPrompt, setImprovingPrompt] = createSignal(false)
+  const canImprovePrompt = createMemo(
+    () => store.mode === "normal" && !working() && !improvingPrompt() && promptText().trim().length > 0,
+  )
+  const improveStatusText = createMemo(() => {
+    const model = local.model.current()?.name
+    return model ? `Improving with ${model}` : "Improving prompt"
   })
   const stopping = createMemo(() => working() && blank())
   const tip = () => {
@@ -656,6 +688,104 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     command.trigger(cmd.id, "slash")
   }
 
+  const buildImprovedPromptParts = (text: string): Prompt => {
+    const current = prompt.current()
+    const markers = current.filter((part): part is FileAttachmentPart | AgentPart => part.type === "file" || part.type === "agent")
+    const missing = markers.filter((part) => part.content && !text.includes(part.content))
+    const guardedText = missing.length ? `${missing.map((part) => part.content).join(" ")}\n${text}` : text
+    const used = new Set<number>()
+    const parts: Prompt = []
+    let position = 0
+
+    const pushText = (content: string) => {
+      if (!content) return
+      parts.push({ type: "text", content, start: position, end: position + content.length })
+      position += content.length
+    }
+
+    while (position < guardedText.length) {
+      let next:
+        | {
+            index: number
+            markerIndex: number
+            marker: FileAttachmentPart | AgentPart
+          }
+        | undefined
+
+      markers.forEach((marker, markerIndex) => {
+        if (used.has(markerIndex) || !marker.content) return
+        const index = guardedText.indexOf(marker.content, position)
+        if (index < 0) return
+        if (!next || index < next.index || (index === next.index && marker.content.length > next.marker.content.length)) {
+          next = { index, markerIndex, marker }
+        }
+      })
+
+      if (!next) {
+        pushText(guardedText.slice(position))
+        break
+      }
+
+      pushText(guardedText.slice(position, next.index))
+      parts.push({
+        ...next.marker,
+        start: next.index,
+        end: next.index + next.marker.content.length,
+      })
+      used.add(next.markerIndex)
+      position = next.index + next.marker.content.length
+    }
+
+    if (parts.length === 0) parts.push({ type: "text", content: guardedText, start: 0, end: guardedText.length })
+    return [...parts, ...imageAttachments()]
+  }
+
+  const improvePrompt = async () => {
+    if (!canImprovePrompt()) return
+    const model = local.model.current()
+    if (!model) {
+      showToast({ variant: "error", title: "Select a model first" })
+      restoreFocus()
+      return
+    }
+
+    setImprovingPrompt(true)
+    closePopover()
+
+    try {
+      const response = await (sdk.client as any).client.post({
+        url: "/prompt/improve",
+        throwOnError: true,
+        body: {
+          prompt: promptText().trim(),
+          model: {
+            providerID: model.provider.id,
+            modelID: model.id,
+          },
+          variant: local.model.variant.current() ?? undefined,
+        },
+      })
+      const body = response?.data as { prompt?: string } | undefined
+      const improved = body.prompt?.trim()
+      if (!improved) throw new Error("The model returned an empty prompt.")
+      const next = buildImprovedPromptParts(improved)
+      prompt.set(next, promptLength(next))
+      resetHistoryNavigation(true)
+      requestAnimationFrame(() => {
+        editorRef.focus()
+        setCursorPosition(editorRef, promptLength(next))
+        queueScroll()
+      })
+      showToast({ title: "Prompt improved" })
+    } catch (error) {
+      const description = error instanceof Error ? error.message : String(error)
+      showToast({ variant: "error", title: "Improve prompt failed", description })
+      restoreFocus()
+    } finally {
+      setImprovingPrompt(false)
+    }
+  }
+
   const {
     flat: slashFlat,
     active: slashActive,
@@ -862,6 +992,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const handleInput = () => {
+    if (improvingPrompt()) return
+
     const rawParts = parseFromDOM()
     const images = imageAttachments()
     const cursorPosition = getCursorPosition(editorRef)
@@ -1120,6 +1252,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    if (improvingPrompt()) {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "u") {
       event.preventDefault()
       if (store.mode !== "normal") return
@@ -1300,7 +1438,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   )
 
   return (
-    <div class="agent-terminal-prompt relative size-full _max-h-[320px] flex flex-col gap-0">
+    <div
+      class="agent-terminal-prompt relative size-full _max-h-[320px] flex flex-col gap-0"
+      data-improving={improvingPrompt() ? "true" : undefined}
+    >
       {(promptReady(), null)}
       <PromptPopover
         popover={store.popover}
@@ -1318,7 +1459,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         t={(key) => language.t(key as Parameters<typeof language.t>[0])}
       />
       <DockShellForm
-        onSubmit={handleSubmit}
+        onSubmit={(event) => {
+          if (improvingPrompt()) {
+            event.preventDefault()
+            return
+          }
+          void handleSubmit(event)
+        }}
         classList={{
           "group/prompt-input": true,
           "border-ring! border-dashed!": store.draggingType !== null,
@@ -1355,9 +1502,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         <div
           class="agent-terminal-prompt-line relative flex items-start justify-between gap-3 p-4"
           onMouseDown={(e) => {
+            if (improvingPrompt()) return
             const target = e.target
             if (!(target instanceof HTMLElement)) return
-            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-submit"]')) {
+            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-submit"], [data-action="prompt-improve"]')) {
               return
             }
             editorRef?.focus()
@@ -1381,11 +1529,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 aria-multiline="true"
                 aria-label={placeholder()}
                 aria-placeholder={placeholder()}
-                contenteditable="true"
+                aria-disabled={improvingPrompt()}
+                contenteditable={improvingPrompt() ? "false" : "true"}
                 autocapitalize="sentences"
                 autocorrect="on"
-                spellcheck={store.mode === "normal" ? "true" : "false"}
+                spellcheck={store.mode === "normal" && !improvingPrompt() ? "true" : "false"}
                 inputMode="text"
+                tabIndex={improvingPrompt() ? -1 : undefined}
                 // @ts-expect-error
                 autocomplete="off"
                 enterkeyhint="send"
@@ -1409,6 +1559,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               >
                 {placeholder()}
               </div>
+              <Show when={improvingPrompt()}>
+                <div class="agent-terminal-prompt-improve-overlay" aria-live="polite">
+                  <div class="agent-terminal-prompt-improve-badge">
+                    <Spinner class="agent-terminal-prompt-improve-spinner" />
+                    <PromptImproveMark class="agent-terminal-prompt-improve-mark" />
+                  </div>
+                  <div class="agent-terminal-prompt-improve-copy">
+                    <span class="agent-terminal-prompt-improve-title">{improveStatusText()}</span>
+                    <span class="agent-terminal-prompt-improve-subtitle">Input locked. Context stays unchanged.</span>
+                  </div>
+                </div>
+              </Show>
             </div>
           </div>
 
@@ -1418,7 +1580,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 <span>{promptLength(prompt.current().filter((p) => p.type !== "image"))} ch</span>
                 <button
                   type="button"
+                  disabled={improvingPrompt()}
                   onClick={() => {
+                    if (improvingPrompt()) return
                     clearEditor()
                     prompt.set(DEFAULT_PROMPT, 0)
                     resetHistoryNavigation(true)
@@ -1436,7 +1600,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               <IconButton
                 data-action="prompt-submit"
                 type="submit"
-                disabled={!working() && blank()}
+                disabled={improvingPrompt() || (!working() && blank())}
                 tabIndex={store.mode === "normal" ? undefined : -1}
                 icon={stopping() ? "stop" : "arrow-up"}
                 variant="primary"
@@ -1469,6 +1633,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               accept={ACCEPTED_FILE_TYPES.join(",")}
               class="hidden"
               onChange={(e) => {
+                if (improvingPrompt()) {
+                  e.currentTarget.value = ""
+                  return
+                }
                 const list = e.currentTarget.files
                 if (list) void addAttachments(Array.from(list))
                 e.currentTarget.value = ""
@@ -1485,7 +1653,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 type="button"
                 class="size-8 flex items-center justify-center rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
                 onClick={pick}
-                disabled={store.mode !== "normal"}
+                disabled={store.mode !== "normal" || improvingPrompt()}
                 aria-label={language.t("prompt.action.attachFile")}
               >
                 <Icon name="plus" class="size-4" />
@@ -1502,9 +1670,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               >
                 <button
                   type="button"
+                  disabled={improvingPrompt()}
                   class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
                   data-action="prompt-model"
                   onClick={() => {
+                    if (improvingPrompt()) return
                     dialog.show(() => <DialogSelectModel model={local.model} />)
                     restoreFocus()
                   }}
@@ -1534,7 +1704,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   size="normal"
                   options={agentNames()}
                   current={local.agent.current()?.name ?? ""}
+                  disabled={improvingPrompt()}
                   onSelect={(value) => {
+                    if (improvingPrompt()) return
                     local.agent.set(value)
                     restoreFocus()
                   }}
@@ -1562,7 +1734,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   current={local.model.variant.current() ?? "default"}
                   label={variantLabel}
                   groupBy={() => "Reasoning"}
+                  disabled={improvingPrompt()}
                   onSelect={(value) => {
+                    if (improvingPrompt()) return
                     local.model.variant.set(value === "default" ? undefined : value)
                     restoreFocus()
                   }}
@@ -1577,6 +1751,26 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
+            <Tooltip placement="top" value={improvingPrompt() ? "Improving prompt..." : "Improve prompt"}>
+              <button
+                data-action="prompt-improve"
+                type="button"
+                disabled={!canImprovePrompt()}
+                class="size-8 rounded-lg! border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 backdrop-blur-sm"
+                classList={{
+                  "is-busy": improvingPrompt(),
+                }}
+                aria-label="Improve prompt"
+                aria-busy={improvingPrompt()}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  void improvePrompt()
+                }}
+              >
+                <PromptImproveMark class="size-4" />
+              </button>
+            </Tooltip>
             <Show when={params.sessionId}>
               <SessionContextUsage
                 sessionId={params.sessionId!}
@@ -1588,6 +1782,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             {/* Help Button (?) */}
             <button
               type="button"
+              disabled={improvingPrompt()}
               class="size-8 flex items-center justify-center rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground text-[12px] font-mono transition-colors duration-150 cursor-pointer outline-none backdrop-blur-sm"
               aria-label="Help"
             >
