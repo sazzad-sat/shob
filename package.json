@@ -3,7 +3,7 @@
   "private": true,
   "description": "Desktop app for running and organizing multiple CLI agent sessions in one workspace.",
   "author": "shobcoder",
-  "version": "0.0.49",
+  "version": "0.0.47",
   "type": "module",
   "packageManager": "bun@1.3.14",
   "workspaces": [
@@ -56,43 +56,20 @@
       }
     ],
     "win": {
-      "target": [
-        "nsis",
-        "portable",
-        "msi",
-        "zip"
-      ],
+      "target": "nsis",
       "icon": "electron/icons/icon.ico",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
-    },
-    "nsis": {
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
-    },
-    "portable": {
-      "artifactName": "${productName}-Portable-${arch}.${ext}"
-    },
-    "msi": {
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "icon": "electron/icons/icon.icns",
-      "artifactName": "${productName}-${arch}.${ext}"
+      "icon": "electron/icons/icon.icns"
     },
     "linux": {
-      "target": [
-        "AppImage",
-        "deb",
-        "rpm",
-        "pacman",
-        "zip"
-      ],
+      "target": "AppImage",
       "icon": "electron/icons/icon.png",
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "maintainer": "shobcoder <shobcoder@users.noreply.github.com>",
       "desktop": {
         "entry": {
           "StartupWMClass": "shob"
