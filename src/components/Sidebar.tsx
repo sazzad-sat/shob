@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
-import { Archive, Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Settings, SquarePen, X } from "lucide-solid"
+import { Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Search, Settings, SquarePen, X } from "lucide-solid"
 import { nativeApi } from "../services/native"
 import { useStore, setStore } from "../store"
 import type { Project } from "../types"
@@ -12,13 +12,19 @@ import { DotsSpinner } from "./DotsSpinner"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { sessionPermissionRequest } from "@/opencode-ported/composer/session-request-tree"
-import { useServer } from "@/context/server"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -35,19 +41,167 @@ const formatSessionAge = (createdAt: number | null | undefined, now: number) => 
   return `${Math.floor(h / 24)}d`
 }
 
-const ChevronIcon = (props: { isOpen: boolean }) => (
-  <svg
-    viewBox="0 0 24 24"
-    class={`size-3 transition-transform duration-200 shrink-0 ${props.isOpen ? "rotate-90 text-text-base" : "text-text-weaker"}`}
-    fill="none"
-    stroke="currentColor"
-    stroke-width="3"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  >
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
+type SidebarSessionHit = {
+  project: Project
+  session: Project["sessions"][number]
+}
+
+type SidebarSearchResult =
+  | { type: "project"; project: Project }
+  | { type: "session"; project: Project; session: Project["sessions"][number] }
+
+const latestSessionTime = (session: Project["sessions"][number]) => session.lastActiveAt ?? session.createdAt ?? 0
+const PROJECT_SESSION_PREVIEW_LIMIT = 5
+
+const SidebarSectionTitle = (props: { children: string }) => (
+  <div class="px-3 pb-2 pt-4 text-[13px] leading-none text-text-weaker">
+    {props.children}
+  </div>
 )
+
+const SidebarActionButton = (props: {
+  label: string
+  title?: string
+  active?: boolean
+  mobileDot?: boolean
+  icon: any
+  onClick: () => void
+}) => {
+  const Icon = props.icon
+
+  return (
+    <button
+      type="button"
+      class={`group/action flex h-8 w-full items-center gap-3 rounded-md px-3 text-left text-[13px] transition-colors ${
+        props.active
+          ? "bg-surface-raised-base text-text-strong"
+          : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
+      }`}
+      title={props.title ?? props.label}
+      onClick={props.onClick}
+    >
+      <span class="relative flex size-4 shrink-0 items-center justify-center text-text-weak group-hover/action:text-text-strong">
+        <Icon size={15} />
+        <Show when={props.mobileDot}>
+          <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-text-interactive-base ring-2 ring-background-stronger" />
+        </Show>
+      </span>
+      <span class="min-w-0 truncate">{props.label}</span>
+    </button>
+  )
+}
+
+const PinnedSessionRow = (props: {
+  hit: SidebarSessionHit
+  activeSessionId: string | null
+  now: number
+  onSelect: (projectId: string, sessionId: string) => void
+}) => (
+  <button
+    type="button"
+    class={`group/pinned grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md px-3 text-left transition-colors ${
+      props.activeSessionId === props.hit.session.id
+        ? "bg-surface-raised-base text-text-strong"
+        : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
+    }`}
+    title={`${props.hit.session.name} · ${props.hit.project.name}`}
+    onClick={() => props.onSelect(props.hit.project.id, props.hit.session.id)}
+  >
+    <span class="min-w-0 truncate text-[13px] leading-none">{props.hit.session.name}</span>
+    <span class="text-[12px] leading-5 text-text-weak">{formatSessionAge(latestSessionTime(props.hit.session), props.now)}</span>
+  </button>
+)
+
+function SidebarSearchModal(props: {
+  open: boolean
+  query: string
+  results: SidebarSearchResult[]
+  onQueryChange: (value: string) => void
+  onClose: () => void
+  onSelectProject: (projectId: string) => void
+  onSelectSession: (projectId: string, sessionId: string) => void
+}) {
+  let inputRef: HTMLInputElement | undefined
+
+  createEffect(() => {
+    if (!props.open) return
+    window.setTimeout(() => inputRef?.focus(), 30)
+  })
+
+  return (
+    <Dialog open={props.open} onOpenChange={(open: boolean) => !open && props.onClose()}>
+      <DialogHeader class="sr-only">
+        <DialogTitle>Search sidebar</DialogTitle>
+        <DialogDescription>Search projects and chats.</DialogDescription>
+      </DialogHeader>
+      <DialogContent
+        class="top-[12vh] max-w-[560px] translate-y-0 gap-0 overflow-hidden rounded-lg border border-border-weak-base bg-surface-raised-base p-0 shadow-2xl sm:max-w-[560px]"
+        showCloseButton={false}
+      >
+        <div class="border-b border-border-weak-base px-4 py-3">
+          <div class="flex items-center gap-2">
+            <Search size={16} class="shrink-0 text-text-weak" />
+            <input
+              ref={inputRef}
+              value={props.query}
+              placeholder="Search projects and chats..."
+              class="h-8 min-w-0 flex-1 bg-transparent text-[14px] text-text-strong outline-none placeholder:text-text-weaker"
+              onInput={(e) => props.onQueryChange(e.currentTarget.value)}
+            />
+            <button
+              type="button"
+              class="flex size-7 shrink-0 items-center justify-center rounded-md text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+              aria-label="Close search"
+              onClick={props.onClose}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        <div class="max-h-[420px] overflow-y-auto p-2">
+          <Show
+            when={props.results.length > 0}
+            fallback={
+              <div class="px-3 py-8 text-center text-[13px] text-text-weak">
+                {props.query.trim() ? "No results found." : "Type to search across projects and chats."}
+              </div>
+            }
+          >
+            <For each={props.results}>
+              {(result) => (
+                <button
+                  type="button"
+                  class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-surface-raised-base-hover"
+                  onClick={() => {
+                    if (result.type === "project") props.onSelectProject(result.project.id)
+                    else props.onSelectSession(result.project.id, result.session.id)
+                    props.onClose()
+                  }}
+                >
+                  <span class="flex size-7 items-center justify-center rounded-md bg-background-stronger text-text-weak">
+                    {result.type === "project" ? <ProjectFolderIcon /> : <SquarePen size={14} />}
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block truncate text-[13px] font-medium text-text-strong">
+                      {result.type === "project" ? result.project.name : result.session.name}
+                    </span>
+                    <span class="block truncate text-[12px] text-text-weak">
+                      {result.type === "project" ? result.project.path : result.project.name}
+                    </span>
+                  </span>
+                  <span class="rounded border border-border-weak-base px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-weaker">
+                    {result.type === "project" ? "Project" : "Chat"}
+                  </span>
+                </button>
+              )}
+            </For>
+          </Show>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 function FolderSection(props: {
   project: Project
@@ -62,6 +216,7 @@ function FolderSection(props: {
   onRenameSession: (projectId: string, sessionId: string, newName: string) => void
   onRenameProject: (projectId: string, name: string) => void | Promise<void>
   onToggleProjectPin: (projectId: string) => void | Promise<void>
+  hidePinnedSessions?: boolean
 }) {
   const globalSync = useGlobalSync()
   const globalSDK = useGlobalSDK()
@@ -69,6 +224,7 @@ function FolderSection(props: {
   const permission = usePermission()
 
   const [isOpen, setIsOpen] = createSignal(true)
+  const [showAllSessions, setShowAllSessions] = createSignal(false)
   const [projectMenuOpen, setProjectMenuOpen] = createSignal(false)
   const [renameProjectOpen, setRenameProjectOpen] = createSignal(false)
   const [renameProjectValue, setRenameProjectValue] = createSignal(props.project.name)
@@ -101,7 +257,9 @@ function FolderSection(props: {
     const now = sortNow()
     const oneMinuteAgo = now - 60000
     const query = searchQuery().toLowerCase().trim()
-    let filtered = [...props.project.sessions]
+    let filtered = props.hidePinnedSessions
+      ? props.project.sessions.filter((session) => !session.pinned)
+      : [...props.project.sessions]
     if (query) {
       filtered = filtered.filter((s) => s.name.toLowerCase().includes(query))
     }
@@ -214,22 +372,24 @@ function FolderSection(props: {
   }
 
   const sessionTree = (sessionId: string) => sessionsByParent().map.get(sessionId) ?? []
+  const rootSessions = createMemo(() => sessionsByParent().map.get(sessionsByParent().ROOT) ?? [])
+  const visibleRootSessions = createMemo(() =>
+    showAllSessions() ? rootSessions() : rootSessions().slice(0, PROJECT_SESSION_PREVIEW_LIMIT),
+  )
+  const hiddenRootSessionCount = createMemo(() => Math.max(0, rootSessions().length - PROJECT_SESSION_PREVIEW_LIMIT))
 
   const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
     <>
       <div
-        class={`group/session relative flex cursor-pointer items-center justify-between rounded-md py-[5.5px] pr-3 transition-all duration-150 ${
+        class={`group/session relative flex h-8 cursor-pointer items-center justify-between rounded-md pr-3 transition-colors ${
           props.activeSessionId === session.id
-            ? "bg-surface-raised-base text-text-strong font-semibold shadow-xs"
+            ? "bg-surface-raised-base text-text-strong"
             : "hover:bg-surface-raised-base-hover text-text-base hover:text-text-strong"
         }`}
-        style={{ "padding-left": `${12 + level * 14}px` }}
+        style={{ "padding-left": `${24 + level * 14}px` }}
         onClick={() => props.onSelectSession(props.project.id, session.id)}
       >
-        <Show when={props.activeSessionId === session.id}>
-          <div class="absolute left-0 top-[20%] bottom-[20%] w-[3px] rounded-r-md bg-surface-brand-base shadow-[0_0_8px_var(--surface-brand-base)] animate-in slide-in-from-left duration-200" />
-        </Show>
-        <div class="min-w-0 flex flex-1 items-center gap-1.5">
+        <div class="min-w-0 flex flex-1 items-center gap-2">
           <div class="flex size-4 items-center justify-center">
             <div class="relative flex size-4 items-center justify-center">
               <Switch fallback={<span class="inline-block w-[1ch]" aria-hidden="true" />}>
@@ -442,27 +602,20 @@ function FolderSection(props: {
       </Show>
 
       <div
-        class="group flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-surface-raised-base-hover"
+        class={`group/project flex h-8 items-center justify-between rounded-md px-3 transition-colors hover:bg-surface-raised-base-hover ${
+          props.activeSessionId === null ? "text-text-strong" : "text-text-base"
+        }`}
+        title={isOpen() ? "Collapse project" : "Expand project"}
         onClick={() => {
           handleSelectProject()
+          setIsOpen(!isOpen())
         }}
       >
         <div class="min-w-0 flex flex-1 items-center gap-2 text-text-weak select-none">
-          <button
-            type="button"
-            class="flex size-4 shrink-0 items-center justify-center rounded text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
-            title={isOpen() ? "Collapse project" : "Expand project"}
-            onClick={(e) => {
-              e.stopPropagation()
-              setIsOpen(!isOpen())
-            }}
-          >
-            <ChevronIcon isOpen={isOpen()} />
-          </button>
-          <span class="text-icon-warning-base transition-colors group-hover:text-icon-warning-hover">
+          <span class="text-text-weak transition-colors group-hover/project:text-text-strong">
             <ProjectFolderIcon />
           </span>
-          <span class="truncate text-[13px] leading-none font-semibold text-text-base transition-colors group-hover:text-text-strong">
+          <span class="truncate text-[13px] leading-none text-text-base transition-colors group-hover/project:text-text-strong">
             {props.project.name}
           </span>
           <Show when={props.project.pinned}>
@@ -470,7 +623,7 @@ function FolderSection(props: {
           </Show>
         </div>
 
-        <div class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        <div class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/project:opacity-100">
           <DropdownMenu open={projectMenuOpen()} onOpenChange={setProjectMenuOpen} placement="bottom-end" gutter={4}>
             <DropdownMenuTrigger
               class="rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover data-expanded:bg-surface-raised-base-hover"
@@ -536,18 +689,30 @@ function FolderSection(props: {
       </div>
 
       <Show when={isOpen()}>
-        <div class="mt-1 flex flex-col gap-0.5 overflow-hidden transition-all duration-150 ease-out pl-4 pr-1">
+        <div class="flex flex-col gap-0.5 overflow-hidden transition-all duration-150 ease-out">
           <Show
-            when={(sessionsByParent().map.get(sessionsByParent().ROOT) ?? []).length > 0}
+            when={rootSessions().length > 0}
             fallback={
-              <div class="py-2.5 pr-4 pl-3.5 text-[12px] text-text-weaker italic font-light select-none">
+              <div class="py-2 pl-8 text-[12px] text-text-weaker italic font-light select-none">
                 No active chats
               </div>
             }
           >
-            <For each={sessionsByParent().map.get(sessionsByParent().ROOT) ?? []}>
+            <For each={visibleRootSessions()}>
               {(session) => renderSessionNode(session, 0)}
             </For>
+            <Show when={hiddenRootSessionCount() > 0}>
+              <button
+                type="button"
+                class="h-8 rounded-md pl-8 pr-3 text-left text-[13px] text-text-weaker transition-colors hover:bg-surface-raised-base-hover hover:text-text-base"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowAllSessions((current) => !current)
+                }}
+              >
+                {showAllSessions() ? "Show less" : "Show more"}
+              </button>
+            </Show>
           </Show>
         </div>
       </Show>
@@ -559,7 +724,6 @@ export function Sidebar(props: {
   onOpenSettingsPage?: () => void
   onOpenWorkspacePage?: () => void
 }) {
-  const server = useServer()
   const projects = useStore((s) => s.projects)
   const currentProjectId = useStore((s) => s.currentProjectId)
   const activeSessionId = useStore((s) => s.activeSessionId)
@@ -575,8 +739,37 @@ export function Sidebar(props: {
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
-  const [sidebarWidth, setSidebarWidth] = createSignal(320)
+  const [sidebarWidth, setSidebarWidth] = createSignal(292)
   const [pendingDeleteSessionIDs, setPendingDeleteSessionIDs] = createSignal<Set<string>>(new Set())
+  const [searchOpen, setSearchOpen] = createSignal(false)
+  const [searchQuery, setSearchQuery] = createSignal("")
+  const [sidebarNow, setSidebarNow] = createSignal(Date.now())
+
+  const allSessionHits = createMemo<SidebarSessionHit[]>(() =>
+    projects().flatMap((project) => project.sessions.map((session) => ({ project, session }))),
+  )
+
+  const pinnedSessionHits = createMemo(() =>
+    allSessionHits()
+      .filter((hit) => hit.session.pinned)
+      .sort((left, right) => latestSessionTime(right.session) - latestSessionTime(left.session)),
+  )
+
+  const searchResults = createMemo<SidebarSearchResult[]>(() => {
+    const query = searchQuery().trim().toLowerCase()
+    if (!query) return []
+
+    const projectMatches: SidebarSearchResult[] = projects()
+      .filter((project) => `${project.name} ${project.path}`.toLowerCase().includes(query))
+      .map((project) => ({ type: "project", project }))
+
+    const sessionMatches: SidebarSearchResult[] = allSessionHits()
+      .filter((hit) => `${hit.session.name} ${hit.project.name} ${hit.project.path}`.toLowerCase().includes(query))
+      .sort((left, right) => latestSessionTime(right.session) - latestSessionTime(left.session))
+      .map((hit) => ({ type: "session", project: hit.project, session: hit.session }))
+
+    return [...projectMatches, ...sessionMatches].slice(0, 80)
+  })
 
   createEffect(() => {
     window.dispatchEvent(
@@ -590,15 +783,21 @@ export function Sidebar(props: {
     const handleSidebarToggleRequest = () => {
       setIsSidebarVisible((current) => !current)
     }
+    const handleSearchShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return
+      if (event.key.toLowerCase() !== "k") return
+      event.preventDefault()
+      setSearchOpen(true)
+    }
+    const nowInterval = window.setInterval(() => setSidebarNow(Date.now()), 60_000)
 
     window.addEventListener("gg-toggle-sidebar", handleSidebarToggleRequest)
-    onCleanup(() => window.removeEventListener("gg-toggle-sidebar", handleSidebarToggleRequest))
-  })
-
-  createEffect(() => {
-    if (!currentProjectId() && projects().length > 0) {
-      setCurrentProject(projects()[0].id)
-    }
+    window.addEventListener("keydown", handleSearchShortcut)
+    onCleanup(() => {
+      window.removeEventListener("gg-toggle-sidebar", handleSidebarToggleRequest)
+      window.removeEventListener("keydown", handleSearchShortcut)
+      window.clearInterval(nowInterval)
+    })
   })
 
   const handleAddProject = async () => {
@@ -713,6 +912,24 @@ export function Sidebar(props: {
     setActiveSession(sessionId)
   }
 
+  const handleCreateNewChat = () => {
+    const projectId = currentProjectId() ?? projects()[0]?.id
+    if (!projectId) {
+      void handleAddProject()
+      return
+    }
+    void handleCreateSession(projectId)
+  }
+
+  const handleSelectProjectOnly = (projectId: string) => {
+    props.onOpenWorkspacePage?.()
+    setCurrentProject(projectId)
+  }
+
+  const handleOpenSettings = () => {
+    props.onOpenSettingsPage?.()
+  }
+
   return (
     <aside
       class={`relative h-full shrink-0 ${
@@ -721,79 +938,98 @@ export function Sidebar(props: {
       style={isSidebarVisible() ? { width: `${sidebarWidth()}px` } : undefined}
     >
       <Show when={isSidebarVisible()}>
+        <SidebarSearchModal
+          open={searchOpen()}
+          query={searchQuery()}
+          results={searchResults()}
+          onQueryChange={setSearchQuery}
+          onClose={() => setSearchOpen(false)}
+          onSelectProject={handleSelectProjectOnly}
+          onSelectSession={handleSelectSession}
+        />
         <ResizeHandle
           edge="end"
-          onResize={(clientX) => setSidebarWidth(Math.max(220, Math.min(520, clientX)))}
+          onResize={(clientX) => setSidebarWidth(Math.max(240, Math.min(460, clientX)))}
         />
         <div class="relative flex h-full max-h-full flex-col bg-background-stronger select-none">
-          <div class="sticky top-0 z-10 flex flex-col border-b border-border-weaker-base bg-background-stronger select-none">
-            <div class="flex items-center justify-between px-4 pt-3.5 pb-2.5">
-              <div class="flex items-center gap-2 select-none">
-                <span class="relative flex h-1.5 w-1.5">
-                  <Show when={server.healthy() !== false}>
-                    <span 
-                      class={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                        server.healthy() === true ? "bg-icon-success-base" : "bg-icon-warning-base"
-                      }`} 
-                    />
-                  </Show>
-                  <span 
-                    class={`relative inline-flex rounded-full h-1.5 w-1.5 ${
-                      server.healthy() === true
-                        ? "bg-icon-success-base shadow-[0_0_4px_var(--icon-success-base)]"
-                        : server.healthy() === false
-                        ? "bg-icon-critical-base"
-                        : "bg-icon-warning-base"
-                    }`} 
-                  />
-                </span>
-                <span class="text-[12px] font-bold tracking-wide text-text-weak uppercase">Projects</span>
-              </div>
-              <button
-                class="flex items-center justify-center rounded-md p-0.5 text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
-                title="New Project"
-                onClick={() => void handleAddProject()}
+          <div class="custom-scrollbar flex-1 overflow-y-auto">
+            <div class="flex flex-col gap-0.5 px-1.5 pb-4 pt-2">
+              <nav class="mb-3 flex flex-col gap-1 px-0.5">
+                <SidebarActionButton
+                  label="New chat"
+                  title="Start a new chat"
+                  icon={SquarePen}
+                  onClick={handleCreateNewChat}
+                />
+                <SidebarActionButton
+                  label="Search"
+                  title="Search projects and chats"
+                  icon={Search}
+                  onClick={() => setSearchOpen(true)}
+                />
+                <SidebarActionButton
+                  label="Settings"
+                  title="Open settings"
+                  icon={Settings}
+                  onClick={handleOpenSettings}
+                />
+              </nav>
+
+              <Show when={pinnedSessionHits().length > 0}>
+                <div class="mb-2">
+                  <SidebarSectionTitle>Pinned</SidebarSectionTitle>
+                  <div class="flex flex-col gap-0.5">
+                    <For each={pinnedSessionHits()}>
+                      {(hit) => (
+                        <PinnedSessionRow
+                          hit={hit}
+                          activeSessionId={activeSessionId()}
+                          now={sidebarNow()}
+                          onSelect={handleSelectSession}
+                        />
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
+
+              <SidebarSectionTitle>Projects</SidebarSectionTitle>
+              <Show
+                when={projects().length > 0}
+                fallback={
+                  <button
+                    type="button"
+                    class="mx-1 flex h-8 items-center gap-2 rounded-md px-3 text-left text-[13px] text-text-base transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                    onClick={() => void handleAddProject()}
+                  >
+                    <Plus size={14} />
+                    Open folder
+                  </button>
+                }
               >
-                <Plus size={14} />
-              </button>
+                <div class="flex flex-col gap-2">
+                  <For each={projects()}>
+                    {(project) => (
+                      <FolderSection
+                        project={project}
+                        activeSessionId={activeSessionId()}
+                        onSelectProject={setCurrentProject}
+                        onSelectSession={handleSelectSession}
+                        onCreateSession={handleCreateSession}
+                        onDeleteSession={handleDeleteSession}
+                        onDeleteProject={handleDeleteProject}
+                        onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
+                        onOpenWorkspacePage={props.onOpenWorkspacePage}
+                        onRenameSession={renameSession}
+                        onRenameProject={handleRenameProject}
+                        onToggleProjectPin={handleToggleProjectPin}
+                        hidePinnedSessions
+                      />
+                    )}
+                  </For>
+                </div>
+              </Show>
             </div>
-          </div>
-
-          <div class="custom-scrollbar flex-1 overflow-y-auto py-2">
-            <div class="flex flex-col gap-0.5 pb-3">
-              <For each={projects()}>
-                {(project) => (
-                  <FolderSection
-                    project={project}
-                    activeSessionId={activeSessionId()}
-                    onSelectProject={setCurrentProject}
-                    onSelectSession={handleSelectSession}
-                    onCreateSession={handleCreateSession}
-                    onDeleteSession={handleDeleteSession}
-                    onDeleteProject={handleDeleteProject}
-                    onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
-                    onOpenWorkspacePage={props.onOpenWorkspacePage}
-                    onRenameSession={renameSession}
-                    onRenameProject={handleRenameProject}
-                    onToggleProjectPin={handleToggleProjectPin}
-                  />
-                )}
-              </For>
-            </div>
-          </div>
-
-          <div class="border-t border-border-weak-base p-2">
-            <button
-              type="button"
-              class="flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-[13px] text-text-strong transition-colors hover:bg-surface-raised-base-hover"
-              title="Settings"
-              onClick={() => {
-                props.onOpenSettingsPage?.()
-              }}
-            >
-              <Settings size={15} />
-              <span class="text-[13px] leading-none">Settings</span>
-            </button>
           </div>
         </div>
       </Show>
