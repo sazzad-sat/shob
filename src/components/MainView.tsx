@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, on, Show, Suspense } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, on, onCleanup, Show, Suspense } from 'solid-js'
 import { nativeApi } from '../services/native'
 import { Sidebar } from './Sidebar'
 
@@ -20,6 +20,7 @@ import type { VcsFileDiff } from '@opencode-ai/sdk/v2'
 import { SessionReviewTab } from '@/pages/session/review-tab'
 import { FileComponentProvider } from '@opencode-ai/ui/context'
 import { File as OpenCodeFile } from '@opencode-ai/ui/file'
+import { ScrollView } from '@opencode-ai/ui/scroll-view'
 import { SessionSidePanel } from '@/pages/session/session-side-panel'
 
 
@@ -70,11 +71,17 @@ function FileTabContent(props: { projectPath: () => string; filePath: string }) 
   const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
 
   return (
-    <div class="h-full min-h-0 overflow-auto bg-background-base">
+    <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background-base">
       <FileComponentProvider component={FilePreview}>
-        <Show when={content()} fallback={<div class="p-4 text-12-regular text-text-weak">Loading…</div>}>
-          {(file) => <OpenCodeFile mode="text" file={file()} class="h-full" />}
-        </Show>
+        <ScrollView class="h-full min-h-0">
+          <Show when={content()} fallback={<div class="px-6 py-4 text-12-regular text-text-weak">Loading...</div>}>
+            {(file) => (
+              <div class="relative overflow-hidden pb-40">
+                <OpenCodeFile mode="text" file={file()} class="select-text" />
+              </div>
+            )}
+          </Show>
+        </ScrollView>
       </FileComponentProvider>
     </div>
   )
@@ -107,22 +114,6 @@ function OpenCodeReviewContent(props: {
     if (!active) return
     const target = normalizeReviewPath(active)
     return props.reviewDiffs().find((diff) => normalizeReviewPath(diff.file) === target)?.file
-  })
-  const selectedPlainFile = createMemo(() => {
-    const active = props.activeFilePath()
-    if (!active) return
-    if (activeDiffPath()) return
-    return active
-  })
-  const [plainFileContent] = createResource(selectedPlainFile, async (filePath) => {
-    const root = props.projectPath()
-    const absolute = toPosix(`${root}/${filePath}`)
-    const contents = await nativeApi.invoke("read_text_file", { path: absolute })
-    return {
-      name: filePath,
-      contents,
-      cacheKey: `${filePath}:${contents.length}:${contents.slice(0, 64)}`,
-    }
   })
 
   const openReviewPath = (path: string) => {
@@ -157,17 +148,19 @@ function OpenCodeReviewContent(props: {
       terminalTabs={props.terminalTabs}
       onCloseTerminal={props.onCloseTerminal}
       reviewPanel={() => (
-        <div class="h-full min-h-0 overflow-auto">
-          <FileComponentProvider component={FilePreview}>
-            <SessionReviewTab
-              diffs={props.reviewDiffs}
-              view={view}
-              diffStyle={layout.review.diffStyle()}
-              onDiffStyleChange={layout.review.setDiffStyle}
-              onViewFile={openReviewPath}
-              focusedFile={activeDiffPath() ?? props.activeFilePath() ?? undefined}
-            />
-          </FileComponentProvider>
+        <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background-stronger contain-strict">
+          <div class="relative flex-1 min-h-0 overflow-hidden pt-2">
+            <FileComponentProvider component={FilePreview}>
+              <SessionReviewTab
+                diffs={props.reviewDiffs}
+                view={view}
+                diffStyle={layout.review.diffStyle()}
+                onDiffStyleChange={layout.review.setDiffStyle}
+                onViewFile={openReviewPath}
+                focusedFile={activeDiffPath() ?? props.activeFilePath() ?? undefined}
+              />
+            </FileComponentProvider>
+          </div>
         </div>
       )}
       renderFileTab={(filePath) => <FileTabContent projectPath={props.projectPath} filePath={filePath} />}
@@ -200,10 +193,19 @@ export function MainView() {
   const [gitDiffError, setGitDiffError] = createSignal<string | null>(null)
   const [gitUnavailable, setGitUnavailable] = createSignal(false)
   const [reviewDiffs, setReviewDiffs] = createSignal<VcsFileDiff[]>([])
+  const [sidePanelMounted, setSidePanelMounted] = createSignal(false)
+  const [reviewResizeActive, setReviewResizeActive] = createSignal(false)
+  const [reviewSnap, setReviewSnap] = createSignal(false)
   const projectSessions = createMemo(() => currentProject()?.sessions ?? [])
   let workspaceSplitRef: HTMLDivElement | undefined
+  let reviewResizeBounds: { rightEdge: number; min: number; max: number } | undefined
+  let reviewResizeFrame: number | undefined
+  let pendingReviewWidth: number | undefined
+  let reviewSnapFrame: number | undefined
+  let sidePanelWarmToken = 0
 
   const projectPath = createMemo(() => currentProject()?.path ?? '')
+  const sidePanelOpen = createMemo(() => isReviewVisible() || isFileTreeVisible() || !!contextTabSessionId())
 
   const fileCtx = createFileContext({
     projectPath,
@@ -226,15 +228,48 @@ export function MainView() {
     on(
       projectPath,
       (path) => {
+        sidePanelWarmToken++
         fileCtx.tree.reset()
         setActiveFilePath(null)
         setReviewFiles([])
-        if (!path) return
+        if (!path) {
+          setSidePanelMounted(false)
+          return
+        }
+
+        const token = sidePanelWarmToken
+        const warm = () => {
+          if (token === sidePanelWarmToken) setSidePanelMounted(true)
+        }
+
+        if ("requestIdleCallback" in window) {
+          window.requestIdleCallback(warm, { timeout: 1000 })
+        } else {
+          globalThis.setTimeout(warm, 0)
+        }
+
         void fileCtx.tree.listDir("", { force: true })
       },
       { defer: false },
     ),
   )
+
+  createEffect(() => {
+    if (sidePanelOpen()) setSidePanelMounted(true)
+  })
+
+  createEffect((previous: boolean | undefined) => {
+    const open = sidePanelOpen()
+    if (previous !== undefined && previous !== open) {
+      if (reviewSnapFrame !== undefined) cancelAnimationFrame(reviewSnapFrame)
+      setReviewSnap(true)
+      reviewSnapFrame = requestAnimationFrame(() => {
+        reviewSnapFrame = undefined
+        setReviewSnap(false)
+      })
+    }
+    return open
+  })
 
   const gitStatusToKind = (status: string): DiffKind => {
     if (status === "??" || status.includes("A")) return "add"
@@ -508,16 +543,53 @@ export function MainView() {
 
   const workspaceSplitRect = () => workspaceSplitRef?.getBoundingClientRect()
 
-  const resizeReviewPanel = (clientX: number) => {
+  const computeReviewResizeBounds = () => {
     const rect = workspaceSplitRect()
     const rightEdge = rect?.right ?? window.innerWidth
     const leftEdge = rect?.left ?? 0
     const available = Math.max(0, rightEdge - leftEdge)
     const minMainContent = projectSessions().length > 0 ? 420 : 300
     const maxReviewWidth = Math.max(360, available - minMainContent)
-    const next = rightEdge - clientX
-    setReviewWidth(clampPanelWidth(next, 360, Math.min(1080, maxReviewWidth)))
+    return {
+      rightEdge,
+      min: 360,
+      max: Math.min(1080, maxReviewWidth),
+    }
   }
+
+  const commitReviewWidth = () => {
+    reviewResizeFrame = undefined
+    if (pendingReviewWidth === undefined) return
+    setReviewWidth(pendingReviewWidth)
+    pendingReviewWidth = undefined
+  }
+
+  const scheduleReviewWidth = (width: number) => {
+    pendingReviewWidth = width
+    if (reviewResizeFrame !== undefined) return
+    reviewResizeFrame = requestAnimationFrame(commitReviewWidth)
+  }
+
+  const beginReviewResize = () => {
+    reviewResizeBounds = computeReviewResizeBounds()
+    setReviewResizeActive(true)
+  }
+
+  const endReviewResize = () => {
+    reviewResizeBounds = undefined
+    setReviewResizeActive(false)
+  }
+
+  const resizeReviewPanel = (clientX: number) => {
+    const bounds = reviewResizeBounds ?? computeReviewResizeBounds()
+    const next = bounds.rightEdge - clientX
+    scheduleReviewWidth(clampPanelWidth(next, bounds.min, bounds.max))
+  }
+
+  onCleanup(() => {
+    if (reviewResizeFrame !== undefined) cancelAnimationFrame(reviewResizeFrame)
+    if (reviewSnapFrame !== undefined) cancelAnimationFrame(reviewSnapFrame)
+  })
 
   return (
     <div class="flex min-h-0 flex-1 overflow-hidden bg-background text-foreground">
@@ -548,15 +620,29 @@ export function MainView() {
                     </div>
                   )}
 
-                  <Show when={isReviewVisible() || isFileTreeVisible() || contextTabSessionId()}>
+                  <Show when={sidePanelMounted()}>
                     <div
-                      class="relative min-h-0 shrink-0 overflow-hidden border-l border-border/60"
-                      style={{ width: `${reviewWidth()}px` }}
+                      class="relative min-h-0 shrink-0 overflow-hidden"
+                      classList={{
+                        "border-l": sidePanelOpen(),
+                        "border-border/60": sidePanelOpen(),
+                        "pointer-events-none": !sidePanelOpen(),
+                        "transition-[width]": !reviewResizeActive() && !reviewSnap(),
+                        "duration-[240ms]": !reviewResizeActive() && !reviewSnap(),
+                        "ease-[cubic-bezier(0.22,1,0.36,1)]": !reviewResizeActive() && !reviewSnap(),
+                        "will-change-[width]": !reviewResizeActive() && !reviewSnap(),
+                        "motion-reduce:transition-none": !reviewResizeActive() && !reviewSnap(),
+                      }}
+                      style={{ width: sidePanelOpen() ? `${reviewWidth()}px` : "0px" }}
                     >
-                      <ResizeHandle
-                        edge="start"
-                        onResize={resizeReviewPanel}
-                      />
+                      <Show when={sidePanelOpen()}>
+                        <ResizeHandle
+                          edge="start"
+                          onResize={resizeReviewPanel}
+                          onResizeStart={beginReviewResize}
+                          onResizeEnd={endReviewResize}
+                        />
+                      </Show>
                       <Suspense fallback={null}>
                         <SDKProvider directory={projectPath}>
                           <SyncProvider>

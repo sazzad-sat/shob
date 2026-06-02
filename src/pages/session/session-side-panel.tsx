@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createMemo, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { IconButton } from "@opencode-ai/ui/icon-button"
@@ -50,6 +50,8 @@ export function SessionSidePanel(props: SidePanelProps) {
   const file = useFile()
   const language = useLanguage()
   const dialog = useDialog()
+  const [fileTreeResizeActive, setFileTreeResizeActive] = createSignal(false)
+  let fileTreeResizeTimer: number | undefined
 
   const openAddTabDialog = () => {
     dialog.show(() => (
@@ -116,6 +118,31 @@ export function SessionSidePanel(props: SidePanelProps) {
     if (value !== "changes" && value !== "all") return
     layout.fileTree.setTab(value)
   }
+
+  const stopFileTreeResize = () => {
+    if (fileTreeResizeTimer !== undefined) {
+      window.clearTimeout(fileTreeResizeTimer)
+      fileTreeResizeTimer = undefined
+    }
+    setFileTreeResizeActive(false)
+  }
+
+  const startFileTreeResize = () => {
+    if (fileTreeResizeTimer !== undefined) {
+      window.clearTimeout(fileTreeResizeTimer)
+      fileTreeResizeTimer = undefined
+    }
+    setFileTreeResizeActive(true)
+  }
+
+  const touchFileTreeResize = () => {
+    startFileTreeResize()
+    fileTreeResizeTimer = window.setTimeout(stopFileTreeResize, 120)
+  }
+
+  onCleanup(() => {
+    if (fileTreeResizeTimer !== undefined) window.clearTimeout(fileTreeResizeTimer)
+  })
 
   const empty = (message: string) => (
     <div class="h-full flex flex-col">
@@ -229,9 +256,11 @@ export function SessionSidePanel(props: SidePanelProps) {
                 </div>
                 <Tabs.Content
                   value="review"
-                  class="flex-1 min-h-0 overflow-y-auto"
+                  class="flex flex-col h-full min-h-0 overflow-hidden contain-strict"
                 >
-                  <Show when={props.reviewOpen()}>{props.reviewPanel()}</Show>
+                  <Show when={props.reviewOpen() && props.activeTabId() === "review"}>
+                    {props.reviewPanel()}
+                  </Show>
                 </Tabs.Content>
                 <Tabs.Content
                   value="context"
@@ -278,7 +307,7 @@ export function SessionSidePanel(props: SidePanelProps) {
             class="relative min-w-0 h-full shrink-0 overflow-hidden"
             classList={{
               "pointer-events-none": !props.fileTreeOpen(),
-              "transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none": true,
+              "transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none": !fileTreeResizeActive(),
             }}
             style={{ width: treeWidth() }}
           >
@@ -344,14 +373,19 @@ export function SessionSidePanel(props: SidePanelProps) {
               </Tabs>
             </div>
             <Show when={props.fileTreeOpen()}>
-              <ResizeHandle
-                direction="horizontal"
-                edge="start"
-                size={layout.fileTree.width()}
-                min={200}
-                max={480}
-                onResize={(width) => layout.fileTree.resize(width)}
-              />
+              <div onPointerDown={startFileTreeResize}>
+                <ResizeHandle
+                  direction="horizontal"
+                  edge="start"
+                  size={layout.fileTree.width()}
+                  min={200}
+                  max={480}
+                  onResize={(width) => {
+                    touchFileTreeResize()
+                    layout.fileTree.resize(width)
+                  }}
+                />
+              </div>
             </Show>
           </div>
         </div>

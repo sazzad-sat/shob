@@ -261,11 +261,6 @@ export const SessionReview = (props: SessionReviewProps) => {
     queue()
   }
 
-  const handleExpandOrCollapseAll = () => {
-    const next = open().length > 0 ? [] : files()
-    handleChange(next)
-  }
-
   const openFileLabel = () => i18n.t("ui.sessionReview.openFile")
 
   const selectionSide = (range: SelectedLineRange) => range.endSide ?? range.side ?? "additions"
@@ -350,19 +345,6 @@ export const SessionReview = (props: SessionReviewProps) => {
               onSelect={(style) => style && props.onDiffStyleChange?.(style)}
             />
           </Show>
-          <Show when={hasDiffs()}>
-            <Button
-              size="small"
-              icon="chevron-grabber-vertical"
-              class="w-[106px] justify-start"
-              onClick={handleExpandOrCollapseAll}
-            >
-              <Switch>
-                <Match when={open().length > 0}>{i18n.t("ui.sessionReview.collapseAll")}</Match>
-                <Match when={true}>{i18n.t("ui.sessionReview.expandAll")}</Match>
-              </Switch>
-            </Button>
-          </Show>
           {props.actions}
         </div>
       </div>
@@ -385,8 +367,10 @@ export const SessionReview = (props: SessionReviewProps) => {
               <Accordion multiple value={open()} onChange={handleChange}>
                 <For each={items()}>
                   {(diff) => {
-                    let wrapper: HTMLDivElement | undefined
                     const file = diff.file
+
+                    // Binary files can appear as changed files without a renderable line diff.
+                    const diffCanRender = () => diff.additions !== 0 || diff.deletions !== 0
 
                     const expanded = createMemo(() => open().includes(file))
                     const mounted = createMemo(() => expanded() && (!!store.visible[file] || pinned(file)))
@@ -496,14 +480,14 @@ export const SessionReview = (props: SessionReviewProps) => {
 
                     return (
                       <Accordion.Item
-                        value={file}
+                        value={diffCanRender() ? file : null!}
                         id={diffId(file)}
                         data-file={file}
                         data-slot="session-review-accordion-item"
                         data-selected={props.focusedFile === file ? "" : undefined}
                       >
                         <StickyAccordionHeader>
-                          <Accordion.Trigger>
+                          <Accordion.Trigger disabled={!diffCanRender()} class="cursor-default">
                             <div data-slot="session-review-trigger-content">
                               <div data-slot="session-review-file-info">
                                 <FileIcon node={{ path: file, type: "file" }} />
@@ -512,7 +496,7 @@ export const SessionReview = (props: SessionReviewProps) => {
                                     <span data-slot="session-review-directory">{`\u202A${getDirectory(file)}\u202C`}</span>
                                   </Show>
                                   <span data-slot="session-review-filename">{getFilename(file)}</span>
-                                  <Show when={props.onViewFile}>
+                                  <Show when={props.onViewFile && diffCanRender()}>
                                     <Tooltip value={openFileLabel()} placement="top" gutter={4}>
                                       <button
                                         data-slot="session-review-view-button"
@@ -553,9 +537,11 @@ export const SessionReview = (props: SessionReviewProps) => {
                                     <DiffChanges changes={diff} />
                                   </Match>
                                 </Switch>
-                                <span data-slot="session-review-diff-chevron">
-                                  <Icon name="chevron-down" size="small" />
-                                </span>
+                                <Show when={diffCanRender()}>
+                                  <span data-slot="session-review-diff-chevron">
+                                    <Icon name="chevron-down" size="small" />
+                                  </span>
+                                </Show>
                               </div>
                             </div>
                           </Accordion.Trigger>
@@ -564,7 +550,6 @@ export const SessionReview = (props: SessionReviewProps) => {
                           <div
                             data-slot="session-review-diff-wrapper"
                             ref={(el) => {
-                              wrapper = el
                               anchors.set(file, el)
                               nodes.set(file, el)
                               queue()
