@@ -4,6 +4,7 @@ export interface Project {
   path: string;
   color?: string | null;
   logoPath?: string | null;
+  pinned?: boolean;
   sessions: Session[];
 }
 

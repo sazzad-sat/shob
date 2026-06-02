@@ -61,6 +61,7 @@ const normalizeProjects = (projects: Project[]): Project[] =>
     ...project,
     color: project.color ?? null,
     logoPath: project.logoPath ?? null,
+    pinned: Boolean(project.pinned),
     sessions: project.sessions.map((session) => ({
       ...session,
       name: sanitizeSessionName(session.name) || session.name,
@@ -70,6 +71,12 @@ const normalizeProjects = (projects: Project[]): Project[] =>
       startupDurationMs: normalizeOptionalDuration(session.startupDurationMs),
     })),
   }));
+
+const sortProjects = (projects: Project[]): Project[] =>
+  [...projects].sort((left, right) => {
+    if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+    return 0;
+  });
 
 const findProjectBySessionId = (projects: Project[], sessionId: string | null) => {
   if (!sessionId) return { project: null, session: null };
@@ -151,7 +158,7 @@ export const actions: AppActions = {
       const normalizedProjects = normalizeProjects(await api.getProjects());
       const storedProjectId = getStoredValue(STORAGE_KEYS.currentProjectId);
       const storedSessionId = getStoredValue(STORAGE_KEYS.activeSessionId);
-      const projects = normalizedProjects;
+      const projects = sortProjects(normalizedProjects);
 
       const resolvedProjectId =
         storedProjectId && projects.some((project) => project.id === storedProjectId)
@@ -191,7 +198,7 @@ export const actions: AppActions = {
     setStoredValue(STORAGE_KEYS.currentProjectId, saved.id);
     setStoredValue(STORAGE_KEYS.activeSessionId, null);
     setStore({
-      projects: [...store.projects, saved],
+      projects: sortProjects([...store.projects, saved]),
       currentProjectId: saved.id,
       activeSessionId: null,
     });
@@ -206,7 +213,7 @@ export const actions: AppActions = {
       ),
     );
     await api.deleteProject(id);
-    const projects = store.projects.filter((p) => p.id !== id);
+    const projects = sortProjects(store.projects.filter((p) => p.id !== id));
     const currentProjectId = store.currentProjectId === id ? projects[0]?.id ?? null : store.currentProjectId;
     const currentProject = projects.find((project) => project.id === currentProjectId);
     const activeSessionId =
@@ -238,9 +245,9 @@ export const actions: AppActions = {
     await api.saveProject(updatedProject);
 
     setStore('projects', (prev) =>
-      prev.map((item) =>
+      sortProjects(prev.map((item) =>
         item.id === projectId ? updatedProject : item
-      ),
+      )),
     );
   },
 

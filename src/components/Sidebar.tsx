@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
-import { MoreHorizontal, Plus, Settings, SquarePen, Trash2 } from "lucide-solid"
+import { Archive, Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Settings, SquarePen, X } from "lucide-solid"
 import { nativeApi } from "../services/native"
 import { useStore, setStore } from "../store"
 import type { Project } from "../types"
@@ -13,6 +13,12 @@ import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { sessionPermissionRequest } from "@/opencode-ported/composer/session-request-tree"
 import { useServer } from "@/context/server"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -54,6 +60,8 @@ function FolderSection(props: {
   onSyncOpenCodeSessions: (projectId: string, sessions: OpenCodeSession[]) => void
   onOpenWorkspacePage?: () => void
   onRenameSession: (projectId: string, sessionId: string, newName: string) => void
+  onRenameProject: (projectId: string, name: string) => void | Promise<void>
+  onToggleProjectPin: (projectId: string) => void | Promise<void>
 }) {
   const globalSync = useGlobalSync()
   const globalSDK = useGlobalSDK()
@@ -61,8 +69,10 @@ function FolderSection(props: {
   const permission = usePermission()
 
   const [isOpen, setIsOpen] = createSignal(true)
-  const [showMenu, setShowMenu] = createSignal(false)
-  let menuRef: HTMLDivElement | undefined
+  const [projectMenuOpen, setProjectMenuOpen] = createSignal(false)
+  const [renameProjectOpen, setRenameProjectOpen] = createSignal(false)
+  const [renameProjectValue, setRenameProjectValue] = createSignal(props.project.name)
+  const [renameProjectSaving, setRenameProjectSaving] = createSignal(false)
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
   const openCodeSessions = createMemo(() => projectStore().session)
 
@@ -155,6 +165,51 @@ function FolderSection(props: {
       }
     }
     setEditingSessionId(null)
+  }
+
+  const handleOpenInExplorer = () => {
+    nativeApi.invoke("reveal_in_finder", { path: props.project.path }).catch(() => undefined)
+  }
+
+  const handleToggleProjectPin = () => {
+    void props.onToggleProjectPin(props.project.id)
+  }
+
+  const renameProjectValueTrimmed = createMemo(() => renameProjectValue().trim())
+  const canRenameProject = createMemo(() => {
+    const next = renameProjectValueTrimmed()
+    return next.length > 0 && next !== props.project.name
+  })
+
+  const openRenameProjectDialog = () => {
+    setRenameProjectValue(props.project.name)
+    setProjectMenuOpen(false)
+    window.setTimeout(() => setRenameProjectOpen(true), 20)
+  }
+
+  const submitRenameProject = async () => {
+    const trimmed = renameProjectValueTrimmed()
+    if (!trimmed || trimmed === props.project.name || renameProjectSaving()) return
+
+    setRenameProjectSaving(true)
+    try {
+      await props.onRenameProject(props.project.id, trimmed)
+      setRenameProjectOpen(false)
+    } finally {
+      setRenameProjectSaving(false)
+    }
+  }
+
+  const handleSelectProject = () => {
+    props.onOpenWorkspacePage?.()
+    props.onSelectProject(props.project.id)
+  }
+
+  const runProjectMenuAction = (event: MouseEvent, action: () => void) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setProjectMenuOpen(false)
+    window.setTimeout(action, 0)
   }
 
   const sessionTree = (sessionId: string) => sessionsByParent().map.get(sessionId) ?? []
@@ -266,64 +321,196 @@ function FolderSection(props: {
     props.onSyncOpenCodeSessions(props.project.id, sessions)
   })
 
-  const handleMenuClick = (e: MouseEvent) => {
-    if (menuRef && !menuRef.contains(e.target as Node)) {
-      setShowMenu(false)
-    }
-  }
-
-  createEffect(() => {
-    if (!showMenu()) return
-    document.addEventListener("mousedown", handleMenuClick)
-    onCleanup(() => document.removeEventListener("mousedown", handleMenuClick))
-  })
-
   return (
     <div class="flex flex-col">
+      <Show when={renameProjectOpen()}>
+        <div
+          class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`rename-project-title-${props.project.id}`}
+          onClick={() => {
+            if (!renameProjectSaving()) setRenameProjectOpen(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !renameProjectSaving()) setRenameProjectOpen(false)
+          }}
+        >
+          <form
+            class="grid w-full max-w-[420px] gap-0 overflow-hidden rounded-xl border border-border-weak-base bg-surface-raised-base shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault()
+              void submitRenameProject()
+            }}
+          >
+            <div class="border-b border-border-weak-base px-4 pt-4 pb-3">
+              <div class="flex items-center gap-2">
+                <span class="flex size-8 items-center justify-center rounded-md bg-surface-raised-base-hover text-icon-warning-base">
+                  <ProjectFolderIcon />
+                </span>
+                <div class="min-w-0">
+                  <h2 id={`rename-project-title-${props.project.id}`} class="text-[15px] font-semibold text-text-strong">
+                    Rename project
+                  </h2>
+                  <p class="truncate text-[12px] text-text-weak">
+                    {props.project.path}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="ml-auto flex size-7 items-center justify-center rounded-md text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                  aria-label="Close rename dialog"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!renameProjectSaving()) setRenameProjectOpen(false)
+                  }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+
+            <div class="grid gap-2 px-4 py-4">
+              <label class="text-[12px] font-medium text-text-base" for={`rename-project-${props.project.id}`}>
+                Project name
+              </label>
+              <input
+                id={`rename-project-${props.project.id}`}
+                class="h-9 rounded-md border border-border-weak-base bg-background-stronger px-3 text-[13px] text-text-strong outline-none transition-colors placeholder:text-text-weaker focus:border-border-weak-hover focus:bg-surface-raised-base-hover"
+                value={renameProjectValue()}
+                placeholder="Project name"
+                onInput={(e) => setRenameProjectValue(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.stopPropagation()
+                    if (!renameProjectSaving()) setRenameProjectOpen(false)
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    void submitRenameProject()
+                  }
+                }}
+                ref={(el) =>
+                  setTimeout(() => {
+                    el.focus()
+                    el.select()
+                  }, 50)
+                }
+              />
+              <Show when={!renameProjectValueTrimmed()}>
+                <div class="text-[12px] text-icon-critical-base">Project name cannot be empty.</div>
+              </Show>
+              <div class="rounded-md border border-border-weak-base bg-background-stronger px-3 py-2">
+                <div class="text-[11px] font-medium uppercase tracking-wide text-text-weaker">Current name</div>
+                <div class="mt-1 truncate text-[12px] text-text-base">{props.project.name}</div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-border-weak-base bg-background-stronger px-4 py-3">
+              <button
+                type="button"
+                class="inline-flex h-8 items-center justify-center rounded-lg border border-border-weak-base bg-background-stronger px-3 text-[13px] font-medium text-text-base transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!renameProjectSaving()) setRenameProjectOpen(false)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!canRenameProject() || renameProjectSaving()}
+                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void submitRenameProject()
+                }}
+              >
+                <Check size={14} />
+                {renameProjectSaving() ? "Saving..." : "Save name"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Show>
+
       <div
-        class="group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-surface-raised-base-hover"
+        class="group flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-surface-raised-base-hover"
         onClick={() => {
-          props.onOpenWorkspacePage?.()
-          props.onSelectProject(props.project.id)
-          setIsOpen(!isOpen())
+          handleSelectProject()
         }}
       >
-        <div class="flex items-center gap-2 text-text-weak select-none">
-          <ChevronIcon isOpen={isOpen()} />
+        <div class="min-w-0 flex flex-1 items-center gap-2 text-text-weak select-none">
+          <button
+            type="button"
+            class="flex size-4 shrink-0 items-center justify-center rounded text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+            title={isOpen() ? "Collapse project" : "Expand project"}
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsOpen(!isOpen())
+            }}
+          >
+            <ChevronIcon isOpen={isOpen()} />
+          </button>
           <span class="text-icon-warning-base transition-colors group-hover:text-icon-warning-hover">
             <ProjectFolderIcon />
           </span>
-          <span class="text-[13px] leading-none font-semibold text-text-base group-hover:text-text-strong transition-colors">{props.project.name}</span>
+          <span class="truncate text-[13px] leading-none font-semibold text-text-base transition-colors group-hover:text-text-strong">
+            {props.project.name}
+          </span>
+          <Show when={props.project.pinned}>
+            <Pin size={12} class="shrink-0 fill-current text-text-weaker" />
+          </Show>
         </div>
 
         <div class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <div class="relative flex items-center" ref={menuRef}>
-            <button
-              class="rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover"
+          <DropdownMenu open={projectMenuOpen()} onOpenChange={setProjectMenuOpen} placement="bottom-end" gutter={4}>
+            <DropdownMenuTrigger
+              class="rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover data-expanded:bg-surface-raised-base-hover"
+              onPointerDown={(e) => {
+                e.stopPropagation()
+              }}
               onClick={(e) => {
                 e.stopPropagation()
-                setShowMenu(!showMenu())
               }}
+              title="Project actions"
             >
               <MoreHorizontal size={14} />
-            </button>
+            </DropdownMenuTrigger>
 
-            <Show when={showMenu()}>
-              <div class="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded border border-border-base bg-surface-raised-base py-1 text-[12px] text-text-strong shadow-xl">
-                <button
-                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-icon-critical-base transition-colors hover:bg-surface-raised-base-hover"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setShowMenu(false)
-                    props.onDeleteProject(props.project.id)
-                  }}
-                >
-                  <Trash2 size={13} />
-                  Close Project
-                </button>
-              </div>
-            </Show>
-          </div>
+            <DropdownMenuContent class="w-[236px] rounded-lg border border-border-weak-base bg-surface-raised-base/95 p-1.5 text-[13px] shadow-2xl backdrop-blur">
+              <DropdownMenuItem
+                class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-base focus:bg-surface-raised-base-hover"
+                onClick={(e: MouseEvent) => runProjectMenuAction(e, handleToggleProjectPin)}
+              >
+                <Pin size={14} class={props.project.pinned ? "fill-current" : ""} />
+                {props.project.pinned ? "Unpin project" : "Pin project"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-base focus:bg-surface-raised-base-hover"
+                onClick={(e: MouseEvent) => runProjectMenuAction(e, handleOpenInExplorer)}
+              >
+                <FolderOpen size={14} />
+                Open in Explorer
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-base focus:bg-surface-raised-base-hover"
+                onClick={(e: MouseEvent) => runProjectMenuAction(e, openRenameProjectDialog)}
+              >
+                <Pencil size={14} />
+                Rename project
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                data-variant="destructive"
+                class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-icon-critical-base focus:bg-text-diff-delete-base/10 focus:text-icon-critical-base"
+                onClick={(e: MouseEvent) => runProjectMenuAction(e, () => props.onDeleteProject(props.project.id))}
+              >
+                <X size={14} />
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <div class="relative flex items-center">
             <button
               class="peer rounded p-1 text-text-strong transition-colors hover:bg-surface-raised-base-hover"
@@ -377,6 +564,7 @@ export function Sidebar(props: {
   const removeSession = useStore((s) => s.removeSession)
   const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
   const deleteProject = useStore((s) => s.deleteProject)
+  const updateProject = useStore((s) => s.updateProject)
   const renameSession = useStore((s) => s.renameSession)
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
@@ -503,6 +691,16 @@ export function Sidebar(props: {
     await deleteProject(projectId)
   }
 
+  const handleRenameProject = async (projectId: string, name: string) => {
+    await updateProject(projectId, { name })
+  }
+
+  const handleToggleProjectPin = async (projectId: string) => {
+    const project = projects().find((item) => item.id === projectId)
+    if (!project) return
+    await updateProject(projectId, { pinned: !project.pinned })
+  }
+
   const handleSelectSession = (projectId: string, sessionId: string) => {
     props.onOpenWorkspacePage?.()
     setCurrentProject(projectId)
@@ -570,6 +768,8 @@ export function Sidebar(props: {
                     onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
                     onOpenWorkspacePage={props.onOpenWorkspacePage}
                     onRenameSession={renameSession}
+                    onRenameProject={handleRenameProject}
+                    onToggleProjectPin={handleToggleProjectPin}
                   />
                 )}
               </For>

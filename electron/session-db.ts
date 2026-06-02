@@ -9,6 +9,7 @@ interface StoredProject {
   path: string;
   color?: string | null;
   logoPath?: string | null;
+  pinned?: boolean;
   sessions: StoredSession[];
 }
 
@@ -30,6 +31,7 @@ type ProjectRow = {
   path: string;
   color: string | null;
   logo_path: string | null;
+  pinned: number;
   sort_order: number;
   time_created: number;
   time_updated: number;
@@ -132,6 +134,7 @@ function createSchema(db: DatabaseSync) {
       path TEXT NOT NULL,
       color TEXT,
       logo_path TEXT,
+      pinned INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
       time_created INTEGER NOT NULL,
       time_updated INTEGER NOT NULL
@@ -164,6 +167,14 @@ function createSchema(db: DatabaseSync) {
   `);
 }
 
+function ensureProjectColumns(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+  const names = new Set(columns.map((column) => column.name));
+  if (!names.has("pinned")) {
+    db.exec("ALTER TABLE projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
+  }
+}
+
 function projectCount(db: DatabaseSync) {
   const row = db.prepare("SELECT COUNT(*) AS count FROM projects").get() as { count: number } | undefined;
   return Number(row?.count ?? 0);
@@ -178,13 +189,14 @@ function insertProject(db: DatabaseSync, project: StoredProject, sortOrder: numb
   const timestamp = now();
   db.prepare(`
     INSERT INTO projects (
-      id, name, path, color, logo_path, sort_order, time_created, time_updated
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      id, name, path, color, logo_path, pinned, sort_order, time_created, time_updated
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       path = excluded.path,
       color = excluded.color,
       logo_path = excluded.logo_path,
+      pinned = excluded.pinned,
       sort_order = excluded.sort_order,
       time_updated = excluded.time_updated
   `).run(
@@ -193,6 +205,7 @@ function insertProject(db: DatabaseSync, project: StoredProject, sortOrder: numb
     project.path || "",
     optionalString(project.color),
     optionalString(project.logoPath),
+    project.pinned ? 1 : 0,
     sortOrder,
     timestamp,
     timestamp,
@@ -293,6 +306,7 @@ export function initSessionDatabase() {
     PRAGMA foreign_keys = ON;
   `);
   createSchema(db);
+  ensureProjectColumns(db);
   migrateLegacyJson(db);
   client = db;
   return db;
@@ -334,6 +348,7 @@ export function loadProjects(): StoredProject[] {
     path: row.path,
     color: row.color,
     logoPath: row.logo_path,
+    pinned: Boolean(row.pinned),
     sessions: sessionsByProject.get(row.id) ?? [],
   }));
 }
