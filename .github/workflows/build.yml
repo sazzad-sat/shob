@@ -151,7 +151,20 @@ jobs:
               continue
             fi
             echo "Installing native optional dependencies for ${target_os}-${target_cpu}"
-            bun install --os="${target_os}" --cpu="${target_cpu}"
+            install_status=0
+            bun install --os="${target_os}" --cpu="${target_cpu}" || install_status=$?
+
+            for package_name in "@lydell/node-pty-${target_os}-${target_cpu}" "@parcel/watcher-${target_os}-${target_cpu}"; do
+              package_path="node_modules/${package_name}"
+              if [[ ! -d "${package_path}" ]]; then
+                echo "::error::Missing ${package_name} after targeted install"
+                exit "${install_status:-1}"
+              fi
+            done
+
+            if [[ "${install_status}" != "0" ]]; then
+              echo "Targeted install returned ${install_status}, but required native packages are present; continuing."
+            fi
           done <<< "${NATIVE_TARGETS}"
 
       - name: Validate release version
