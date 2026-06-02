@@ -8,6 +8,7 @@ export const popularProviders = [
   "xai",
   "google",
   "antigravity",
+  "cline",
   "openrouter",
   "kilo",
   "vercel",

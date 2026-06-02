@@ -58,6 +58,7 @@ import { ProviderTransform } from "./transform"
 import { Installation } from "../installation"
 import { ModelID, ProviderID } from "./schema"
 import { ProviderError } from "./error"
+import { buildClineHeaders } from "../plugin/cline"
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })
@@ -180,6 +181,37 @@ export namespace Provider {
 
   function useLanguageModel(sdk: any) {
     return sdk.responses === undefined && sdk.chat === undefined
+  }
+
+  async function clineFetch(input: RequestInfo | URL, init?: RequestInit) {
+    let requestInput = input
+    const requestUrl =
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : String((input as Request).url)
+    if (requestUrl.includes("/chat/completions")) {
+      requestInput = "https://api.cline.bot/api/v1/chat/completions"
+    }
+    const headers = new Headers(init?.headers)
+    const bearer = headers.get("authorization")?.replace(/^Bearer\s+/i, "")
+    headers.delete("authorization")
+    headers.delete("Authorization")
+    for (const [key, value] of Object.entries(buildClineHeaders(bearer))) {
+      headers.set(key, value)
+    }
+    const response = await fetch(requestInput, { ...init, headers })
+    const contentType = response.headers.get("content-type") || ""
+    if (!contentType.includes("application/json")) return response
+
+    const payload = await response.clone().json().catch(() => undefined)
+    if (!payload || typeof payload !== "object" || !("data" in payload)) return response
+
+    const normalized = JSON.stringify((payload as { data: unknown }).data)
+    const nextHeaders = new Headers(response.headers)
+    nextHeaders.set("content-length", String(Buffer.byteLength(normalized)))
+    return new Response(normalized, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: nextHeaders,
+    })
   }
 
   function custom(dep: CustomDep): Record<string, CustomLoader> {
@@ -846,6 +878,25 @@ export namespace Provider {
             return sdk.languageModel(id)
           },
         }),
+      cline: Effect.fnUntraced(function* () {
+        const auth = yield* dep.auth("cline")
+        if (auth?.type === "oauth") {
+          return {
+            autoload: false,
+            options: {
+              headers: buildClineHeaders(undefined),
+            },
+          }
+        }
+        const token = auth?.type === "api" ? auth.key : undefined
+        return {
+          autoload: false,
+          options: {
+            headers: buildClineHeaders(token),
+            fetch: clineFetch,
+          },
+        }
+      }),
       qoder: () =>
         Effect.succeed({
           autoload: false,

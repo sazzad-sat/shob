@@ -23,6 +23,7 @@ export const ProviderID = providerIdSchema.pipe(
     mistral: schema.make("mistral"),
     gitlab: schema.make("gitlab"),
     qoder: schema.make("qoder"),
+    cline: schema.make("cline"),
   })),
 )
 

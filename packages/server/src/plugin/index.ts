@@ -13,6 +13,7 @@ import { AntigravityAuthPlugin } from "./antigravity"
 import { XaiAuthPlugin } from "./xai"
 import { QoderAuthPlugin } from "./qoder"
 import { CommandCodeAuthPlugin } from "./commandcode"
+import { ClineAuthPlugin } from "./cline"
 import { gitlabAuthPlugin as GitlabAuthPlugin } from "opencode-gitlab-auth"
 import { PoeAuthPlugin } from "opencode-poe-auth"
 import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cloudflare"
@@ -59,6 +60,7 @@ export namespace Plugin {
     XaiAuthPlugin,
     QoderAuthPlugin,
     CommandCodeAuthPlugin,
+    ClineAuthPlugin,
     KiloAuthPlugin,
     CopilotAuthPlugin,
     GitlabAuthPlugin,
