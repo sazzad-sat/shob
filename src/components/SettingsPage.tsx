@@ -5,6 +5,8 @@ import { SettingsModels } from "./opencode-settings/settings-models"
 import { SettingsAbout } from "./settings-about"
 import { useStore } from "../store"
 import { OPEN_CODE_THEME_LIST } from "../theme"
+import { useSettings } from "@/context/settings"
+import { Switch } from "@/components/ui/switch"
 
 type SettingsSection = "general" | "providers" | "models" | "about"
 
@@ -52,7 +54,30 @@ function getThemeColors(theme: any, isDark: boolean) {
   }
 }
 
+function AgentTimelineToggle(props: {
+  title: string
+  description: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <div class="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/25 px-3 py-2.5">
+      <div class="min-w-0">
+        <div class="truncate text-xs font-semibold text-foreground">{props.title}</div>
+        <div class="mt-0.5 text-[11px] leading-4 text-muted-foreground">{props.description}</div>
+      </div>
+      <Switch
+        size="default"
+        checked={props.checked}
+        onChange={props.onChange}
+        aria-label={props.title}
+      />
+    </div>
+  )
+}
+
 export function SettingsPage() {
+  const settings = useSettings()
   const preferredShell = useStore((s) => s.preferredShell)
   const availableShells = useStore((s) => s.availableShells)
   const setPreferredShell = useStore((s) => s.setPreferredShell)
@@ -379,6 +404,33 @@ export function SettingsPage() {
                     </For>
                   </div>
                 </Show>
+              </div>
+
+              <div class="space-y-4 rounded-lg border border-border/70 bg-card/30 p-4">
+                <div>
+                  <h3 class="text-sm font-medium text-foreground">Agent timeline</h3>
+                  <p class="mt-0.5 text-xs text-muted-foreground">Choose which agent details open in chat.</p>
+                </div>
+                <div class="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
+                  <AgentTimelineToggle
+                    title="Reasoning"
+                    description="Show model summaries in the timeline."
+                    checked={settings.general.showReasoningSummaries()}
+                    onChange={settings.general.setShowReasoningSummaries}
+                  />
+                  <AgentTimelineToggle
+                    title="Shell output"
+                    description="Open command output by default."
+                    checked={settings.general.shellToolPartsExpanded()}
+                    onChange={settings.general.setShellToolPartsExpanded}
+                  />
+                  <AgentTimelineToggle
+                    title="File edits"
+                    description="Open edit, write, and patch details."
+                    checked={settings.general.editToolPartsExpanded()}
+                    onChange={settings.general.setEditToolPartsExpanded}
+                  />
+                </div>
               </div>
 
               {/* Default Shell */}

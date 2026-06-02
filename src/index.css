@@ -1536,103 +1536,385 @@ button {
 
 .agent-terminal-view [data-component="context-tool-group"] {
   position: relative;
-  margin: 12px 0 16px 0;
-  padding-left: 24px;
+  margin: 12px 0 14px 0;
+  padding-left: 18px;
 }
 
 .agent-terminal-view [data-component="context-tool-group"]::before {
   content: "";
   position: absolute;
-  left: 6px;
-  top: 12px;
-  width: 6px;
-  height: 6px;
+  left: 5px;
+  top: 11px;
+  bottom: 7px;
+  width: 1px;
   border-radius: 999px;
-  background: var(--terminal-agent-accent);
-  opacity: 0.7;
+  background: color-mix(in srgb, var(--border-weak-base) 76%, transparent);
 }
 
 .agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-trigger"] {
   width: auto;
+  border-radius: 7px !important;
+  outline: none !important;
+}
+
+.agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-trigger"]:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 36%, transparent) !important;
 }
 
 .agent-terminal-view [data-slot="context-tool-group-main"] {
-  gap: 10px !important;
+  min-height: 26px !important;
+  gap: 7px !important;
+  border-radius: 7px !important;
+  padding: 2px 6px !important;
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
-.agent-terminal-view [data-slot="context-tool-group-title"] span[style*="opacity"] {
-  display: none !important;
+.agent-terminal-view [data-slot="context-tool-group-main"]:hover {
+  background: color-mix(in srgb, var(--surface-raised-base) 54%, transparent) !important;
 }
 
 .agent-terminal-view [data-slot="context-tool-group-title"] {
-  color: var(--terminal-agent-text) !important;
+  color: var(--text-base) !important;
   font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
+  font-weight: 550 !important;
+  letter-spacing: 0 !important;
+}
+
+.agent-terminal-view [data-component="context-tool-group"][data-status="running"] [data-slot="context-tool-group-title"],
+.agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-trigger"][aria-expanded="true"] [data-slot="context-tool-group-title"] {
+  color: var(--text-strong) !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-title"] .tabular-nums {
+  color: var(--text-weaker) !important;
+  font-family: var(--font-family-mono), ui-monospace, monospace !important;
+  font-size: 11px !important;
   font-weight: 500 !important;
-  opacity: 0.9;
 }
 
-.agent-terminal-view [data-component="context-tool-group"][data-status] [data-slot="context-tool-group-title"] {
-  color: var(--terminal-agent-text) !important;
+.agent-terminal-view [data-slot="context-tool-group-title"] span[style*="opacity: 0.6"] {
+  color: var(--text-weaker) !important;
+  opacity: 1 !important;
 }
 
-.agent-terminal-view [data-slot="context-tool-group-title"] .tabular-nums,
-.agent-terminal-view [data-slot="context-tool-group-title"] [style*="step"] {
-  display: none !important;
+.agent-terminal-view [data-slot="context-tool-group-glow"] {
+  display: inline-block !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 999px !important;
+  background: var(--chart-2, #22c55e) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--chart-2, #22c55e) 12%, transparent) !important;
 }
 
 .agent-terminal-view [data-component="context-tool-batch"] {
-  border-left: 1px solid var(--terminal-agent-border-soft) !important;
-  margin: 8px 0 0 -31px !important;
-  padding: 8px 0 0 16px !important;
-  gap: 8px !important;
+  border-left: 1px solid color-mix(in srgb, var(--border-weak-base) 72%, transparent) !important;
+  margin: 6px 0 0 -13px !important;
+  padding: 6px 0 2px 13px !important;
+  gap: 3px !important;
 }
 
-.agent-terminal-view [data-slot="context-tool-group-glow"],
 .agent-terminal-view [data-component="context-tool-batch"]::before {
   display: none !important;
 }
 
-.agent-terminal-view [data-slot="message-part-title-text"],
-.agent-terminal-view [data-slot="message-part-filename"],
-.agent-terminal-view [data-slot="basic-tool-title"],
+.agent-terminal-view [data-component="tool-part-wrapper"] {
+  --agent-tool-accent: var(--text-weaker);
+  --agent-tool-surface: color-mix(in srgb, var(--surface-raised-base) 40%, transparent);
+  --agent-tool-border: color-mix(in srgb, var(--border-weak-base) 62%, transparent);
+  --tool-accent-color: var(--agent-tool-accent);
+  position: relative;
+  min-width: 0;
+  margin: 1px 0 !important;
+  padding-left: 10px;
+  border-radius: 8px;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"]::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--agent-tool-accent) 64%, transparent);
+  opacity: 0.42;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="bash"] {
+  --agent-tool-accent: var(--chart-2, #22c55e);
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="edit"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="write"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="apply_patch"] {
+  --agent-tool-accent: var(--chart-1, #3b82f6);
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="read"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="list"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="glob"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="grep"] {
+  --agent-tool-accent: var(--chart-3, #eab308);
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="webfetch"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="websearch"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="codesearch"] {
+  --agent-tool-accent: var(--chart-5, #06b6d4);
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="task"] {
+  --agent-tool-accent: var(--chart-4, #a855f7);
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="running"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="pending"] {
+  --agent-tool-surface: color-mix(in srgb, var(--agent-tool-accent) 9%, transparent);
+  --agent-tool-border: color-mix(in srgb, var(--agent-tool-accent) 28%, var(--border-weak-base));
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="running"]::before,
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="pending"]::before {
+  opacity: 0.85;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="error"] {
+  --agent-tool-accent: var(--destructive, #ef4444);
+  --agent-tool-surface: color-mix(in srgb, var(--destructive, #ef4444) 8%, transparent);
+  --agent-tool-border: color-mix(in srgb, var(--destructive, #ef4444) 30%, var(--border-weak-base));
+}
+
+.agent-terminal-view [data-component="collapsible"].tool-collapsible {
+  gap: 0 !important;
+  width: 100%;
+}
+
+.agent-terminal-view [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"] {
+  width: 100% !important;
+  min-width: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  padding: 1px 3px !important;
+  outline: none !important;
+  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+
+.agent-terminal-view [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"]:hover,
+.agent-terminal-view [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"][aria-expanded="true"] {
+  border-color: var(--agent-tool-border) !important;
+  background: var(--agent-tool-surface) !important;
+}
+
+.agent-terminal-view [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"]:focus-visible {
+  border-color: color-mix(in srgb, var(--ring) 48%, var(--border-weak-base)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 24%, transparent) !important;
+}
+
+.agent-terminal-view [data-component="tool-trigger"] {
+  min-height: 28px !important;
+  height: auto !important;
+  gap: 7px !important;
+  margin: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-trigger-content"],
+.agent-terminal-view [data-slot="basic-tool-tool-info"],
+.agent-terminal-view [data-slot="basic-tool-tool-info-structured"],
+.agent-terminal-view [data-slot="basic-tool-tool-info-main"] {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-info-structured"] {
+  width: 100% !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-info-main"] {
+  gap: 6px !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-indicator"],
+.agent-terminal-view [data-slot="basic-tool-tool-spinner"] {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 6px !important;
+  background: color-mix(in srgb, var(--agent-tool-accent) 10%, var(--surface-raised-base)) !important;
+  color: var(--agent-tool-accent) !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-indicator"] svg,
+.agent-terminal-view [data-slot="basic-tool-tool-spinner"] svg,
+.agent-terminal-view [data-component="task-tool-action"] svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
 .agent-terminal-view [data-slot="basic-tool-tool-title"],
-.agent-terminal-view [data-component="task-tool-title"] {
-  color: var(--terminal-agent-muted) !important;
+.agent-terminal-view [data-component="task-tool-title"],
+.agent-terminal-view [data-slot="message-part-title-text"],
+.agent-terminal-view [data-slot="message-part-filename"] {
+  min-width: 0 !important;
+  color: var(--text-base) !important;
   font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
   font-size: 13px !important;
-  font-weight: 500 !important;
-  opacity: 0.85;
+  font-weight: 550 !important;
+  letter-spacing: 0 !important;
+  opacity: 1 !important;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="running"] [data-slot="basic-tool-tool-title"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="running"] [data-component="task-tool-title"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="pending"] [data-slot="basic-tool-tool-title"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="pending"] [data-component="task-tool-title"] {
+  color: var(--text-strong) !important;
 }
 
 .agent-terminal-view [data-slot="basic-tool-tool-subtitle"],
 .agent-terminal-view [data-slot="message-part-path"],
 .agent-terminal-view [data-slot="message-part-directory"],
 .agent-terminal-view [data-slot="basic-tool-tool-arg"] {
-  color: var(--terminal-agent-dim) !important;
-  background: transparent !important;
-  border: 0 !important;
-  padding: 0 !important;
-  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
-  font-size: 12px !important;
+  min-width: 0 !important;
+  max-width: min(52vw, 520px) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  border: 1px solid color-mix(in srgb, var(--border-weak-base) 58%, transparent) !important;
+  border-radius: 6px !important;
+  background: color-mix(in srgb, var(--surface-raised-base) 52%, transparent) !important;
+  color: var(--text-weak) !important;
+  font-family: var(--font-family-mono), ui-monospace, monospace !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0 !important;
+  opacity: 1 !important;
+  padding: 2px 6px !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-subtitle"].clickable:hover,
+.agent-terminal-view [data-slot="basic-tool-tool-subtitle"].subagent-link:hover {
+  color: var(--text-strong) !important;
+  border-color: color-mix(in srgb, var(--agent-tool-accent) 34%, var(--border-weak-base)) !important;
+  background: color-mix(in srgb, var(--agent-tool-accent) 10%, var(--surface-raised-base)) !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-arg"] {
+  display: inline-flex !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-duration"] {
+  color: var(--text-weaker) !important;
+  font-size: 10.5px !important;
+  margin-left: auto !important;
+}
+
+.agent-terminal-view [data-slot="collapsible-arrow"] {
+  margin-left: auto !important;
   opacity: 0.7 !important;
 }
 
-.agent-terminal-view [data-slot="basic-tool-tool-indicator"],
-.agent-terminal-view [data-slot="basic-tool-tool-spinner"],
-.agent-terminal-view [data-component="task-tool-action"],
-.agent-terminal-view [data-slot="collapsible-arrow-icon"] {
-  color: var(--terminal-agent-accent) !important;
+.agent-terminal-view [data-slot="collapsible-arrow-icon"],
+.agent-terminal-view [data-component="task-tool-action"] {
+  color: var(--agent-tool-accent) !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-running-progress"] {
+  left: 6px !important;
+  right: 6px !important;
+  bottom: 0 !important;
+  height: 1px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--agent-tool-accent) 80%, transparent),
+    transparent
+  ) !important;
 }
 
 .agent-terminal-view [data-slot="collapsible-content"] {
-  padding: 3px 0 3px 22px !important;
+  margin: 0 !important;
+  padding: 5px 0 7px 26px !important;
+}
+
+.agent-terminal-view [data-component="tool-output"],
+.agent-terminal-view [data-component="bash-output"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 2px 0 8px !important;
+  border: 1px solid color-mix(in srgb, var(--border-weak-base) 70%, transparent) !important;
+  border-radius: 8px !important;
+  background: color-mix(in srgb, var(--surface-raised-base) 42%, transparent) !important;
+  overflow: hidden !important;
+}
+
+.agent-terminal-view [data-component="tool-output"] {
+  padding: 9px 10px !important;
+  color: var(--text-base) !important;
+  white-space: pre-wrap !important;
+}
+
+.agent-terminal-view [data-component="tool-output"][data-scrollable],
+.agent-terminal-view [data-slot="bash-scroll"] {
+  max-height: min(360px, 45vh) !important;
+  overflow: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--term-scrollbar) transparent !important;
+}
+
+.agent-terminal-view [data-component="tool-output"][data-scrollable]::-webkit-scrollbar,
+.agent-terminal-view [data-slot="bash-scroll"]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.agent-terminal-view [data-component="tool-output"][data-scrollable]::-webkit-scrollbar-thumb,
+.agent-terminal-view [data-slot="bash-scroll"]::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--term-scrollbar);
+}
+
+.agent-terminal-view [data-component="tool-output"] [data-component="markdown"] {
+  color: var(--text-base) !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+.agent-terminal-view [data-component="tool-output"] [data-component="markdown"] pre,
+.agent-terminal-view [data-component="tool-output"] pre,
+.agent-terminal-view [data-slot="bash-pre"] {
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.agent-terminal-view [data-component="tool-output"] [data-component="markdown"] code,
+.agent-terminal-view [data-component="tool-output"] pre,
+.agent-terminal-view [data-slot="bash-pre"] code {
+  font-family: var(--font-family-mono), ui-monospace, monospace !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+}
+
+.agent-terminal-view [data-component="bash-output"] [data-slot="bash-pre"] {
+  padding: 10px 12px !important;
+}
+
+.agent-terminal-view [data-component="bash-output"] [data-slot="bash-copy"] {
+  top: 6px !important;
+  right: 6px !important;
 }
 
 .agent-terminal-view [data-component="reasoning-part"] [data-component="markdown"] {
   margin-top: 0 !important;
   color: var(--terminal-agent-muted) !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
+  line-height: 1.55 !important;
 }
 
 .agent-terminal-view [data-component="reasoning-part"] [data-component="markdown"] p {
@@ -1644,9 +1926,11 @@ button {
 }
 
 .agent-terminal-view [data-component="reasoning-part"] [data-component="tool-output"] {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
   max-height: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 2px 0 0 !important;
 }
 
 /* Redesigned Premium HUD-style Error Cards */
@@ -1679,34 +1963,13 @@ button {
 
 
 
-.agent-terminal-view [data-component="tool-part-wrapper"],
-.agent-terminal-view [data-component="task-tool-card"],
-.agent-terminal-view [data-component="tool-trigger"] {
-  margin: 0 !important;
-  min-height: 0 !important;
-}
-
-.agent-terminal-view [data-slot="collapsible-trigger"] {
-  padding-top: 2px !important;
-  padding-bottom: 2px !important;
-}
-
 .agent-terminal-view [data-component="task-tool-card"] {
-  padding-top: 2px !important;
-  padding-bottom: 2px !important;
-}
-
-.agent-terminal-view [data-slot="basic-tool-tool-indicator"] svg,
-.agent-terminal-view [data-slot="basic-tool-tool-spinner"] svg,
-.agent-terminal-view [data-component="task-tool-action"] svg {
-  width: 13px !important;
-  height: 13px !important;
-}
-
-.agent-terminal-view [data-slot="basic-tool-tool-indicator"],
-.agent-terminal-view [data-slot="basic-tool-tool-spinner"] {
-  width: 15px !important;
-  height: 15px !important;
+  min-height: 28px !important;
+  gap: 7px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .agent-terminal-view [data-component="tool-trigger"]:has([data-component="task-tool-card"]) > [data-slot="basic-tool-tool-indicator"],
@@ -2181,6 +2444,41 @@ button {
     width: calc(100% - 24px) !important;
   }
 
+  .agent-terminal-view [data-component="context-tool-group"] {
+    padding-left: 14px;
+  }
+
+  .agent-terminal-view [data-component="context-tool-batch"] {
+    margin-left: -10px !important;
+    padding-left: 10px !important;
+  }
+
+  .agent-terminal-view [data-component="tool-part-wrapper"] {
+    padding-left: 8px;
+  }
+
+  .agent-terminal-view [data-component="tool-trigger"] {
+    align-items: flex-start !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+
+  .agent-terminal-view [data-slot="basic-tool-tool-info-main"] {
+    flex-wrap: wrap !important;
+    row-gap: 4px !important;
+  }
+
+  .agent-terminal-view [data-slot="basic-tool-tool-subtitle"],
+  .agent-terminal-view [data-slot="message-part-path"],
+  .agent-terminal-view [data-slot="message-part-directory"],
+  .agent-terminal-view [data-slot="basic-tool-tool-arg"] {
+    max-width: 100% !important;
+  }
+
+  .agent-terminal-view [data-slot="collapsible-content"] {
+    padding-left: 16px !important;
+  }
+
   .agent-terminal-session-controls {
     flex-wrap: wrap;
   }
@@ -2191,6 +2489,215 @@ button {
 
   .agent-terminal-session-meta-inline {
     margin-left: 0;
+  }
+}
+
+/* Codex-style compact activity rows for the agent timeline. */
+.agent-terminal-view [data-component="context-tool-group"] {
+  margin: 12px 0 !important;
+  padding-left: 0 !important;
+}
+
+.agent-terminal-view [data-component="context-tool-group"]::before,
+.agent-terminal-view [data-component="tool-part-wrapper"]::before,
+.agent-terminal-view [data-slot="context-tool-group-line"] {
+  display: none !important;
+}
+
+.agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-trigger"] {
+  border-radius: 6px !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-main"] {
+  min-height: 24px !important;
+  gap: 5px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: var(--text-weak) !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-main"]:hover {
+  background: transparent !important;
+  color: var(--text-base) !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-title"] {
+  gap: 6px !important;
+  color: var(--text-weak) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.agent-terminal-view [data-component="context-tool-group"][data-status="running"] [data-slot="context-tool-group-title"],
+.agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-trigger"][aria-expanded="true"] [data-slot="context-tool-group-title"] {
+  color: var(--text-base) !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-icon"] {
+  display: inline-flex !important;
+  width: 15px !important;
+  height: 15px !important;
+  flex: 0 0 15px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--text-weaker) !important;
+}
+
+.agent-terminal-view [data-slot="context-tool-group-icon"] [data-component="icon"],
+.agent-terminal-view [data-slot="context-tool-group-icon"] svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.agent-terminal-view [data-component="context-tool-batch"] {
+  margin: 3px 0 0 21px !important;
+  padding: 0 !important;
+  border-left: 0 !important;
+  gap: 1px !important;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"] {
+  margin: 0 !important;
+  padding-left: 0 !important;
+  border-radius: 6px !important;
+}
+
+.agent-terminal-view [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"] {
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.agent-terminal-view [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"]:hover,
+.agent-terminal-view [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"][aria-expanded="true"] {
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.agent-terminal-view [data-component="tool-trigger"] {
+  min-height: 23px !important;
+  gap: 6px !important;
+  padding: 0 !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-indicator"],
+.agent-terminal-view [data-slot="basic-tool-tool-spinner"] {
+  width: 15px !important;
+  height: 15px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-weaker) !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-indicator"] svg,
+.agent-terminal-view [data-slot="basic-tool-tool-spinner"] svg,
+.agent-terminal-view [data-component="task-tool-action"] svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-title"],
+.agent-terminal-view [data-component="task-tool-title"],
+.agent-terminal-view [data-slot="message-part-title-text"],
+.agent-terminal-view [data-slot="message-part-filename"] {
+  color: var(--text-weak) !important;
+  font-size: 13px !important;
+  font-weight: 450 !important;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="running"] [data-slot="basic-tool-tool-title"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="running"] [data-component="task-tool-title"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="pending"] [data-slot="basic-tool-tool-title"],
+.agent-terminal-view [data-component="tool-part-wrapper"][data-status="pending"] [data-component="task-tool-title"] {
+  color: var(--text-base) !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-subtitle"],
+.agent-terminal-view [data-slot="message-part-path"],
+.agent-terminal-view [data-slot="message-part-directory"],
+.agent-terminal-view [data-slot="basic-tool-tool-arg"] {
+  max-width: min(70vw, 680px) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-weaker) !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+  padding: 0 !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-tool-subtitle"].clickable:hover,
+.agent-terminal-view [data-slot="basic-tool-tool-subtitle"].subagent-link:hover {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--text-base) !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-duration"] {
+  color: var(--text-weaker) !important;
+  font-size: 11px !important;
+}
+
+.agent-terminal-view [data-slot="collapsible-arrow"] {
+  margin-left: 4px !important;
+  color: var(--text-weaker) !important;
+  opacity: 0.72 !important;
+}
+
+.agent-terminal-view [data-slot="collapsible-arrow-icon"],
+.agent-terminal-view [data-component="task-tool-action"] {
+  color: var(--text-weaker) !important;
+}
+
+.agent-terminal-view [data-slot="basic-tool-running-progress"] {
+  display: none !important;
+}
+
+.agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-content"] {
+  padding: 2px 0 0 !important;
+}
+
+.agent-terminal-view [data-component="tool-part-wrapper"] [data-slot="collapsible-content"] {
+  padding: 4px 0 8px 21px !important;
+}
+
+.agent-terminal-view [data-component="tool-output"],
+.agent-terminal-view [data-component="bash-output"] {
+  margin: 2px 0 7px !important;
+  border: 1px solid color-mix(in srgb, var(--border-weak-base) 76%, transparent) !important;
+  border-radius: 6px !important;
+  background: color-mix(in srgb, var(--surface-raised-base) 35%, transparent) !important;
+}
+
+.agent-terminal-view [data-component="tool-output"] {
+  padding: 8px 9px !important;
+}
+
+.agent-terminal-view [data-component="bash-output"] [data-slot="bash-pre"] {
+  padding: 9px 10px !important;
+}
+
+.agent-terminal-view [data-component="task-tool-card"] {
+  min-height: 23px !important;
+  gap: 6px !important;
+}
+
+@media (max-width: 720px) {
+  .agent-terminal-view [data-component="context-tool-batch"] {
+    margin-left: 21px !important;
+    padding-left: 0 !important;
+  }
+
+  .agent-terminal-view [data-component="tool-part-wrapper"] {
+    padding-left: 0 !important;
+  }
+
+  .agent-terminal-view [data-slot="basic-tool-tool-subtitle"],
+  .agent-terminal-view [data-slot="message-part-path"],
+  .agent-terminal-view [data-slot="message-part-directory"],
+  .agent-terminal-view [data-slot="basic-tool-tool-arg"] {
+    max-width: 100% !important;
   }
 }
 

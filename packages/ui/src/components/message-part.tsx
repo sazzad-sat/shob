@@ -322,43 +322,43 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
     case "read":
       return {
         icon: "glasses",
-        title: i18n.t("ui.tool.read"),
+        title: "Read",
         subtitle: input.filePath ? getFilename(input.filePath) : undefined,
       }
     case "list":
       return {
         icon: "bullet-list",
-        title: i18n.t("ui.tool.list"),
+        title: "Listed",
         subtitle: input.path ? getFilename(input.path) : undefined,
       }
     case "glob":
       return {
         icon: "magnifying-glass-menu",
-        title: i18n.t("ui.tool.glob"),
+        title: "Searched",
         subtitle: input.pattern,
       }
     case "grep":
       return {
         icon: "magnifying-glass-menu",
-        title: i18n.t("ui.tool.grep"),
+        title: "Searched",
         subtitle: input.pattern,
       }
     case "webfetch":
       return {
         icon: "window-cursor",
-        title: i18n.t("ui.tool.webfetch"),
+        title: "Fetched",
         subtitle: input.url,
       }
     case "websearch":
       return {
         icon: "window-cursor",
-        title: i18n.t("ui.tool.websearch"),
+        title: "Searched web",
         subtitle: input.query,
       }
     case "codesearch":
       return {
         icon: "code",
-        title: i18n.t("ui.tool.codesearch"),
+        title: "Searched code",
         subtitle: input.query,
       }
     case "task": {
@@ -375,25 +375,25 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
     case "bash":
       return {
         icon: "console",
-        title: "Execute",
+        title: "Ran",
         subtitle: input.description,
       }
     case "edit":
       return {
         icon: "code-lines",
-        title: i18n.t("ui.messagePart.title.edit"),
+        title: "Edited",
         subtitle: input.filePath ? getFilename(input.filePath) : undefined,
       }
     case "write":
       return {
         icon: "code-lines",
-        title: i18n.t("ui.messagePart.title.write"),
+        title: "Edited",
         subtitle: input.filePath ? getFilename(input.filePath) : undefined,
       }
     case "apply_patch":
       return {
         icon: "code-lines",
-        title: i18n.t("ui.tool.patch"),
+        title: "Edited",
         subtitle: input.files?.length
           ? `${input.files.length} ${i18n.t(input.files.length > 1 ? "ui.common.file.other" : "ui.common.file.one")}`
           : undefined,
@@ -674,6 +674,122 @@ function formatElapsed(ms: number) {
   return `${m}m ${s}s`
 }
 
+const INSPECT_TOOLS = new Set(["read", "list", "glob", "grep", "webfetch", "websearch", "codesearch"])
+
+function plural(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+function sentence(phrases: string[]) {
+  if (!phrases.length) return ""
+  const [first, ...rest] = phrases
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(", ")
+}
+
+function latestTools(parts: ToolPart[]) {
+  const latest = new Map<string, ToolPart>()
+  parts.forEach((part) => {
+    const key = keyOf(part)
+    const prev = latest.get(key)
+    if (!prev) {
+      latest.set(key, part)
+      return
+    }
+
+    const nextScore = scoreOf(part)
+    const prevScore = scoreOf(prev)
+    if (nextScore.at > prevScore.at || (nextScore.at === prevScore.at && nextScore.rank > prevScore.rank)) {
+      latest.set(key, part)
+    }
+  })
+  return [...latest.values()]
+}
+
+function toolInput(part: ToolPart): Record<string, any> {
+  return ((part.state as any).input ?? {}) as Record<string, any>
+}
+
+function toolMetadata(part: ToolPart): Record<string, any> {
+  return ((part.state as any).metadata ?? {}) as Record<string, any>
+}
+
+function editedFiles(part: ToolPart) {
+  const input = toolInput(part)
+  const metadata = toolMetadata(part)
+
+  if (part.tool === "apply_patch") {
+    const files = patchFiles(metadata.files)
+    if (files.length > 0) return files.map((file) => file.relativePath || file.filePath).filter(Boolean)
+
+    const inputFiles = input.files
+    if (Array.isArray(inputFiles)) {
+      return inputFiles.filter((file): file is string => typeof file === "string" && file.length > 0)
+    }
+  }
+
+  const path = metadata.filediff?.file || input.filePath
+  if (typeof path === "string" && path.length > 0) return [path]
+  if (part.tool === "edit" || part.tool === "write" || part.tool === "apply_patch") return [keyOf(part)]
+  return []
+}
+
+function summarizeContextTools(parts: ToolPart[], fallbackCount: number, active: boolean) {
+  const latest = latestTools(parts)
+  const edited = new Set<string>()
+  let commands = 0
+  let inspected = 0
+  let agents = 0
+  let questions = 0
+  let skills = 0
+  let other = 0
+
+  for (const part of latest) {
+    if (part.tool === "bash") {
+      commands++
+      continue
+    }
+
+    if (part.tool === "edit" || part.tool === "write" || part.tool === "apply_patch") {
+      editedFiles(part).forEach((file) => edited.add(file))
+      continue
+    }
+
+    if (INSPECT_TOOLS.has(part.tool)) {
+      inspected++
+      continue
+    }
+
+    if (part.tool === "task") {
+      agents++
+      continue
+    }
+
+    if (part.tool === "question") {
+      questions++
+      continue
+    }
+
+    if (part.tool === "skill") {
+      skills++
+      continue
+    }
+
+    other++
+  }
+
+  const phrases: string[] = []
+  if (edited.size > 0) phrases.push(`${active ? "editing" : "edited"} ${plural(edited.size, "file")}`)
+  if (commands > 0) phrases.push(`${active ? "running" : "ran"} ${plural(commands, "command")}`)
+  if (inspected > 0) phrases.push(`${active ? "inspecting" : "inspected"} ${plural(inspected, "item")}`)
+  if (agents > 0) phrases.push(`${active ? "using" : "used"} ${plural(agents, "agent")}`)
+  if (questions > 0) phrases.push(`${active ? "asking" : "answered"} ${plural(questions, "question")}`)
+  if (skills > 0) phrases.push(`${active ? "loading" : "loaded"} ${plural(skills, "skill")}`)
+  if (other > 0) phrases.push(`${active ? "using" : "used"} ${plural(other, "tool")}`)
+
+  const fallback = latest.length || fallbackCount
+  return sentence(phrases) || (active ? "Working" : `Used ${plural(fallback, "tool")}`)
+}
+
 const DOTS_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
 
 function DotsSpinner(props: { class?: string }) {
@@ -753,45 +869,26 @@ function ContextTools(props: {
     setOpen(next)
   }
 
-  const counts = createMemo(() => {
-    const summary: Record<string, number> = {}
-    for (const t of props.tools) {
-      if (t && t.tool) {
-        summary[t.tool] = (summary[t.tool] || 0) + 1
-      }
-    }
-    return summary
-  })
+  const summary = createMemo(() => summarizeContextTools(props.tools, props.count, props.running()))
 
   return (
     <Collapsible
       open={open()}
       onOpenChange={change}
       data-component="context-tool-group"
-      data-status={busy() ? "running" : "completed"}
+      data-status={props.running() ? "running" : "completed"}
+      aria-label={`${summary()}${props.span() ? `, ${elapsed()}` : ""}`}
     >
       <Collapsible.Trigger>
         <div data-slot="context-tool-group-trigger">
           <div data-slot="context-tool-group-main">
             <span data-slot="context-tool-group-title">
+              <span data-slot="context-tool-group-icon">
+                <Icon name={props.running() ? "terminal-active" : "terminal"} size="small" />
+              </span>
+              <span>{summary()}</span>
               <Show when={props.running()}>
-                <span data-slot="context-tool-group-glow" />
-              </Show>
-              <Show
-                when={busy()}
-                fallback={
-                  <>
-                    Explored
-                    <span class="tabular-nums ml-1 inline-block">{elapsed()}</span>
-                  </>
-                }
-              >
-                Exploring
                 <DotsSpinner class="text-[14px] leading-none text-icon-interactive-base font-mono ml-1.5" />
-              </Show>
-              <Show when={props.count > 0}>
-                <span style="opacity: 0.4; margin: 0 6px;">·</span>
-                <span style="opacity: 0.6;">{props.count} step{props.count === 1 ? "" : "s"}</span>
               </Show>
             </span>
             <Collapsible.Arrow />
@@ -1715,7 +1812,7 @@ ToolRegistry.register({
           icon="glasses"
           filePath={props.input.filePath}
           trigger={{
-            title: i18n.t("ui.tool.read"),
+            title: "Read",
             subtitle: pathLine(),
             args,
           }}
@@ -1738,13 +1835,12 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "list",
   render(props) {
-    const i18n = useI18n()
     const path = props.input.path || "/"
     return (
       <BasicTool
         {...props}
         icon="bullet-list"
-        trigger={{ title: i18n.t("ui.tool.list"), subtitle: "(" + path + ")" }}
+        trigger={{ title: "Listed", subtitle: path }}
       >
         <Show when={props.output}>
           <div data-component="tool-output" data-scrollable>
@@ -1759,16 +1855,14 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "glob",
   render(props) {
-    const i18n = useI18n()
     const pat = props.input.pattern
-    const sub =
-      typeof pat === "string" && pat ? "(" + pat + ")" : "(" + (props.input.path || "/") + ")"
+    const sub = typeof pat === "string" && pat ? pat : props.input.path || "/"
     return (
       <BasicTool
         {...props}
         icon="magnifying-glass-menu"
         trigger={{
-          title: i18n.t("ui.tool.glob"),
+          title: "Searched",
           subtitle: sub,
         }}
       >
@@ -1785,7 +1879,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "grep",
   render(props) {
-    const i18n = useI18n()
     const detail = createMemo(() => {
       const bits: string[] = []
       if (props.input.pattern) bits.push('"' + props.input.pattern + '"')
@@ -1794,14 +1887,14 @@ ToolRegistry.register({
       if (dir) bits.push("in " + dir)
       if (props.input.include) bits.push("glob: " + props.input.include)
       if (!bits.length) return ""
-      return "(" + bits.join(", ") + ")"
+      return bits.join(", ")
     })
     return (
       <BasicTool
         {...props}
         icon="magnifying-glass-menu"
         trigger={{
-          title: i18n.t("ui.tool.grep"),
+          title: "Searched",
           subtitle: detail(),
         }}
       >
@@ -1818,7 +1911,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "webfetch",
   render(props) {
-    const i18n = useI18n()
     const pending = createMemo(() => props.status === "pending" || props.status === "running")
     const url = createMemo(() => {
       const value = props.input.url
@@ -1834,7 +1926,7 @@ ToolRegistry.register({
           <div data-slot="basic-tool-tool-info-structured">
             <div data-slot="basic-tool-tool-info-main">
               <span data-slot="basic-tool-tool-title">
-                <TextShimmer text={i18n.t("ui.tool.webfetch")} active={pending()} />
+                <TextShimmer text={pending() ? "Fetching" : "Fetched"} active={pending()} />
               </span>
               <Show when={!pending() && url()}>
                 <a
@@ -1864,7 +1956,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "websearch",
   render(props) {
-    const i18n = useI18n()
     const query = createMemo(() => {
       const value = props.input.query
       if (typeof value !== "string") return ""
@@ -1876,7 +1967,7 @@ ToolRegistry.register({
         {...props}
         icon="window-cursor"
         trigger={{
-          title: i18n.t("ui.tool.websearch"),
+          title: "Searched web",
           subtitle: query(),
           subtitleClass: "exa-tool-query",
         }}
@@ -1890,7 +1981,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "codesearch",
   render(props) {
-    const i18n = useI18n()
     const query = createMemo(() => {
       const value = props.input.query
       if (typeof value !== "string") return ""
@@ -1902,7 +1992,7 @@ ToolRegistry.register({
         {...props}
         icon="code"
         trigger={{
-          title: i18n.t("ui.tool.codesearch"),
+          title: "Searched code",
           subtitle: query(),
           subtitleClass: "exa-tool-query",
         }}
@@ -2024,8 +2114,8 @@ ToolRegistry.register({
         {...props}
         icon="console"
         trigger={{
-          title: "Execute",
-          subtitle: cmd() ? `(${cmd()})` : undefined,
+          title: pending() ? "Running" : "Ran",
+          subtitle: cmd() || undefined,
         }}
       >
         <div data-component="bash-output">
@@ -2059,7 +2149,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "edit",
   render(props) {
-    const i18n = useI18n()
     const fileComponent = useFileComponent()
     const diagnostics = createMemo(() => getDiagnostics(props.metadata.diagnostics, props.input.filePath))
     const path = createMemo(() => props.metadata?.filediff?.file || props.input.filePath || "")
@@ -2076,7 +2165,7 @@ ToolRegistry.register({
           additions={additions()}
           deletions={deletions()}
           trigger={{
-            title: i18n.t("ui.messagePart.title.edit"),
+            title: "Edited",
             subtitle: filename(),
           }}
         >
@@ -2115,7 +2204,6 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "write",
   render(props) {
-    const i18n = useI18n()
     const fileComponent = useFileComponent()
     const diagnostics = createMemo(() => getDiagnostics(props.metadata.diagnostics, props.input.filePath))
     const path = createMemo(() => props.input.filePath || "")
@@ -2128,7 +2216,7 @@ ToolRegistry.register({
           defer
           filePath={props.input.filePath}
           trigger={{
-            title: i18n.t("ui.messagePart.title.write"),
+            title: "Edited",
             subtitle: filename(),
           }}
         >
@@ -2194,7 +2282,7 @@ ToolRegistry.register({
               icon="code-lines"
               defer
               trigger={{
-                title: i18n.t("ui.tool.patch"),
+                title: "Edited",
                 subtitle: subtitle(),
               }}
             >
@@ -2289,7 +2377,7 @@ ToolRegistry.register({
             additions={single()!.additions}
             deletions={single()!.deletions}
             trigger={{
-              title: i18n.t("ui.tool.patch"),
+              title: "Edited",
               subtitle: getFilename(single()!.relativePath),
             }}
           >

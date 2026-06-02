@@ -21,6 +21,7 @@ import { Button } from "@opencode-ai/ui/button"
 import { formatError } from "@/pages/error"
 import { useStore } from "../store"
 import { nativeApi } from "@/services/native"
+import { useSettings } from "@/context/settings"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { Card, CardDescription, CardTitle } from "@opencode-ai/ui/card"
 import { SessionRetry } from "@opencode-ai/ui/session-retry"
@@ -336,6 +337,7 @@ function AgentViewInner(props: AgentViewProps) {
   const sdk = useSDK()
   const params = useParams()
   const navigate = useNavigate()
+  const settings = useSettings()
   const activeSidebarSessionId = useStore((s) => s.activeSessionId)
   const setActiveSidebarSession = useStore((s) => s.setActiveSession)
   const projects = useStore((s) => s.projects)
@@ -909,12 +911,12 @@ function AgentViewInner(props: AgentViewProps) {
                                     >
                                       <AssistantParts
                                         messages={assistants() as any}
-                                        showReasoningSummaries={true}
+                                        showReasoningSummaries={settings.general.showReasoningSummaries()}
                                         working={working() && latestTurn()}
                                         turnDurationMs={turnDurationMs(message, assistants())}
                                         showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
-                                        shellToolDefaultOpen={false}
-                                        editToolDefaultOpen={false}
+                                        shellToolDefaultOpen={settings.general.shellToolPartsExpanded()}
+                                        editToolDefaultOpen={settings.general.editToolPartsExpanded()}
                                       />
                                     </div>
                                   </Show>
@@ -951,7 +953,11 @@ function AgentViewInner(props: AgentViewProps) {
                         <div data-component="session-turn" class="relative min-w-0 w-full">
                           <div data-slot="session-turn-message-container" class="w-full">
                             <div data-slot="session-turn-assistant-content">
-                              <Message message={message} parts={getParts(message.id)} showReasoningSummaries={true} />
+                              <Message
+                                message={message}
+                                parts={getParts(message.id)}
+                                showReasoningSummaries={settings.general.showReasoningSummaries()}
+                              />
                             </div>
                             <Show when={assistantMessageError(message)} keyed>
                               {(error) => <AgentTurnError error={error} />}
