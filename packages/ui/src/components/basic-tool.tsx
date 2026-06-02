@@ -1,4 +1,4 @@
-import { createEffect, For, Match, on, onCleanup, Show, Switch, type JSX } from "solid-js"
+import { createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch, type JSX } from "solid-js"
 import { animate, type AnimationPlaybackControls } from "motion"
 import { useI18n } from "../context/i18n"
 import { createStore } from "solid-js/store"
@@ -51,6 +51,29 @@ export interface BasicToolProps {
 }
 
 const SPRING = { type: "spring" as const, visualDuration: 0.35, bounce: 0 }
+
+const DOTS_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
+
+function DotsSpinner(props: { class?: string }) {
+  const [frame, setFrame] = createSignal(0)
+  let timer: number | undefined
+
+  onMount(() => {
+    timer = window.setInterval(() => {
+      setFrame((prev) => (prev + 1) % DOTS_FRAMES.length)
+    }, 80)
+  })
+
+  onCleanup(() => {
+    if (timer) window.clearInterval(timer)
+  })
+
+  return (
+    <span class={props.class} aria-hidden="true">
+      {DOTS_FRAMES[frame()]}
+    </span>
+  )
+}
 
 export function BasicTool(props: BasicToolProps) {
   const [state, setState] = createStore({
@@ -167,7 +190,7 @@ export function BasicTool(props: BasicToolProps) {
         </span>
       }>
         <span data-slot="basic-tool-tool-spinner">
-          <Spinner />
+          <DotsSpinner class="text-[14px] leading-none text-icon-interactive-base font-mono" />
         </span>
       </Show>
       <div data-slot="basic-tool-tool-trigger-content">

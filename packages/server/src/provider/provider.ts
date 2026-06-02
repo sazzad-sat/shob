@@ -57,6 +57,7 @@ import { GoogleAuth } from "google-auth-library"
 import { ProviderTransform } from "./transform"
 import { Installation } from "../installation"
 import { ModelID, ProviderID } from "./schema"
+import { ProviderError } from "./error"
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })
@@ -844,6 +845,11 @@ export namespace Provider {
             }
             return sdk.languageModel(id)
           },
+        }),
+      qoder: () =>
+        Effect.succeed({
+          autoload: false,
+          options: {},
         }),
     }
   }

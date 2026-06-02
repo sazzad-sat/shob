@@ -674,6 +674,25 @@ function formatElapsed(ms: number) {
   return `${m}m ${s}s`
 }
 
+const DOTS_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
+
+function DotsSpinner(props: { class?: string }) {
+  const [frame, setFrame] = createSignal(0)
+
+  onMount(() => {
+    const timer = window.setInterval(() => {
+      setFrame((prev) => (prev + 1) % DOTS_FRAMES.length)
+    }, 80)
+    onCleanup(() => window.clearInterval(timer))
+  })
+
+  return (
+    <span class={props.class} aria-hidden="true">
+      {DOTS_FRAMES[frame()]}
+    </span>
+  )
+}
+
 function ContextTools(props: {
   running: () => boolean
   generating?: () => boolean
@@ -683,7 +702,7 @@ function ContextTools(props: {
   children: JSX.Element
 }) {
   const [open, setOpen] = createSignal(true)
-  const [busy, setBusy] = createSignal(props.running())
+  const [busy, setBusy] = createSignal(props.running() || !!props.generating?.())
   const [now, setNow] = createSignal(Date.now())
   let settle: ReturnType<typeof setTimeout> | undefined
 
@@ -758,7 +777,18 @@ function ContextTools(props: {
               <Show when={props.running()}>
                 <span data-slot="context-tool-group-glow" />
               </Show>
-              Worked for <span class="tabular-nums ml-1 inline-block">{elapsed()}</span>
+              <Show
+                when={busy()}
+                fallback={
+                  <>
+                    Explored
+                    <span class="tabular-nums ml-1 inline-block">{elapsed()}</span>
+                  </>
+                }
+              >
+                Exploring
+                <DotsSpinner class="text-[14px] leading-none text-icon-interactive-base font-mono ml-1.5" />
+              </Show>
               <Show when={props.count > 0}>
                 <span style="opacity: 0.4; margin: 0 6px;">·</span>
                 <span style="opacity: 0.6;">{props.count} step{props.count === 1 ? "" : "s"}</span>
@@ -811,7 +841,7 @@ export function AssistantParts(props: {
 
   return (
     <Index each={grouped()}>
-      {(entryAccessor) => {
+      {(entryAccessor, index) => {
         const entryType = createMemo(() => entryAccessor().type)
 
         return (
@@ -838,7 +868,7 @@ export function AssistantParts(props: {
                       return (
                         <ContextTools
                           running={() => stats().running}
-                          generating={() => !!props.working}
+                          generating={() => !!props.working && index === grouped().length - 1}
                           span={() => stats().span}
                           count={toolsList().length}
                           tools={toolsList()}
@@ -987,7 +1017,7 @@ export function AssistantMessageDisplay(props: {
 
   return (
     <Index each={grouped()}>
-      {(entryAccessor) => {
+      {(entryAccessor, index) => {
         const entryType = createMemo(() => entryAccessor().type)
 
         return (
@@ -1014,7 +1044,7 @@ export function AssistantMessageDisplay(props: {
                       return (
                         <ContextTools
                           running={() => stats().running}
-                          generating={() => typeof props.message.time.completed !== "number"}
+                          generating={() => typeof props.message.time.completed !== "number" && index === grouped().length - 1}
                           span={() => stats().span}
                           count={toolsList().length}
                           tools={toolsList()}

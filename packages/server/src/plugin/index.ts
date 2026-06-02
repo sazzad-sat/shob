@@ -11,6 +11,7 @@ import { CopilotAuthPlugin } from "./github-copilot/copilot"
 import { KiloAuthPlugin } from "./kilo"
 import { AntigravityAuthPlugin } from "./antigravity"
 import { XaiAuthPlugin } from "./xai"
+import { QoderAuthPlugin } from "./qoder"
 import { gitlabAuthPlugin as GitlabAuthPlugin } from "opencode-gitlab-auth"
 import { PoeAuthPlugin } from "opencode-poe-auth"
 import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cloudflare"
@@ -55,6 +56,7 @@ export namespace Plugin {
     CodexAuthPlugin,
     AntigravityAuthPlugin,
     XaiAuthPlugin,
+    QoderAuthPlugin,
     KiloAuthPlugin,
     CopilotAuthPlugin,
     GitlabAuthPlugin,
