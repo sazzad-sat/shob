@@ -54,6 +54,12 @@ jobs:
           elif [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
             tag="${{ github.event.release.tag_name }}"
             should_release="true"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+              should_release="true"
+            else
+              echo "Tag ${tag} does not exist. Push main or publish a release first."
+            fi
           fi
 
           echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
@@ -72,9 +78,26 @@ jobs:
   build:
     needs: prepare-release
     if: needs.prepare-release.outputs.should_release == 'true'
+    name: Build ${{ matrix.name }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - name: Windows x64 + ARM64
+            os: windows-latest
+            artifact: windows
+            builder_args: "--win --x64 --arm64"
+            native_targets: "win32:arm64"
+          - name: macOS x64 + ARM64 + universal
+            os: macos-latest
+            artifact: macos
+            builder_args: "--mac --x64 --arm64 --universal"
+            native_targets: "darwin:x64"
+          - name: Linux x64 packages
+            os: ubuntu-latest
+            artifact: linux
+            builder_args: "--linux --x64"
+            native_targets: ""
     
     runs-on: ${{ matrix.os }}
     
@@ -109,12 +132,27 @@ jobs:
           
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2
+          sudo apt-get install -y libfuse2 fakeroot rpm dpkg xz-utils zstd || sudo apt-get install -y libfuse2t64 fakeroot rpm dpkg xz-utils zstd
           
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
+
+      - name: Install cross-arch native dependencies
+        if: matrix.native_targets != ''
+        shell: bash
+        env:
+          NATIVE_TARGETS: ${{ matrix.native_targets }}
+        run: |
+          while IFS=: read -r target_os target_cpu; do
+            if [[ -z "${target_os}" || -z "${target_cpu}" ]]; then
+              continue
+            fi
+            echo "Installing native optional dependencies for ${target_os}-${target_cpu}"
+            bun install --frozen-lockfile --os="${target_os}" --cpu="${target_cpu}"
+          done <<< "${NATIVE_TARGETS}"
 
       - name: Validate release version
         shell: bash
@@ -127,19 +165,35 @@ jobs:
           fi
         
       - name: Build Electron app
-        run: bun run build:electron
+        run: bun run build:electron -- ${{ matrix.builder_args }}
+
+      - name: Add default Windows portable alias
+        if: matrix.artifact == 'windows'
+        shell: pwsh
+        run: |
+          $portable = Get-ChildItem -Path release -Filter "shob-Portable-x64.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($portable) {
+            Copy-Item -LiteralPath $portable.FullName -Destination (Join-Path $portable.DirectoryName "shob-Portable.exe") -Force
+          } else {
+            Write-Host "No x64 portable executable found for shob-Portable.exe alias."
+          }
           
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-${{ matrix.os }}
+          name: app-release-${{ matrix.artifact }}
           path: |
             release/*.exe
             release/*.exe.blockmap
+            release/*.msi
             release/*.dmg
             release/*.dmg.blockmap
             release/*.AppImage
             release/*.AppImage.blockmap
+            release/*.deb
+            release/*.rpm
+            release/*.pacman
+            release/*.pkg.tar.*
             release/*.zip
             release/*.zip.blockmap
             release/*.tar.gz
@@ -163,10 +217,15 @@ jobs:
             $_.Name -like "latest*.yml" -or
             $_.Name -like "*.exe" -or
             $_.Name -like "*.exe.blockmap" -or
+            $_.Name -like "*.msi" -or
             $_.Name -like "*.dmg" -or
             $_.Name -like "*.dmg.blockmap" -or
             $_.Name -like "*.AppImage" -or
             $_.Name -like "*.AppImage.blockmap" -or
+            $_.Name -like "*.deb" -or
+            $_.Name -like "*.rpm" -or
+            $_.Name -like "*.pacman" -or
+            $_.Name -like "*.pkg.tar.*" -or
             $_.Name -like "*.zip" -or
             $_.Name -like "*.zip.blockmap" -or
             $_.Name -like "*.tar.gz" -or
