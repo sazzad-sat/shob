@@ -72,16 +72,16 @@ const SidebarActionButton = (props: {
   return (
     <button
       type="button"
-      class={`group/action flex h-8 w-full items-center gap-3 rounded-md px-3 text-left text-[13px] transition-colors ${
+      class={`group/action flex h-9 w-full items-center gap-3 rounded-md px-3 text-left text-[14px] font-medium transition-colors ${
         props.active
-          ? "bg-surface-raised-base text-text-strong"
+          ? "bg-surface-raised-base text-text-strong ring-1 ring-border-weak-base"
           : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
       }`}
       title={props.title ?? props.label}
       onClick={props.onClick}
     >
       <span class="relative flex size-4 shrink-0 items-center justify-center text-text-weak group-hover/action:text-text-strong">
-        <Icon size={15} />
+        <Icon size={16} />
         <Show when={props.mobileDot}>
           <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-text-interactive-base ring-2 ring-background-stronger" />
         </Show>
@@ -952,29 +952,31 @@ export function Sidebar(props: {
           onResize={(clientX) => setSidebarWidth(Math.max(240, Math.min(460, clientX)))}
         />
         <div class="relative flex h-full max-h-full flex-col bg-background-stronger select-none">
-          <div class="custom-scrollbar flex-1 overflow-y-auto">
-            <div class="flex flex-col gap-0.5 px-1.5 pb-4 pt-2">
-              <nav class="mb-3 flex flex-col gap-1 px-0.5">
-                <SidebarActionButton
-                  label="New chat"
-                  title="Start a new chat"
-                  icon={SquarePen}
-                  onClick={handleCreateNewChat}
-                />
-                <SidebarActionButton
-                  label="Search"
-                  title="Search projects and chats"
-                  icon={Search}
-                  onClick={() => setSearchOpen(true)}
-                />
-                <SidebarActionButton
-                  label="Settings"
-                  title="Open settings"
-                  icon={Settings}
-                  onClick={handleOpenSettings}
-                />
-              </nav>
+          <div class="sticky top-0 z-20 shrink-0 bg-background-stronger/95 px-2 py-2.5 backdrop-blur">
+            <nav class="flex flex-col gap-1">
+              <SidebarActionButton
+                label="New chat"
+                title="Start a new chat"
+                icon={SquarePen}
+                onClick={handleCreateNewChat}
+              />
+              <SidebarActionButton
+                label="Search"
+                title="Search projects and chats"
+                icon={Search}
+                onClick={() => setSearchOpen(true)}
+              />
+              <SidebarActionButton
+                label="Settings"
+                title="Open settings"
+                icon={Settings}
+                onClick={handleOpenSettings}
+              />
+            </nav>
+          </div>
 
+          <div class="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+            <div class="flex flex-col gap-0.5 px-1.5 pb-4 pt-2">
               <Show when={pinnedSessionHits().length > 0}>
                 <div class="mb-2">
                   <SidebarSectionTitle>Pinned</SidebarSectionTitle>

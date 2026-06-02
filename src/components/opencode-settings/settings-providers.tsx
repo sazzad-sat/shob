@@ -1,7 +1,6 @@
 import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
-import { Tag } from "@opencode-ai/ui/tag"
 import { showToast } from "@opencode-ai/ui/toast"
 import { popularProviders, useProviders } from "@/hooks/use-providers"
 import { createMemo, type Component, For, Show, type JSX } from "solid-js"
@@ -12,83 +11,115 @@ import { DialogConnectProvider } from "./dialog-connect-provider"
 import { DialogSelectProvider } from "./dialog-select-provider"
 import { DialogCustomProvider } from "./dialog-custom-provider"
 import { DialogOpenAICompatible } from "./dialog-openai-compatible"
+import { iconNames } from "../../../packages/ui/src/components/provider-icons/types"
 
 type ProviderSource = "env" | "api" | "config" | "custom"
 type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
+const POPULAR_PROVIDER_LIMIT = 24
 
-const PROVIDER_NOTES = [
-  { match: (id: string) => id === "opencode", key: "dialog.provider.opencode.note" },
-  { match: (id: string) => id === "opencode-go", key: "dialog.provider.opencodeGo.tagline" },
-  { match: (id: string) => id === "anthropic", key: "dialog.provider.anthropic.note" },
-  { match: (id: string) => id.startsWith("github-copilot"), key: "dialog.provider.copilot.note" },
-  { match: (id: string) => id === "openai", key: "dialog.provider.openai.note" },
-  { match: (id: string) => id === "xai", key: "dialog.provider.xai.note" },
-  { match: (id: string) => id === "google", key: "dialog.provider.google.note" },
-  { match: (id: string) => id === "antigravity", key: "dialog.provider.google.note" },
-  { match: (id: string) => id === "openrouter", key: "dialog.provider.openrouter.note" },
-  { match: (id: string) => id === "vercel", key: "dialog.provider.vercel.note" },
-] as const
+const providerRank = (id: string) => {
+  const rank = popularProviders.indexOf(id)
+  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank
+}
 
-const Section: Component<{ title: string; children: JSX.Element }> = (props) => (
-  <div class="flex flex-col gap-3">
-    <h2 class="text-13-semibold text-text-strong px-1">{props.title}</h2>
-    <div>{props.children}</div>
-  </div>
+const Section: Component<{ title: string; children: JSX.Element; action?: JSX.Element }> = (props) => (
+  <section class="space-y-4 sm:space-y-5">
+    <div class="flex min-h-9 flex-wrap items-center justify-between gap-3">
+      <h2 class="text-lg font-semibold leading-7 text-foreground sm:text-[21px]">{props.title}</h2>
+      {props.action}
+    </div>
+    {props.children}
+  </section>
 )
 
 const providerName = (item: { id: string; name: string }) => (item.id === "xai" ? "xAI (Grok)" : item.name)
 
+const hasProviderIcon = (id: string) => id === "antigravity" || iconNames.includes(id as (typeof iconNames)[number])
+
+const initials = (value: string) => {
+  const parts = value.split(/[^a-z0-9]+/i).filter(Boolean)
+  const text = parts.length > 1 ? parts.slice(0, 2).map((part) => part[0]).join("") : (parts[0] ?? value).slice(0, 2)
+  return text.toUpperCase()
+}
+
+const ReadyPill: Component<{ label: string }> = (props) => (
+  <span class="mt-1 inline-flex h-5 items-center gap-1.5 rounded-md bg-emerald-500/15 px-2 text-[12px] font-semibold leading-none text-emerald-400">
+    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+    {props.label}
+  </span>
+)
+
+const ProviderMark: Component<{ id: string; label: string }> = (props) => (
+  <Show
+    when={hasProviderIcon(props.id)}
+    fallback={
+      <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted text-[11px] font-semibold text-foreground">
+        {initials(props.label)}
+      </span>
+    }
+  >
+    <ProviderIcon id={props.id} class="size-8 shrink-0" />
+  </Show>
+)
+
 const ConnectedRow: Component<{
   item: ProviderItem
-  type: string
+  connectedLabel: string
   canDisconnect: boolean
   onDisconnect: () => void
   disconnectHint: string
   disconnectLabel: string
 }> = (props) => (
-  <div class="rounded-lg border border-border-weak-base bg-surface-base p-3 h-full">
-    <div class="flex items-center gap-3 min-w-0">
-      <ProviderIcon id={props.item.id} class="size-5 shrink-0 icon-strong-base" />
-      <span class="text-13-medium text-text-strong truncate flex-1">{providerName(props.item)}</span>
-      <Tag>{props.type}</Tag>
-    </div>
-    <div class="mt-2.5 flex items-center justify-end">
-      <Show
-        when={props.canDisconnect}
-        fallback={<span class="text-12-regular text-text-weak">{props.disconnectHint}</span>}
+  <div class="group grid min-h-[72px] min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 rounded-xl border border-border/70 bg-card/60 px-3.5 py-3 text-left shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_5%,transparent)] transition-colors hover:border-border hover:bg-accent/55 sm:px-4">
+    <ProviderMark id={props.item.id} label={providerName(props.item)} />
+    <span class="min-w-0">
+      <span class="block whitespace-normal break-words text-[16px] font-semibold leading-5 text-foreground">{providerName(props.item)}</span>
+      <ReadyPill label={props.connectedLabel} />
+    </span>
+    <Show
+      when={props.canDisconnect}
+      fallback={<span class="max-w-[150px] justify-self-end text-right text-[12px] font-medium leading-4 text-muted-foreground">{props.disconnectHint}</span>}
+    >
+      <Button
+        size="small"
+        variant="ghost"
+        class="justify-self-end rounded-lg border border-border/70 bg-background/45 px-3 text-foreground hover:bg-muted"
+        onClick={props.onDisconnect}
       >
-        <Button size="small" variant="ghost" onClick={props.onDisconnect}>
-          {props.disconnectLabel}
-        </Button>
-      </Show>
-    </div>
+        {props.disconnectLabel}
+      </Button>
+    </Show>
   </div>
 )
 
 const PopularRow: Component<{
   item: { id: string; name: string }
-  note?: string
   showRecommended?: boolean
   onConnect: () => void
   connectLabel: string
   recommendedLabel: string
 }> = (props) => (
-  <div class="rounded-lg border border-border-weak-base bg-surface-base p-3 h-full min-h-[96px]">
-    <div class="flex items-start justify-between gap-3 min-w-0">
-      <div class="flex items-center gap-x-2.5 min-w-0 flex-1">
-        <ProviderIcon id={props.item.id} class="size-5 shrink-0 icon-strong-base" />
-        <span class="text-13-medium text-text-strong truncate min-w-0">{providerName(props.item)}</span>
+  <div class="group grid min-h-[64px] min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 rounded-xl border border-border/70 bg-card/60 px-3.5 py-3 text-left shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_5%,transparent)] transition-colors hover:border-border hover:bg-accent/55 sm:px-4">
+    <ProviderMark id={props.item.id} label={providerName(props.item)} />
+    <span class="min-w-0">
+      <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <span class="whitespace-normal break-words text-[16px] font-semibold leading-5 text-foreground">{providerName(props.item)}</span>
         <Show when={props.showRecommended}>
-          <Tag class="hidden sm:inline-flex shrink-0">{props.recommendedLabel}</Tag>
+          <span class="inline-flex shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground">
+            {props.recommendedLabel}
+          </span>
         </Show>
-      </div>
-      <Button size="small" variant="secondary" icon="plus-small" class="shrink-0" onClick={props.onConnect}>
-        {props.connectLabel}
-      </Button>
-    </div>
-    <Show when={props.note}>
-      <span class="text-12-regular text-text-weak mt-2 line-clamp-2 block">{props.note}</span>
-    </Show>
+      </span>
+    </span>
+    <Button
+      size="small"
+      variant="secondary"
+      icon="plus-small"
+      aria-label={props.connectLabel}
+      title={props.connectLabel}
+      class="size-8 justify-self-end rounded-lg border border-border/70 bg-background/45 p-0 text-foreground hover:bg-muted"
+      onClick={props.onConnect}
+    />
   </div>
 )
 
@@ -96,22 +127,28 @@ const SimpleTopActionCard: Component<{
   iconId: string
   title: string
   tag: string
-  description: string
   onConnect: () => void
   connectLabel: string
 }> = (props) => (
-  <div class="rounded-lg border border-border-weak-base bg-surface-base p-3 h-full min-h-[96px]">
-    <div class="flex items-start justify-between gap-3">
-      <div class="flex items-center gap-x-2.5 min-w-0 flex-1">
-        <ProviderIcon id={props.iconId} class="size-5 shrink-0 icon-strong-base" />
-        <span class="text-13-medium text-text-strong truncate min-w-0">{props.title}</span>
-        <Tag class="hidden sm:inline-flex shrink-0">{props.tag}</Tag>
-      </div>
-      <Button size="small" variant="secondary" icon="plus-small" class="shrink-0" onClick={props.onConnect}>
-        {props.connectLabel}
-      </Button>
-    </div>
-    <span class="text-12-regular text-text-weak mt-2 line-clamp-2 block">{props.description}</span>
+  <div class="group grid min-h-[64px] min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 rounded-xl border border-border/70 bg-card/60 px-3.5 py-3 text-left shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_5%,transparent)] transition-colors hover:border-border hover:bg-accent/55 sm:px-4">
+    <ProviderMark id={props.iconId} label={props.title} />
+    <span class="min-w-0">
+      <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <span class="whitespace-normal break-words text-[16px] font-semibold leading-5 text-foreground">{props.title}</span>
+        <span class="inline-flex shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground">
+          {props.tag}
+        </span>
+      </span>
+    </span>
+    <Button
+      size="small"
+      variant="secondary"
+      icon="plus-small"
+      aria-label={props.connectLabel}
+      title={props.connectLabel}
+      class="size-8 justify-self-end rounded-lg border border-border/70 bg-background/45 p-0 text-foreground hover:bg-muted"
+      onClick={props.onConnect}
+    />
   </div>
 )
 
@@ -131,11 +168,15 @@ export const SettingsProviders: Component = () => {
   const popular = createMemo(() => {
     const connectedIDs = new Set(connected().map((p) => p.id))
     const items = providers
-      .popular()
+      .all()
       .filter((p) => !connectedIDs.has(p.id))
       .slice()
-    items.sort((a, b) => popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id))
-    return items
+    items.sort((a, b) => {
+      const rank = providerRank(a.id) - providerRank(b.id)
+      if (rank !== 0) return rank
+      return providerName(a).localeCompare(providerName(b))
+    })
+    return items.slice(0, POPULAR_PROVIDER_LIMIT)
   })
 
   const source = (item: ProviderItem): ProviderSource | undefined => {
@@ -145,21 +186,7 @@ export const SettingsProviders: Component = () => {
     return
   }
 
-  const type = (item: ProviderItem) => {
-    const current = source(item)
-    if (current === "env") return language.t("settings.providers.tag.environment")
-    if (current === "api") return language.t("provider.connect.method.apiKey")
-    if (current === "config") {
-      if (isConfigCustom(item.id)) return language.t("settings.providers.tag.custom")
-      return language.t("settings.providers.tag.config")
-    }
-    if (current === "custom") return language.t("settings.providers.tag.custom")
-    return language.t("settings.providers.tag.other")
-  }
-
   const canDisconnect = (item: ProviderItem) => source(item) !== "env"
-
-  const note = (id: string) => PROVIDER_NOTES.find((item) => item.match(id))?.key
 
   const isConfigCustom = (providerID: string) => {
     const provider = globalSync.data.config.provider?.[providerID]
@@ -215,24 +242,23 @@ export const SettingsProviders: Component = () => {
   }
 
   return (
-    <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 sm:px-6 py-5 sm:py-6">
-      <div class="flex flex-col gap-5 max-w-7xl w-full">
-        {/* Connected */}
+    <div class="min-h-full bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
+      <div class="w-full space-y-8">
         <Section title={language.t("settings.providers.section.connected")}>
           <Show
             when={connected().length > 0}
             fallback={
-              <div class="py-4 text-14-regular text-text-weak text-center">
+              <div class="rounded-xl border border-border/70 bg-card/60 px-4 py-5 text-center text-[14px] text-muted-foreground">
                 {language.t("settings.providers.connected.empty")}
               </div>
             }
           >
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3.5">
               <For each={connected()}>
                 {(item) => (
                   <ConnectedRow
                     item={item}
-                    type={type(item)}
+                    connectedLabel="Connected"
                     canDisconnect={canDisconnect(item)}
                     onDisconnect={() => void disconnect(item.id, item.name)}
                     disconnectHint={language.t("settings.providers.connected.environmentDescription")}
@@ -244,14 +270,13 @@ export const SettingsProviders: Component = () => {
           </Show>
         </Section>
 
-        {/* Popular */}
         <Section title={language.t("settings.providers.section.popular")}>
-          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3.5">
             <For each={popular()}>
               {(item) => (
                 <PopularRow
                   item={item}
-                  note={note(item.id) ? language.t(note(item.id)!) : undefined}
+                  showRecommended={providerRank(item.id) < 3}
                   onConnect={() => dialog.show(() => <DialogConnectProvider provider={item.id} />)}
                   connectLabel={language.t("common.connect")}
                   recommendedLabel={language.t("dialog.provider.tag.recommended")}
@@ -259,40 +284,37 @@ export const SettingsProviders: Component = () => {
               )}
             </For>
 
-            {/* OpenAI Compatible API */}
             <div data-component="openai-compatible-section">
               <SimpleTopActionCard
                 iconId="openai"
                 title={language.t("provider.openaiCompatible.title")}
                 tag={language.t("settings.providers.tag.custom")}
-                description={language.t("provider.openaiCompatible.description")}
                 connectLabel={language.t("common.connect")}
                 onConnect={() => dialog.show(() => <DialogOpenAICompatible />)}
               />
             </div>
 
-            {/* Custom Provider */}
             <div data-component="custom-provider-section">
               <SimpleTopActionCard
                 iconId="synthetic"
                 title={language.t("provider.custom.title")}
                 tag={language.t("settings.providers.tag.custom")}
-                description={language.t("settings.providers.custom.description")}
                 connectLabel={language.t("common.connect")}
                 onConnect={() => dialog.show(() => <DialogCustomProvider back="close" />)}
               />
             </div>
           </div>
-        </Section>
 
-        {/* View All */}
-        <Button
-          variant="ghost"
-          class="px-0 py-0 mt-1 text-13-medium text-text-interactive-base text-left justify-start hover:bg-transparent active:bg-transparent"
-          onClick={() => dialog.show(() => <DialogSelectProvider />)}
-        >
-          {language.t("dialog.provider.viewAll")}
-        </Button>
+          <div class="flex justify-center pt-1">
+            <Button
+              variant="ghost"
+              class="rounded-lg border border-border/70 bg-card/45 px-4 py-2 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => dialog.show(() => <DialogSelectProvider />)}
+            >
+              All providers
+            </Button>
+          </div>
+        </Section>
       </div>
     </div>
   )
