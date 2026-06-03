@@ -316,10 +316,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const canImprovePrompt = createMemo(
     () => store.mode === "normal" && !working() && !improvingPrompt() && promptText().trim().length > 0,
   )
-  const improveStatusText = createMemo(() => {
-    const model = local.model.current()?.name
-    return model ? `Improving with ${model}` : "Improving prompt"
-  })
+  const improveStatusText = () => "Improving prompt"
   const stopping = createMemo(() => working() && blank())
   const tip = () => {
     if (stopping()) {
@@ -1516,7 +1513,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               {store.mode === "shell" ? ">" : ""}
             </span>
             <div
-              class="relative flex-1 max-h-[240px] overflow-y-auto no-scrollbar"
+              class="agent-terminal-input-scroll relative flex-1 max-h-[240px] overflow-y-auto no-scrollbar"
               ref={(el) => (scrollRef = el)}
             >
               <div
@@ -1560,14 +1557,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 {placeholder()}
               </div>
               <Show when={improvingPrompt()}>
-                <div class="agent-terminal-prompt-improve-overlay" aria-live="polite">
+                <div class="agent-terminal-prompt-improve-overlay" role="status" aria-live="polite">
                   <div class="agent-terminal-prompt-improve-badge">
                     <Spinner class="agent-terminal-prompt-improve-spinner" />
-                    <PromptImproveMark class="agent-terminal-prompt-improve-mark" />
                   </div>
                   <div class="agent-terminal-prompt-improve-copy">
                     <span class="agent-terminal-prompt-improve-title">{improveStatusText()}</span>
-                    <span class="agent-terminal-prompt-improve-subtitle">Input locked. Context stays unchanged.</span>
                   </div>
                 </div>
               </Show>

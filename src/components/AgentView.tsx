@@ -421,7 +421,6 @@ function AgentViewInner(props: AgentViewProps) {
   const setActiveSidebarSession = useStore((s) => s.setActiveSession)
   const projects = useStore((s) => s.projects)
   const currentProjectId = useStore((s) => s.currentProjectId)
-  const setCurrentProject = useStore((s) => s.setCurrentProject)
   const renameSession = useStore((s) => s.renameSession)
   const updateSession = useStore((s) => s.updateSession)
   const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
@@ -432,8 +431,6 @@ function AgentViewInner(props: AgentViewProps) {
   const [renameValue, setRenameValue] = createSignal("")
   const [renameSaving, setRenameSaving] = createSignal(false)
   const [todoCollapsed, setTodoCollapsed] = createSignal(false)
-  const [gitBranch, setGitBranch] = createSignal("")
-  const [gitChanges, setGitChanges] = createSignal<number | null>(null)
   const [autoCompactingContext, setAutoCompactingContext] = createSignal(false)
   const [autoCompactKey, setAutoCompactKey] = createSignal("")
   const [queuedFollowups, setQueuedFollowups] = createSignal<QueuedFollowup[]>([])
@@ -508,12 +505,6 @@ function AgentViewInner(props: AgentViewProps) {
   const currentProjectName = createMemo(() => {
     const current = currentProject()
     return current?.name || basename(current?.path || props.projectPath)
-  })
-  const gitChangeLabel = createMemo(() => {
-    const count = gitChanges()
-    if (count === null) return ""
-    if (count === 0) return "Clean"
-    return count === 1 ? "1 change" : `${count} changes`
   })
   const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
   const sessionID = createMemo(() => activeSessionId() ?? "")
@@ -684,37 +675,6 @@ function AgentViewInner(props: AgentViewProps) {
     const sessionID = activeSessionId()
     if (!sessionID) return
     void sync.session.sync(sessionID)
-  })
-
-  createEffect(() => {
-    const path = props.projectPath
-    setGitBranch("")
-    setGitChanges(null)
-    if (!path) return
-
-    let cancelled = false
-    void nativeApi.invoke("get_git_branch", { path })
-      .then((info: any) => {
-        if (cancelled) return
-        setGitBranch(typeof info?.head === "string" ? info.head : "")
-      })
-      .catch(() => {
-        if (!cancelled) setGitBranch("")
-      })
-
-    void nativeApi.invoke("get_git_status", { path })
-      .then((status: any) => {
-        if (cancelled) return
-        const count = Array.isArray(status?.changedFiles) ? status.changedFiles.length : null
-        setGitChanges(count)
-      })
-      .catch(() => {
-        if (!cancelled) setGitChanges(null)
-      })
-
-    onCleanup(() => {
-      cancelled = true
-    })
   })
 
   // Keep global sidebar/terminal active session in sync with in-view route changes
@@ -1210,37 +1170,6 @@ function AgentViewInner(props: AgentViewProps) {
                       <div class="agent-terminal-new-session relative z-10 w-full">
                         <div class="relative z-10 w-full text-left">
                           <PromptInput />
-                        </div>
-
-                        <div class="agent-terminal-session-bar">
-                          <div class="agent-terminal-session-controls">
-                            <label class="agent-terminal-project-switch">
-                              <Icon name="folder" class="size-3.5" />
-                              <select
-                                value={currentProjectId() ?? ""}
-                                onChange={(event) => setCurrentProject(event.currentTarget.value || null)}
-                                aria-label="Switch project"
-                              >
-                                <For each={projects()}>
-                                  {(project) => <option value={project.id}>{project.name || basename(project.path)}</option>}
-                                </For>
-                              </select>
-                            </label>
-
-                            <div class="agent-terminal-session-meta agent-terminal-session-meta-inline">
-                              <Show when={gitBranch()}>
-                                <div class="agent-terminal-meta-chip">
-                                  <Icon name="branch" class="size-3.5" />
-                                  <span>{gitBranch()}</span>
-                                </div>
-                              </Show>
-                              <Show when={gitChangeLabel()}>
-                                <div class="agent-terminal-meta-chip" data-warn={gitChanges() !== 0}>
-                                  <span>{gitChangeLabel()}</span>
-                                </div>
-                              </Show>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </div>

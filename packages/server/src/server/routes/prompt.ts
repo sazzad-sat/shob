@@ -34,11 +34,26 @@ async function improvePrompt(input: z.infer<typeof PromptImproveBody>) {
   const sessionID = "prompt-improve"
   const system = [
     [
-      "You improve user prompts before they are sent to a coding agent.",
-      "Rewrite the prompt for clearer grammar, wording, and structure.",
-      "Preserve the user's exact intent, constraints, facts, filenames, paths, @mentions, commands, code, and requested scope.",
-      "Do not add new requirements, remove requirements, answer the prompt, or change the user's context.",
-      "Return only the improved prompt text.",
+      "You are an expert prompt engineer that rewrites user prompts before they are sent to a coding agent.",
+      "Your goal is to make the prompt SIGNIFICANTLY more effective so the coding agent produces the correct result on the first attempt.",
+    ].join(" "),
+    [
+      "IMPROVEMENTS TO MAKE:",
+      "1. Disambiguate vague language — replace unclear words like 'fix it', 'make it work', 'improve this' with precise technical descriptions of what should change.",
+      "2. Add explicit acceptance criteria when the user's intent implies them but doesn't state them.",
+      "3. Specify edge cases, error handling, and expected behavior that the user likely wants but didn't mention.",
+      "4. Structure multi-step requests into clear numbered steps.",
+      "5. Clarify the scope — if the user references files, functions, or components, make the references unambiguous.",
+      "6. Add relevant technical context that would help the coding agent (e.g., 'this is a React component' or 'this uses TypeScript').",
+      "7. If the prompt is already well-written, still look for opportunities to add clarity, precision, or structure.",
+    ].join(" "),
+    [
+      "RULES:",
+      "1. PRESERVE the user's exact intent — never change what they want done, only how clearly they ask for it.",
+      "2. PRESERVE all filenames, paths, @mentions, commands, code snippets, and quoted text exactly as written.",
+      "3. Do NOT add requirements the user didn't imply. Do NOT remove requirements.",
+      "4. Do NOT answer the prompt or write code. Do NOT add greetings or meta-commentary.",
+      "5. Return ONLY the improved prompt text, nothing else.",
     ].join(" "),
   ]
   const isOpenaiOauth = provider.id === "openai" && auth?.type === "oauth"
@@ -57,7 +72,10 @@ async function improvePrompt(input: z.infer<typeof PromptImproveBody>) {
     {
       role: "user",
       content: [
-        "Improve this prompt. Keep the same meaning and context:",
+        "Significantly improve the following prompt for a coding agent.",
+        "Make it more precise, unambiguous, and actionable.",
+        "Add structure, acceptance criteria, and technical clarity where appropriate.",
+        "Preserve the exact intent, all file references, @mentions, and code snippets.",
         "",
         "<prompt>",
         input.prompt,
@@ -67,7 +85,7 @@ async function improvePrompt(input: z.infer<typeof PromptImproveBody>) {
   ]
   const maxOutputTokens = Math.min(
     ProviderTransform.maxOutputTokens(model),
-    Math.max(1024, Math.ceil(input.prompt.length / 3) + 512),
+    Math.max(2048, Math.ceil(input.prompt.length / 2) + 1024),
   )
   const result = await generateText({
     temperature: model.capabilities.temperature ? 0.2 : undefined,
