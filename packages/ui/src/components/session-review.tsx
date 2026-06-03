@@ -255,6 +255,17 @@ export const SessionReview = (props: SessionReviewProps) => {
     queue()
   })
 
+  // Auto-expand all diffs by default — show all files without needing to click
+  createEffect(() => {
+    const allFiles = files()
+    if (props.open !== undefined) return // controlled externally
+    if (allFiles.length === 0) return
+    const currentOpen = untrack(() => store.open)
+    const newFiles = allFiles.filter((f) => !currentOpen.includes(f))
+    if (newFiles.length === 0) return
+    setStore("open", [...currentOpen, ...newFiles])
+  })
+
   const handleChange = (next: string[]) => {
     props.onOpenChange?.(next)
     if (props.open === undefined) setStore("open", next)
@@ -353,7 +364,7 @@ export const SessionReview = (props: SessionReviewProps) => {
         data-slot="session-review-scroll"
         viewportRef={(el) => {
           scroll = el
-          props.scrollRef?.(el)
+          if (el) props.scrollRef?.(el)
           queue()
         }}
         onScroll={handleScroll}

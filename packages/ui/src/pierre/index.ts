@@ -27,11 +27,12 @@ const unsafeCSS = `
   --diffs-deletion-base: var(--syntax-diff-delete);
   --diffs-addition-base: var(--syntax-diff-add);
   --diffs-modified-base: var(--syntax-diff-unknown);
-  --diffs-bg-deletion: var(--diffs-bg-deletion-override, light-dark( color-mix(in lab, var(--diffs-bg) 98%, var(--diffs-deletion-base)), color-mix(in lab, var(--diffs-bg) 92%, var(--diffs-deletion-base))));
+  /* Enhanced oklch color-mix for vivid, harmonious diff row highlights at 14% opacity */
+  --diffs-bg-deletion: var(--diffs-bg-deletion-override, color-mix(in oklch, var(--diffs-deletion-base, var(--syntax-diff-delete)) 14%, transparent));
   --diffs-bg-deletion-number: var(--diffs-bg-deletion-number-override, light-dark( color-mix(in lab, var(--diffs-bg) 91%, var(--diffs-deletion-base)), color-mix(in lab, var(--diffs-bg) 85%, var(--diffs-deletion-base))));
   --diffs-bg-deletion-hover: var(--diffs-bg-deletion-hover-override, light-dark( color-mix(in lab, var(--diffs-bg) 80%, var(--diffs-deletion-base)), color-mix(in lab, var(--diffs-bg) 75%, var(--diffs-deletion-base))));
   --diffs-bg-deletion-emphasis: var(--diffs-bg-deletion-emphasis-override, light-dark(rgb(from var(--diffs-deletion-base) r g b / 0.7), rgb(from var(--diffs-deletion-base) r g b / 0.1)));
-  --diffs-bg-addition: var(--diffs-bg-addition-override, light-dark( color-mix(in lab, var(--diffs-bg) 98%, var(--diffs-addition-base)), color-mix(in lab, var(--diffs-bg) 92%, var(--diffs-addition-base))));
+  --diffs-bg-addition: var(--diffs-bg-addition-override, color-mix(in oklch, var(--diffs-addition-base, var(--syntax-diff-add)) 14%, transparent));
   --diffs-bg-addition-number: var(--diffs-bg-addition-number-override, light-dark( color-mix(in lab, var(--diffs-bg) 91%, var(--diffs-addition-base)), color-mix(in lab, var(--diffs-bg) 85%, var(--diffs-addition-base))));
   --diffs-bg-addition-hover: var(--diffs-bg-addition-hover-override, light-dark( color-mix(in lab, var(--diffs-bg) 80%, var(--diffs-addition-base)), color-mix(in lab, var(--diffs-bg) 70%, var(--diffs-addition-base))));
   --diffs-bg-addition-emphasis: var(--diffs-bg-addition-emphasis-override, light-dark(rgb(from var(--diffs-addition-base) r g b / 0.07), rgb(from var(--diffs-addition-base) r g b / 0.1)));
@@ -153,6 +154,62 @@ const unsafeCSS = `
     overflow-x: auto !important;
     overflow-y: clip !important;
   }
+}
+
+/* ── Syntax token colour overrides (applied inside the shadow-DOM stylesheet) ── */
+/* Keywords: if, else, for, while, return, const, let, var, import, export, etc. */
+.token.keyword,
+.token.control-flow,
+.token.module {
+  color: var(--syntax-keyword, var(--diffs-fg));
+}
+
+/* Strings and template literals */
+.token.string,
+.token.template-string,
+.token.template-punctuation {
+  color: var(--syntax-string, var(--diffs-fg));
+}
+
+/* Types, class names, interfaces */
+.token.class-name,
+.token.type-annotation,
+.token.builtin {
+  color: var(--syntax-type, var(--diffs-fg));
+}
+
+/* Numbers */
+.token.number {
+  color: var(--syntax-primitive, var(--diffs-fg));
+}
+
+/* Properties / member access */
+.token.property,
+.token.property-access {
+  color: var(--syntax-property, var(--diffs-fg));
+}
+
+/* Function names */
+.token.function {
+  color: var(--syntax-info, var(--diffs-fg));
+}
+
+/* Constants */
+.token.constant,
+.token.boolean {
+  color: var(--syntax-constant, var(--diffs-fg));
+}
+
+/* Comments */
+.token.comment {
+  color: var(--syntax-comment, var(--diffs-fg));
+  font-style: italic;
+}
+
+/* Operators and punctuation */
+.token.operator,
+.token.punctuation {
+  color: var(--syntax-operator, var(--diffs-fg));
 }
 
 ${lineCommentStyles}

@@ -10,13 +10,17 @@ export interface AutoScrollOptions {
   bottomThreshold?: number
 }
 
+const AUTO_SCROLL_WINDOW_MS = 1500
+
 export function createAutoScroll(options: AutoScrollOptions) {
   let settling = false
   let settleTimer: ReturnType<typeof setTimeout> | undefined
   let autoTimer: ReturnType<typeof setTimeout> | undefined
   let auto: { top: number; time: number } | undefined
+  let lastUserScrollInputAt = 0
+  let touchY: number | undefined
 
-  const threshold = () => options.bottomThreshold ?? 10
+  const threshold = () => Math.max(0, options.bottomThreshold ?? 10)
 
   const [store, setStore] = createStore({
     contentRef: undefined as HTMLElement | undefined,
@@ -26,12 +30,35 @@ export function createAutoScroll(options: AutoScrollOptions) {
 
   const active = () => options.working() || settling
 
+  const maxScrollTop = (el: HTMLElement) => {
+    return Math.max(0, el.scrollHeight - el.clientHeight)
+  }
+
   const distanceFromBottom = (el: HTMLElement) => {
-    return el.scrollHeight - el.clientHeight - el.scrollTop
+    return maxScrollTop(el) - el.scrollTop
   }
 
   const canScroll = (el: HTMLElement) => {
-    return el.scrollHeight - el.clientHeight > 1
+    return maxScrollTop(el) > 1
+  }
+
+  const eventTarget = (event: Event) => (event.target instanceof Element ? event.target : undefined)
+
+  const isEditableTarget = (target: Element | undefined) => {
+    if (!target) return false
+    const element = target.closest("input, textarea, select, [contenteditable='true']")
+    return !!element
+  }
+
+  const isNestedScrollableTarget = (event: Event) => {
+    const el = store.scrollRef
+    const target = eventTarget(event)
+    const nested = target?.closest("[data-scrollable]")
+    return !!(el && nested && nested !== el)
+  }
+
+  const noteUserScrollInput = () => {
+    lastUserScrollInputAt = Date.now()
   }
 
   // Browsers can dispatch scroll events asynchronously. If new content arrives
@@ -40,7 +67,7 @@ export function createAutoScroll(options: AutoScrollOptions) {
   // the user scrolled.
   const markAuto = (el: HTMLElement) => {
     auto = {
-      top: Math.max(0, el.scrollHeight - el.clientHeight),
+      top: maxScrollTop(el),
       time: Date.now(),
     }
 
@@ -48,19 +75,20 @@ export function createAutoScroll(options: AutoScrollOptions) {
     autoTimer = setTimeout(() => {
       auto = undefined
       autoTimer = undefined
-    }, 1500)
+    }, AUTO_SCROLL_WINDOW_MS)
   }
 
   const isAuto = (el: HTMLElement) => {
     const a = auto
     if (!a) return false
 
-    if (Date.now() - a.time > 1500) {
+    if (Date.now() - a.time > AUTO_SCROLL_WINDOW_MS) {
       auto = undefined
       return false
     }
 
-    return Math.abs(el.scrollTop - a.top) < 2
+    if (lastUserScrollInputAt > a.time) return false
+    return el.scrollTop >= a.top - 2
   }
 
   const scrollToBottomNow = (behavior: ScrollBehavior) => {
@@ -111,15 +139,45 @@ export function createAutoScroll(options: AutoScrollOptions) {
   }
 
   const handleWheel = (e: WheelEvent) => {
-    if (e.deltaY >= 0) return
     // If the user is scrolling within a nested scrollable region (tool output,
     // code block, etc), don't treat it as leaving the "follow bottom" mode.
     // Those regions opt in via `data-scrollable`.
-    const el = store.scrollRef
-    const target = e.target instanceof Element ? e.target : undefined
-    const nested = target?.closest("[data-scrollable]")
-    if (el && nested && nested !== el) return
-    stop()
+    if (isNestedScrollableTarget(e)) return
+    noteUserScrollInput()
+    if (e.deltaY < 0) stop()
+  }
+
+  const handleTouchStart = (e: TouchEvent) => {
+    if (isNestedScrollableTarget(e)) return
+    touchY = e.touches[0]?.clientY
+  }
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (isNestedScrollableTarget(e)) return
+    const next = e.touches[0]?.clientY
+    if (next === undefined) return
+    noteUserScrollInput()
+    if (touchY !== undefined && next > touchY + 2) stop()
+    touchY = next
+  }
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (isEditableTarget(eventTarget(e)) || isNestedScrollableTarget(e)) return
+
+    switch (e.key) {
+      case "ArrowUp":
+      case "PageUp":
+      case "Home":
+        noteUserScrollInput()
+        stop()
+        return
+      case "ArrowDown":
+      case "PageDown":
+      case "End":
+      case " ":
+        noteUserScrollInput()
+        return
+    }
   }
 
   const handleScroll = () => {
@@ -214,6 +272,9 @@ export function createAutoScroll(options: AutoScrollOptions) {
   })
 
   createEventListener(() => store.scrollRef, "wheel", handleWheel, { passive: true })
+  createEventListener(() => store.scrollRef, "touchstart", handleTouchStart, { passive: true })
+  createEventListener(() => store.scrollRef, "touchmove", handleTouchMove, { passive: true })
+  createEventListener(() => store.scrollRef, "keydown", handleKeyDown)
 
   onCleanup(() => {
     if (settleTimer) clearTimeout(settleTimer)

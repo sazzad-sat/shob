@@ -1,12 +1,20 @@
 .scroll-view {
   position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
 .scroll-view__viewport {
   height: 100%;
   width: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   scrollbar-width: none;
   outline: none;
 }
@@ -24,6 +32,7 @@
   cursor: default;
   user-select: none;
   opacity: 0;
+  pointer-events: none;
 }
 
 .scroll-view__thumb::after {
@@ -59,4 +68,5 @@
 
 .scroll-view__thumb[data-visible="true"] {
   opacity: 1;
+  pointer-events: auto;
 }
