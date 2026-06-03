@@ -55,7 +55,7 @@ const latestSessionTime = (session: Project["sessions"][number]) => session.last
 const PROJECT_SESSION_PREVIEW_LIMIT = 5
 
 const SidebarSectionTitle = (props: { children: string }) => (
-  <div class="px-3 pb-2 pt-4 text-[13px] font-normal leading-4 text-text-weaker">
+  <div class="shob-sidebar-section-label px-3 pb-2 pt-4 text-[13px] font-normal leading-4 text-text-weaker">
     {props.children}
   </div>
 )
@@ -73,7 +73,7 @@ const SidebarSectionHeader = (props: {
 
   return (
     <div class="flex items-center justify-between gap-2 px-3 pb-2 pt-4">
-      <div class="min-w-0 truncate text-[13px] font-normal leading-4 text-text-weaker">
+      <div class="shob-sidebar-section-label min-w-0 truncate text-[13px] font-normal leading-4 text-text-weaker">
         {props.children}
       </div>
       <Show when={props.action && Icon}>
@@ -96,6 +96,7 @@ const SidebarActionButton = (props: {
   title?: string
   active?: boolean
   mobileDot?: boolean
+  shortcut?: string
   icon: any
   onClick: () => void
 }) => {
@@ -105,20 +106,26 @@ const SidebarActionButton = (props: {
     <button
       type="button"
       aria-label={props.label}
-      class={`group/action flex h-8 w-full min-w-0 items-center justify-center rounded-[5px] border border-transparent text-text-weak transition-colors ${
+      class={`group/action shob-sidebar-action grid h-8 w-full min-w-0 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-[5px] border border-transparent px-2.5 text-left text-[13px] leading-4 transition-colors ${
         props.active
           ? "border-border-weak-base bg-surface-raised-base text-text-strong"
-          : "hover:bg-surface-raised-base-hover hover:text-text-strong"
+          : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
       }`}
       title={props.title ?? props.label}
       onClick={props.onClick}
     >
-      <span class="relative flex size-4 shrink-0 items-center justify-center">
-        <Icon size={15} />
+      <span class="relative flex size-4 items-center justify-center text-text-weak group-hover/action:text-text-strong">
+        <Icon size={14} strokeWidth={1.8} />
         <Show when={props.mobileDot}>
           <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-text-interactive-base ring-2 ring-background-stronger" />
         </Show>
       </span>
+      <span class="shob-sidebar-main-label min-w-0 truncate font-normal text-current">{props.label}</span>
+      <Show when={props.shortcut}>
+        <span class="shob-sidebar-shortcut rounded-full bg-surface-raised-base px-1.5 py-0.5 font-mono text-[11px] leading-3 text-text-weaker">
+          {props.shortcut}
+        </span>
+      </Show>
     </button>
   )
 }
@@ -145,7 +152,6 @@ const PinnedSessionRow = (props: {
       props.hit.session.id,
       (item) => !permission.autoResponds(item, props.hit.project.path),
     )
-  const unseenCount = () => notification.session.unseenCount(props.hit.session.id)
   const hasError = () => notification.session.unseenHasError(props.hit.session.id)
 
   return (
@@ -159,11 +165,11 @@ const PinnedSessionRow = (props: {
       title={`${props.hit.session.name} · ${props.hit.project.name}`}
       onClick={() => props.onSelect(props.hit.project.id, props.hit.session.id)}
     >
-      <span class="min-w-0 truncate text-[13px] font-normal leading-4">{props.hit.session.name}</span>
+      <span class="shob-sidebar-main-label min-w-0 truncate text-[13px] font-normal leading-4">{props.hit.session.name}</span>
       <span class="flex min-w-7 items-center justify-end">
         <Switch
           fallback={
-            <span class="text-[12px] font-normal leading-5 text-text-weak">
+            <span class="shob-sidebar-meta text-[12px] font-normal leading-5 text-text-weak">
               {formatSessionAge(latestSessionTime(props.hit.session), props.now)}
             </span>
           }
@@ -178,9 +184,6 @@ const PinnedSessionRow = (props: {
           </Match>
           <Match when={hasError()}>
             <span class="size-2 rounded-full bg-text-diff-delete-base" title="Error" />
-          </Match>
-          <Match when={unseenCount() > 0}>
-            <span class="size-2 rounded-full bg-text-interactive-base" title="Unread messages" />
           </Match>
         </Switch>
       </span>
@@ -379,10 +382,6 @@ function FolderSection(props: {
     )
   }
 
-  const sessionUnseenCount = (sessionId: string) => {
-    return notification.session.unseenCount(sessionId)
-  }
-
   const sessionHasError = (sessionId: string) => {
     return notification.session.unseenHasError(sessionId)
   }
@@ -455,7 +454,7 @@ function FolderSection(props: {
   const renderSessionMeta = (session: Project["sessions"][number]) => (
     <Switch
       fallback={
-        <span class="text-[12px] font-normal leading-5 text-text-weak">
+        <span class="shob-sidebar-meta text-[12px] font-normal leading-5 text-text-weak">
           {formatSessionAge(session.lastActiveAt ?? session.createdAt, sortNow())}
         </span>
       }
@@ -470,9 +469,6 @@ function FolderSection(props: {
       </Match>
       <Match when={sessionHasError(session.id)}>
         <span class="size-2 rounded-full bg-text-diff-delete-base" title="Error" />
-      </Match>
-      <Match when={sessionUnseenCount(session.id) > 0}>
-        <span class="size-2 rounded-full bg-text-interactive-base" title="Unread messages" />
       </Match>
     </Switch>
   )
@@ -493,7 +489,7 @@ function FolderSection(props: {
             when={editingSessionId() === session.id}
             fallback={
               <span
-                class={`truncate text-[13px] leading-4 ${
+                class={`shob-sidebar-main-label truncate text-[13px] leading-4 ${
                   props.activeSessionId === session.id ? "font-medium text-text-strong" : "font-normal text-current"
                 }`}
                 onDblClick={(e) => {
@@ -697,7 +693,7 @@ function FolderSection(props: {
           <span class="text-text-weak transition-colors group-hover/project:text-text-strong">
             <ProjectFolderIcon />
           </span>
-          <span class="truncate text-[13px] font-normal leading-4 text-text-base transition-colors group-hover/project:text-text-strong">
+          <span class="shob-sidebar-main-label truncate text-[13px] font-normal leading-4 text-text-base transition-colors group-hover/project:text-text-strong">
             {props.project.name}
           </span>
           <Show when={props.project.pinned}>
@@ -792,7 +788,7 @@ function FolderSection(props: {
             <Show when={hiddenRootSessionCount() > 0}>
               <button
                 type="button"
-                class="h-8 rounded-[5px] pl-[34px] pr-3 text-left text-[13px] font-normal text-text-weaker transition-colors hover:bg-surface-raised-base-hover hover:text-text-base"
+                class="shob-sidebar-main-label h-8 rounded-[5px] pl-[34px] pr-3 text-left text-[13px] font-normal text-text-weaker transition-colors hover:bg-surface-raised-base-hover hover:text-text-base"
                 onClick={(e) => {
                   e.stopPropagation()
                   setShowAllSessions((current) => !current)
@@ -829,7 +825,7 @@ export function Sidebar(props: {
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
-  const [sidebarWidth, setSidebarWidth] = createSignal(292)
+  const [sidebarWidth, setSidebarWidth] = createSignal(264)
   const [pendingDeleteSessionIDs, setPendingDeleteSessionIDs] = createSignal<Set<string>>(new Set())
   const [searchOpen, setSearchOpen] = createSignal(false)
   const [searchQuery, setSearchQuery] = createSignal("")
@@ -883,19 +879,11 @@ export function Sidebar(props: {
     const handleSidebarToggleRequest = () => {
       setIsSidebarVisible((current) => !current)
     }
-    const handleSearchShortcut = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return
-      if (event.key.toLowerCase() !== "k") return
-      event.preventDefault()
-      setSearchOpen(true)
-    }
     const nowInterval = window.setInterval(() => setSidebarNow(Date.now()), 60_000)
 
     window.addEventListener("gg-toggle-sidebar", handleSidebarToggleRequest)
-    window.addEventListener("keydown", handleSearchShortcut)
     onCleanup(() => {
       window.removeEventListener("gg-toggle-sidebar", handleSidebarToggleRequest)
-      window.removeEventListener("keydown", handleSearchShortcut)
       window.clearInterval(nowInterval)
     })
   })
@@ -1054,12 +1042,12 @@ export function Sidebar(props: {
           edge="end"
           onResize={(clientX) => setSidebarWidth(Math.max(240, Math.min(460, clientX)))}
         />
-        <div class="relative flex h-full max-h-full flex-col bg-background-stronger text-text-base select-none">
-          <div class="sticky top-0 z-20 shrink-0 bg-background-stronger/95 px-2 pb-1.5 pt-2 backdrop-blur">
-            <nav class="grid grid-cols-3 gap-1">
+        <div class="shob-sidebar relative flex h-full max-h-full flex-col bg-background-stronger text-text-base select-none">
+          <div class="sticky top-0 z-20 shrink-0 bg-background-stronger/95 px-1.5 pb-3 pt-2 backdrop-blur">
+            <nav class="flex flex-col gap-0.5">
               <SidebarActionButton
-                label="New chat"
-                title="Start a new chat"
+                label="New session"
+                title="Start a new session"
                 icon={SquarePen}
                 onClick={handleCreateNewChat}
               />

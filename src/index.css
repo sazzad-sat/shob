@@ -95,6 +95,11 @@
   --font-family-mono: "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-family-mono--font-feature-settings: normal;
   --font-size-small: 12px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 430;
+  --shob-font-weight-medium: 430;
+  --shob-font-weight-semibold: 500;
+  --shob-font-weight-bold: 600;
   --line-height-large: 1.4;
   --letter-spacing-normal: 0;
 
@@ -135,6 +140,7 @@ body,
 body {
   font-family: var(--font-family-sans);
   font-feature-settings: var(--font-family-sans--font-feature-settings, normal);
+  font-weight: var(--font-weight-regular);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -149,6 +155,20 @@ textarea {
 
 button {
   -webkit-app-region: no-drag;
+}
+
+.font-medium {
+  font-weight: var(--shob-font-weight-medium) !important;
+}
+
+.font-semibold {
+  font-weight: var(--shob-font-weight-semibold) !important;
+}
+
+.font-bold,
+strong,
+b {
+  font-weight: var(--shob-font-weight-bold) !important;
 }
 
 ::selection {
@@ -569,6 +589,34 @@ button {
 
 .shob-sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--text-weak) 82%, transparent);
+}
+
+.shob-sidebar {
+  font-family: var(--font-family-sans);
+  font-feature-settings: var(--font-family-sans--font-feature-settings, normal);
+  letter-spacing: 0;
+}
+
+.shob-sidebar .shob-sidebar-main-label,
+.shob-sidebar .shob-sidebar-section-label {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  letter-spacing: 0 !important;
+}
+
+.shob-sidebar .shob-sidebar-meta {
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  letter-spacing: 0 !important;
+}
+
+.shob-sidebar .shob-sidebar-shortcut {
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  line-height: 12px !important;
+  letter-spacing: 0 !important;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1068,7 +1116,7 @@ button {
 .text-12-medium {
   font-family: var(--font-family-sans);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: var(--shob-font-weight-medium);
   line-height: 1.4;
 }
 
@@ -1082,7 +1130,7 @@ button {
 .text-12-bold {
   font-family: var(--font-family-sans);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--shob-font-weight-bold);
   line-height: 1.4;
 }
 
@@ -1232,7 +1280,7 @@ button {
 [data-slot="select-section"] {
   font-family: var(--font-family-sans);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--shob-font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-weak);
@@ -1407,7 +1455,7 @@ button {
 .agent-terminal-title [data-slot="session-title-child"] {
   color: var(--text-strong) !important;
   font-size: 13px !important;
-  font-weight: 650 !important;
+  font-weight: var(--shob-font-weight-semibold) !important;
   line-height: 1.4;
 }
 
@@ -1579,7 +1627,7 @@ button {
   color: var(--text-base) !important;
   font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
   font-size: 13px !important;
-  font-weight: 550 !important;
+  font-weight: var(--shob-font-weight-medium) !important;
   letter-spacing: 0 !important;
 }
 
@@ -1763,7 +1811,7 @@ button {
   color: var(--text-base) !important;
   font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
   font-size: 13px !important;
-  font-weight: 550 !important;
+  font-weight: var(--shob-font-weight-medium) !important;
   letter-spacing: 0 !important;
   opacity: 1 !important;
 }
@@ -2452,7 +2500,7 @@ button {
   overflow: hidden;
   color: var(--foreground);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--shob-font-weight-semibold);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2989,6 +3037,12 @@ button {
   }
 }
 
+.agent-terminal-view [data-slot="basic-tool-tool-title"],
+.agent-terminal-view [data-component="task-tool-title"],
+.agent-terminal-view [data-slot="message-part-title-text"] {
+  font-weight: 700 !important;
+}
+
 /* ── Glassmorphism components ────────────────────────── */
 .glass-container {
   background: color-mix(in srgb, var(--card) 50%, transparent);
@@ -3078,7 +3132,7 @@ button {
 
 .todo-dock-count {
   color: var(--foreground);
-  font-weight: 600;
+  font-weight: var(--shob-font-weight-semibold);
 }
 
 .todo-dock-separator {
