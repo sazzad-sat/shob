@@ -16,12 +16,13 @@ import { useGlobalSync } from '@/context/global-sync'
 import { SDKProvider } from '@/context/sdk'
 import { SyncProvider } from '@/context/sync'
 import { LayoutProvider, useLayout } from '@/context/layout'
-import type { VcsFileDiff } from '@opencode-ai/sdk/v2'
+import type { SessionStatus, VcsFileDiff } from '@opencode-ai/sdk/v2'
 import { SessionReviewTab } from '@/pages/session/review-tab'
 import { FileComponentProvider } from '@opencode-ai/ui/context'
 import { File as OpenCodeFile } from '@opencode-ai/ui/file'
 import { ScrollView } from '@opencode-ai/ui/scroll-view'
 import { SessionSidePanel } from '@/pages/session/session-side-panel'
+import { sortOpenCodeSessionsById } from '@/utils/opencode-session'
 
 
 const folderNameFromPath = (path: string) => {
@@ -527,8 +528,22 @@ export function MainView() {
     const client = globalSDK.createClient({ directory: project.path, throwOnError: true })
     const created = await client.session.create().then((response) => response.data)
     if (!created) return
-    const [projectStore] = globalSync.child(project.path)
-    void appStore.syncOpenCodeSessions(cpid, [created, ...projectStore.session])
+    const [projectStore, setProjectStore] = globalSync.child(project.path)
+    const hadSession = projectStore.session.some((session) => session.id === created.id)
+    const mergedSessions = [created, ...projectStore.session.filter((session) => session.id !== created.id)]
+    setProjectStore("session", (sessions) =>
+      hadSession
+        ? sessions.map((session) => (session.id === created.id ? created : session))
+        : sortOpenCodeSessionsById([...sessions, created]),
+    )
+    setProjectStore("message", created.id, (messages) => messages ?? [])
+    if (!projectStore.session_status[created.id]) {
+      setProjectStore("session_status", created.id, { type: "idle" } as SessionStatus)
+    }
+    if (!hadSession && !created.parentID) {
+      setProjectStore("sessionTotal", (total) => total + 1)
+    }
+    void appStore.syncOpenCodeSessions(cpid, mergedSessions)
     if (currentProjectId() !== cpid) appStore.setCurrentProject(cpid)
     appStore.setActiveSession(created.id)
     void globalSync.project.loadSessions(project.path)

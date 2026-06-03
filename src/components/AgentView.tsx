@@ -455,10 +455,11 @@ function AgentViewInner(props: AgentViewProps) {
     return id?.startsWith("ses") ? id : undefined
   })
 
-  const messages = createMemo<ChatMessage[]>(() => {
+  const messageState = createMemo<ChatMessage[] | undefined>(() => {
     const sessionID = activeSessionId()
-    return sessionID ? (sync.data.message[sessionID] ?? []) : []
+    return sessionID ? sync.data.message[sessionID] : undefined
   })
+  const messages = createMemo<ChatMessage[]>(() => messageState() ?? [])
   const contextMetrics = createMemo(() => getSessionContextMetrics(messages(), providers.all()))
   const contextInfo = createMemo(() => contextMetrics().context)
   const activeQueuedFollowups = createMemo(() => {
@@ -536,7 +537,9 @@ function AgentViewInner(props: AgentViewProps) {
   const orphanMessages = createMemo(() =>
     messages().filter((message) => message.role !== "user" && (!("parentID" in message) || !message.parentID)),
   )
-  const isNewSession = createMemo(() => messages().length === 0)
+  const sessionContentLoading = createMemo(() => Boolean(activeSessionId() && messageState() === undefined))
+  const isNewSession = createMemo(() => !sessionContentLoading() && messages().length === 0)
+  const showDockedComposer = createMemo(() => !sessionContentLoading() && !isNewSession())
 
   const runSessionMenuAction = (event: MouseEvent, action: () => void) => {
     event.preventDefault()
@@ -1011,7 +1014,7 @@ function AgentViewInner(props: AgentViewProps) {
               ref={setScrollRef}
               data-slot="session-turn-content"
               class="agent-terminal-scroll h-full min-w-0 overflow-x-hidden overflow-y-auto thin-scrollbar"
-              classList={{ "agent-terminal-scroll-empty": messages().length === 0 }}
+              classList={{ "agent-terminal-scroll-empty": isNewSession() }}
               style={{
                 "--session-title-height": "40px",
                 "--sticky-accordion-top": "48px",
@@ -1077,8 +1080,14 @@ function AgentViewInner(props: AgentViewProps) {
                 <div
                   ref={autoScroll.contentRef}
                   class="agent-terminal-buffer min-h-full pb-56 pt-2"
-                  classList={{ "agent-terminal-buffer-empty": messages().length === 0 }}
+                  classList={{ "agent-terminal-buffer-empty": isNewSession() }}
                 >
+                  <Show when={sessionContentLoading()}>
+                    <div class="flex min-h-full items-center justify-center px-6 text-center">
+                      <TextShimmer text="Loading chat..." />
+                    </div>
+                  </Show>
+
                   <For each={userMessages()}>
                     {(message, index) => {
                       const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
@@ -1196,7 +1205,7 @@ function AgentViewInner(props: AgentViewProps) {
                     )}
                   </For>
 
-                  <Show when={messages().length === 0}>
+                  <Show when={isNewSession()}>
                     <div class="agent-terminal-empty relative isolate flex min-h-0 flex-col items-stretch justify-center px-2 text-left overflow-visible md:mx-auto md:px-5">
                       <div class="agent-terminal-new-session relative z-10 w-full">
                         <div class="relative z-10 w-full text-left">
@@ -1241,7 +1250,7 @@ function AgentViewInner(props: AgentViewProps) {
             </div>
           </div>
 
-          <Show when={!isNewSession()}>
+          <Show when={showDockedComposer()}>
             <>
               <Show when={composerDockVisible()}>
                 <div class="agent-terminal-composer-docks">

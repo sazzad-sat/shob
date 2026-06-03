@@ -14,7 +14,7 @@ import {
 } from '../utils';
 import { CLI_CATALOG, DEFAULT_CLI_ID, type CliProbeResult } from '../config/check';
 import type { Project, Session, CliTool } from '../types';
-import { sessionTitle } from '@/utils/session-title';
+import { toLocalOpenCodeSession } from '@/utils/opencode-session';
 
 const SESSION_ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 let launchSessionQueue: Promise<unknown> = Promise.resolve();
@@ -551,23 +551,10 @@ export const actions: AppActions = {
       .filter((session) => session.id?.startsWith('ses'))
       .filter((session) => !session.time?.archived)
         .map((session): Session => {
-          const createdAt = session.time?.created ?? Date.now();
-          const lastActiveAt = session.time?.updated ?? createdAt;
-          const title = sessionTitle(session.title) || 'New session';
-
-          return {
-            id: session.id,
-            name: title,
-            parentSessionId: session.parentID ?? null,
+          return toLocalOpenCodeSession(session, {
             shell: store.preferredShell ?? (process.platform === 'win32' ? 'powershell.exe' : '/bin/sh'),
-            cliTool: 'opencode',
-            pendingLaunchCommand: null,
             pinned: existingPinned.get(session.id) ?? false,
-          createdAt,
-          lastActiveAt,
-          commandCount: 0,
-          startupDurationMs: null,
-        };
+          });
       })
       .sort((left, right) => {
         if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;

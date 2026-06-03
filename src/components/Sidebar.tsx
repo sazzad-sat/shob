@@ -7,11 +7,12 @@ import { api } from "../services/api"
 import { ResizeHandle } from "@/opencode-ported/resize-handle"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
-import type { Session as OpenCodeSession } from "@opencode-ai/sdk/v2/client"
+import type { Session as OpenCodeSession, SessionStatus } from "@opencode-ai/sdk/v2/client"
 import { DotsSpinner } from "./DotsSpinner"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { sessionPermissionRequest } from "@/opencode-ported/composer/session-request-tree"
+import { sortOpenCodeSessionsById, toLocalOpenCodeSession } from "@/utils/opencode-session"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -788,6 +789,7 @@ export function Sidebar(props: {
   const setCurrentProjectId = useStore((s) => s.setCurrentProjectId)
   const setActiveSession = useStore((s) => s.setActiveSession)
   const addProject = useStore((s) => s.addProject)
+  const preferredShell = useStore((s) => s.preferredShell)
   const removeSession = useStore((s) => s.removeSession)
   const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
   const deleteProject = useStore((s) => s.deleteProject)
@@ -893,20 +895,23 @@ export function Sidebar(props: {
     const created = await client.session.create().then((response) => response.data)
     if (!created) return
 
-    // Insert into store immediately for instant UI
-    const now = Date.now()
-    const localSession = {
-      id: created.id,
-      name: created.title || "New session",
-      parentSessionId: created.parentID ?? null,
-      shell: "powershell.exe",
-      cliTool: "opencode" as const,
-      pendingLaunchCommand: null,
-      createdAt: created.time?.created ?? now,
-      lastActiveAt: created.time?.updated ?? now,
-      commandCount: 0,
-      startupDurationMs: null,
+    const [projectStore, setProjectStore] = globalSync.child(project.path)
+    const hadSession = projectStore.session.some((session) => session.id === created.id)
+    const mergedSessions = [created, ...projectStore.session.filter((session) => session.id !== created.id)]
+    setProjectStore("session", (sessions) =>
+      hadSession
+        ? sessions.map((session) => (session.id === created.id ? created : session))
+        : sortOpenCodeSessionsById([...sessions, created]),
+    )
+    setProjectStore("message", created.id, (messages) => messages ?? [])
+    if (!projectStore.session_status[created.id]) {
+      setProjectStore("session_status", created.id, { type: "idle" } as SessionStatus)
     }
+    if (!hadSession && !created.parentID) {
+      setProjectStore("sessionTotal", (total) => total + 1)
+    }
+
+    const localSession = toLocalOpenCodeSession(created, { shell: preferredShell() ?? "powershell.exe" })
 
     const currentProject = projects().find((p) => p.id === projectId)
     if (currentProject) {
@@ -919,7 +924,7 @@ export function Sidebar(props: {
     }
     setActiveSession(created.id)
 
-    // Background refresh — the API will return the session on next sync
+    void syncOpenCodeSessions(projectId, mergedSessions)
     void globalSync.project.loadSessions(project.path)
   }
 
@@ -955,7 +960,7 @@ export function Sidebar(props: {
 
   const handleSyncOpenCodeSessions = (projectId: string, sessions: OpenCodeSession[]) => {
     const pendingDelete = pendingDeleteSessionIDs()
-    let filtered = pendingDelete.size > 0 ? sessions.filter((s) => !pendingDelete.has(s.id)) : sessions
+    const filtered = pendingDelete.size > 0 ? sessions.filter((s) => !pendingDelete.has(s.id)) : sessions
     void syncOpenCodeSessions(projectId, filtered)
   }
 
