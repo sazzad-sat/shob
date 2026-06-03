@@ -60,6 +60,37 @@ const SidebarSectionTitle = (props: { children: string }) => (
   </div>
 )
 
+const SidebarSectionHeader = (props: {
+  children: string
+  action?: {
+    label: string
+    title?: string
+    icon: any
+    onClick: () => void
+  }
+}) => {
+  const Icon = props.action?.icon
+
+  return (
+    <div class="flex items-center justify-between gap-2 px-3 pb-2 pt-4">
+      <div class="min-w-0 truncate text-[13px] font-normal leading-4 text-text-weaker">
+        {props.children}
+      </div>
+      <Show when={props.action && Icon}>
+        <button
+          type="button"
+          aria-label={props.action!.label}
+          title={props.action!.title ?? props.action!.label}
+          class="flex size-5 shrink-0 items-center justify-center rounded-[4px] text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+          onClick={props.action!.onClick}
+        >
+          <Icon size={14} />
+        </button>
+      </Show>
+    </div>
+  )
+}
+
 const SidebarActionButton = (props: {
   label: string
   title?: string
@@ -1067,7 +1098,16 @@ export function Sidebar(props: {
                 </div>
               </Show>
 
-              <SidebarSectionTitle>Projects</SidebarSectionTitle>
+              <SidebarSectionHeader
+                action={{
+                  label: "Add project",
+                  title: "Add new project",
+                  icon: Plus,
+                  onClick: () => void handleAddProject(),
+                }}
+              >
+                Projects
+              </SidebarSectionHeader>
               <Show
                 when={projects().length > 0}
                 fallback={
@@ -1077,7 +1117,7 @@ export function Sidebar(props: {
                     onClick={() => void handleAddProject()}
                   >
                     <Plus size={14} />
-                    Open folder
+                    Add project
                   </button>
                 }
               >
