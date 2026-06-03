@@ -1,4 +1,6 @@
 import { render } from 'solid-js/web'
+import '@fontsource-variable/inter/index.css'
+import '@fontsource-variable/jetbrains-mono/index.css'
 import './index.css'
 import './opencode-ported/styles/session-review.css'
 import './opencode-ported/styles/diff-changes.css'

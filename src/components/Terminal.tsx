@@ -566,6 +566,10 @@ export function Terminal(props: TerminalProps) {
             }
             : undefined
 
+        const terminalFontFamily =
+          getComputedStyle(terminalRef.ownerDocument.documentElement).getPropertyValue("--font-family-mono").trim() ||
+          '"JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", Consolas, monospace'
+
         term = new XTerm({
           cursorBlink: true,
           cursorStyle: "bar",
@@ -574,7 +578,7 @@ export function Terminal(props: TerminalProps) {
           macOptionIsMeta: hostInfo.os === "macos",
           rightClickSelectsWord: false,
           fontSize: 14,
-          fontFamily: '"JetBrains Mono", "Cascadia Code", Consolas, monospace',
+          fontFamily: terminalFontFamily,
           fontWeight: "400",
           fontWeightBold: "700",
           lineHeight: 1.22,

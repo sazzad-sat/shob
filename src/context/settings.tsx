@@ -43,15 +43,15 @@ export interface Settings {
   sounds: SoundSettings
 }
 
-export const monoDefault = "System Mono"
-export const sansDefault = "System Sans"
+export const monoDefault = "JetBrains Mono Variable"
+export const sansDefault = "Inter Variable"
 
 const monoFallback =
-  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
-const sansFallback = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+  '"JetBrains Mono", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+const sansFallback = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
-const monoBase = monoFallback
-const sansBase = sansFallback
+const monoBase = `"${monoDefault}", ${monoFallback}`
+const sansBase = `"${sansDefault}", ${sansFallback}`
 
 function input(font: string | undefined) {
   return font ?? ""
