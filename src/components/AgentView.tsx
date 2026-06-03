@@ -1,7 +1,9 @@
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show } from "solid-js"
 import { PromptInput } from "../opencode-ported/prompt-input"
+import { sendFollowupDraft, type FollowupDraft } from "@/opencode-ported/prompt-input/submit"
 import { MockSessionProviders } from "../opencode-ported/mock-session-layout"
 import { useSync } from "@/context/sync"
+import { useGlobalSync } from "@/context/global-sync"
 import { useNavigate, useParams } from "@solidjs/router"
 import { AssistantParts, Message } from "@opencode-ai/ui/message-part"
 import { DataProvider, FileComponentProvider } from "@opencode-ai/ui/context"
@@ -216,6 +218,39 @@ function OpenWithOptionIcon(props: { option: (typeof openWithOptions)[number] })
   )
 }
 
+type QueuedFollowupState = "queued" | "sending" | "failed"
+
+type QueuedFollowup = FollowupDraft & {
+  queueID: string
+  queuedAt: number
+  state: QueuedFollowupState
+  error?: string
+}
+
+const queuedFollowupID = () => `followup-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+function followupPreview(draft: FollowupDraft) {
+  const text = draft.prompt
+    .map((part) => ("content" in part ? part.content : ""))
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim()
+  const imageCount = draft.prompt.filter((part) => part.type === "image").length
+  const contextCount = draft.context.length
+  const extras = [
+    imageCount > 0 ? `${imageCount} image${imageCount === 1 ? "" : "s"}` : "",
+    contextCount > 0 ? `${contextCount} context item${contextCount === 1 ? "" : "s"}` : "",
+  ].filter(Boolean)
+
+  if (text) return extras.length > 0 ? `${text} · ${extras.join(" · ")}` : text
+  return extras.length > 0 ? extras.join(" · ") : "Queued follow-up"
+}
+
+function queueErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  return String(error || "Could not send queued follow-up.")
+}
+
 function AgentHeaderPanelControls(props: { projectPath?: string }) {
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
   const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
@@ -377,6 +412,7 @@ function AgentHeaderPanelControls(props: { projectPath?: string }) {
 
 function AgentViewInner(props: AgentViewProps) {
   const sync = useSync()
+  const globalSync = useGlobalSync()
   const sdk = useSDK()
   const params = useParams()
   const navigate = useNavigate()
@@ -400,6 +436,7 @@ function AgentViewInner(props: AgentViewProps) {
   const [gitChanges, setGitChanges] = createSignal<number | null>(null)
   const [autoCompactingContext, setAutoCompactingContext] = createSignal(false)
   const [autoCompactKey, setAutoCompactKey] = createSignal("")
+  const [queuedFollowups, setQueuedFollowups] = createSignal<QueuedFollowup[]>([])
   let scrollRef: HTMLDivElement | undefined
   let rafId: number | undefined
   const composerState = createSessionComposerState({ closeMs: 320 })
@@ -424,6 +461,26 @@ function AgentViewInner(props: AgentViewProps) {
   })
   const contextMetrics = createMemo(() => getSessionContextMetrics(messages(), providers.all()))
   const contextInfo = createMemo(() => contextMetrics().context)
+  const activeQueuedFollowups = createMemo(() => {
+    const sessionID = activeSessionId()
+    if (!sessionID) return []
+    return queuedFollowups().filter((item) => item.sessionID === sessionID)
+  })
+  const autoCompactStripVisible = createMemo(() => {
+    const context = contextInfo()
+    const guardUsage = context?.autoCompactUsage ?? context?.usage ?? null
+    const full = Boolean(context?.autoCompactAt && context.total >= context.autoCompactAt)
+    return autoCompactingContext() || full || (guardUsage ?? 0) >= 80
+  })
+  const composerDockVisible = createMemo(() =>
+    Boolean(
+      composerState.questionRequest() ||
+        composerState.permissionRequest() ||
+        (composerState.dock() && composerState.todos().length > 0) ||
+        activeQueuedFollowups().length > 0 ||
+        autoCompactStripVisible(),
+    ),
+  )
   const getParts = (messageID: string): Part[] => sync.data.part[messageID] ?? []
   const info = createMemo(() => {
     const sessionID = activeSessionId()
@@ -532,6 +589,60 @@ function AgentViewInner(props: AgentViewProps) {
       showToast({ variant: "error", title: "Copy failed", description: "Could not write session Markdown to clipboard." })
     }
   }
+
+  const enqueueFollowup = (draft: FollowupDraft) => {
+    setQueuedFollowups((items) => [
+      ...items,
+      {
+        ...draft,
+        queueID: queuedFollowupID(),
+        queuedAt: Date.now(),
+        state: "queued",
+      },
+    ])
+    showToast({ title: "Follow-up queued", description: "It will send when the current run finishes." })
+    queueMicrotask(scheduleJumpStateUpdate)
+  }
+
+  const removeQueuedFollowup = (queueID: string) => {
+    setQueuedFollowups((items) => items.filter((item) => item.queueID !== queueID))
+  }
+
+  createEffect(() => {
+    const sessionID = activeSessionId()
+    if (!sessionID || status() !== "idle" || autoCompactingContext()) return
+
+    const next = queuedFollowups().find((item) => item.sessionID === sessionID && item.state === "queued")
+    if (!next) return
+
+    setQueuedFollowups((items) =>
+      items.map((item) => (item.queueID === next.queueID ? { ...item, state: "sending", error: undefined } : item)),
+    )
+
+    void sendFollowupDraft({
+      client: sdk.client,
+      sync,
+      globalSync,
+      draft: next,
+      optimisticBusy: true,
+    })
+      .then((sent) => {
+        if (sent) {
+          setQueuedFollowups((items) => items.filter((item) => item.queueID !== next.queueID))
+          return
+        }
+        setQueuedFollowups((items) =>
+          items.map((item) => (item.queueID === next.queueID ? { ...item, state: "queued" } : item)),
+        )
+      })
+      .catch((error) => {
+        const description = queueErrorMessage(error)
+        setQueuedFollowups((items) =>
+          items.map((item) => (item.queueID === next.queueID ? { ...item, state: "failed", error: description } : item)),
+        )
+        showToast({ variant: "error", title: "Queued follow-up failed", description })
+      })
+  })
 
   createEffect(() => {
     const sessionID = activeSessionId()
@@ -1131,44 +1242,77 @@ function AgentViewInner(props: AgentViewProps) {
           </div>
 
           <Show when={!isNewSession()}>
-            <div
-              data-component="session-prompt-dock"
-              class="agent-terminal-dock pointer-events-none shrink-0 w-full flex flex-col items-center justify-center pb-3"
-            >
-              <div class="pointer-events-auto w-full px-2 md:px-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
-                <Show when={composerState.questionRequest()} keyed>
-                  {(request) => (
-                    <div class="pb-2">
-                      <SessionQuestionDock request={request} onSubmit={() => undefined} />
+            <>
+              <Show when={composerDockVisible()}>
+                <div class="agent-terminal-composer-docks">
+                  <Show when={activeQueuedFollowups().length > 0}>
+                    <div class="agent-terminal-followup-queue" aria-live="polite">
+                      <div class="agent-terminal-followup-queue-header">
+                        <span>Queued follow-ups</span>
+                        <span>{activeQueuedFollowups().length}</span>
+                      </div>
+                      <For each={activeQueuedFollowups()}>
+                        {(item) => (
+                          <div class="agent-terminal-followup-queue-item" data-state={item.state}>
+                            <div class="agent-terminal-followup-queue-copy">
+                              <span>{followupPreview(item)}</span>
+                              <Show when={item.error}>
+                                <small>{item.error}</small>
+                              </Show>
+                            </div>
+                            <span class="agent-terminal-followup-queue-state">
+                              <Show when={item.state === "sending"} fallback={item.state === "failed" ? "Failed" : "Queued"}>
+                                Sending
+                              </Show>
+                            </span>
+                            <button
+                              type="button"
+                              disabled={item.state === "sending"}
+                              class="agent-terminal-followup-queue-remove"
+                              onClick={() => removeQueuedFollowup(item.queueID)}
+                              aria-label="Remove queued follow-up"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </For>
                     </div>
-                  )}
-                </Show>
-                <Show when={composerState.permissionRequest()} keyed>
-                  {(request) => (
+                  </Show>
+                  <Show when={composerState.questionRequest()} keyed>
+                    {(request) => (
+                      <div class="pb-2">
+                        <SessionQuestionDock request={request} onSubmit={() => undefined} />
+                      </div>
+                    )}
+                  </Show>
+                  <Show when={composerState.permissionRequest()} keyed>
+                    {(request) => (
+                      <div class="pb-2">
+                        <SessionPermissionDock
+                          request={request}
+                          responding={composerState.permissionResponding()}
+                          onDecide={composerState.decide}
+                        />
+                      </div>
+                    )}
+                  </Show>
+                  <Show when={composerState.dock() && composerState.todos().length > 0}>
                     <div class="pb-2">
-                      <SessionPermissionDock
-                        request={request}
-                        responding={composerState.permissionResponding()}
-                        onDecide={composerState.decide}
+                      <SessionTodoDock
+                        todos={composerState.todos()}
+                        collapsed={todoCollapsed()}
+                        onToggle={() => setTodoCollapsed((v) => !v)}
+                        collapseLabel={language.t("session.todo.collapse")}
+                        expandLabel={language.t("session.todo.expand")}
                       />
                     </div>
-                  )}
-                </Show>
-                <Show when={composerState.dock() && composerState.todos().length > 0}>
-                  <div class="pb-2">
-                    <SessionTodoDock
-                      todos={composerState.todos()}
-                      collapsed={todoCollapsed()}
-                      onToggle={() => setTodoCollapsed((v) => !v)}
-                      collapseLabel={language.t("session.todo.collapse")}
-                      expandLabel={language.t("session.todo.expand")}
-                    />
-                  </div>
-                </Show>
-                <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
-                <PromptInput />
-              </div>
-            </div>
+                  </Show>
+                  <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
+                </div>
+              </Show>
+              <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} />
+            </>
           </Show>
         </div>
         </>

@@ -27,8 +27,10 @@ export function SessionContextUsage(props: {
       <div class="group relative">
         <button
           type="button"
-          class="flex items-center justify-center size-6 rounded hover:bg-surface-raised-base-hover transition-colors"
+          data-action="prompt-context-usage"
+          class="flex size-8 items-center justify-center rounded-lg border border-border/30 text-foreground outline-none transition-colors duration-150 hover:bg-accent/50"
           onClick={props.onClick}
+          aria-label="Open context usage"
           title={ctx() ? `${fmt(ctx()?.total)} tokens \u00b7 ${ctx()?.usage ?? 0}% \u00b7 ${cost()}` : "Context"}
         >
           <ProgressCircle size={16} strokeWidth={2} percentage={ctx()?.usage ?? 0} />

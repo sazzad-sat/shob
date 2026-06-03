@@ -1472,7 +1472,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           "border-ring! shadow-[0_0_16px_rgba(59,130,246,0.2)]!": store.mode === "shell",
           [props.class ?? ""]: !!props.class,
         }}
-        class="agent-terminal-prompt-shell bg-card! border border-border/60 rounded-2xl flex flex-col w-full overflow-visible! transition-all duration-300"
+        class="agent-terminal-prompt-shell border border-border/60 rounded-2xl flex flex-col w-full overflow-visible! transition-all duration-300"
       >
         <PromptDragOverlay
           type={store.draggingType}
@@ -1611,12 +1611,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           </div>
         </div>
 
-        {/* Horizontal Divider Line */}
-        <div class="agent-terminal-prompt-divider h-px bg-border/40" />
-
-        {/* Bottom Toolbar Row */}
         <div 
-          class="agent-terminal-toolbar flex items-center justify-between px-4 py-2.5 bg-muted/20 min-h-[48px] rounded-b-2xl"
+          class="agent-terminal-toolbar flex items-center justify-between gap-2 px-4 py-2.5 min-h-[48px] rounded-b-2xl"
           onMouseDown={(e) => {
             // Prevent toolbar from stealing focus from editor
             if (e.target instanceof HTMLElement && !e.target.closest('[data-action="prompt-attach"]')) {
@@ -1624,8 +1620,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             }
           }}
         >
-          <div class="flex items-center gap-2 flex-wrap">
-            {/* Attach File (+) Button */}
+          <div class="agent-terminal-toolbar-primary flex min-w-0 flex-1 items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -1651,7 +1646,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               <button
                 data-action="prompt-attach"
                 type="button"
-                class="size-8 flex items-center justify-center rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
+                class="size-8 flex items-center justify-center rounded-lg border border-border/30 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0"
                 onClick={pick}
                 disabled={store.mode !== "normal" || improvingPrompt()}
                 aria-label={language.t("prompt.action.attachFile")}
@@ -1660,7 +1655,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </button>
             </TooltipKeybind>
 
-            {/* Model Selector Button (styled like * Opus 4.7 ||| ) */}
             <Show when={!providersLoading() && store.mode !== "shell"}>
               <TooltipKeybind
                 placement="top"
@@ -1671,7 +1665,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 <button
                   type="button"
                   disabled={improvingPrompt()}
-                  class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
+                  class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0"
                   data-action="prompt-model"
                   onClick={() => {
                     if (improvingPrompt()) return
@@ -1692,7 +1686,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </TooltipKeybind>
             </Show>
 
-            {/* Agent Selector Button (styled like Auto ||| ) */}
             <Show when={!agentsLoading()}>
               <TooltipKeybind
                 placement="top"
@@ -1710,17 +1703,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     local.agent.set(value)
                     restoreFocus()
                   }}
-                  class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
-                  valueClass="truncate"
-                  triggerStyle={{ border: "none", background: "transparent", padding: 0, height: "100%", "font-family": "inherit" }}
+                  class="h-8 min-w-0 px-3 flex items-center gap-2 rounded-lg border border-border/30 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 overflow-hidden"
+                  valueClass="min-w-0 flex-1 truncate text-left"
+                  triggerStyle={{ border: "none", background: "transparent", height: "100%", "font-family": "inherit" }}
                   triggerProps={{ "data-action": "prompt-agent" }}
                   variant="ghost"
-                  label={(name) => <span class="capitalize">{name}</span>}
+                  label={(name) => <span class="min-w-0 truncate capitalize">{name}</span>}
                 />
               </TooltipKeybind>
             </Show>
 
-            {/* Variant Selector Button (styled like Spec Mode) */}
             <Show when={!providersLoading() && store.mode !== "shell" && variants().length > 1}>
               <TooltipKeybind
                 placement="top"
@@ -1740,9 +1732,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     local.model.variant.set(value === "default" ? undefined : value)
                     restoreFocus()
                   }}
-                  class="h-8 px-3 flex items-center gap-2 rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 backdrop-blur-sm"
-                  valueClass="truncate"
-                  triggerStyle={{ border: "none", background: "transparent", padding: 0, height: "100%", "font-family": "inherit" }}
+                  class="h-8 min-w-0 px-3 flex items-center gap-2 rounded-lg border border-border/30 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 overflow-hidden"
+                  valueClass="min-w-0 flex-1 truncate text-left"
+                  triggerStyle={{ border: "none", background: "transparent", height: "100%", "font-family": "inherit" }}
                   triggerProps={{ "data-action": "prompt-model-variant" }}
                   variant="ghost"
                 />
@@ -1750,13 +1742,15 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             </Show>
           </div>
 
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="agent-terminal-toolbar-divider" aria-hidden="true" />
+
+          <div class="agent-terminal-toolbar-secondary flex items-center gap-2 shrink-0">
             <Tooltip placement="top" value={improvingPrompt() ? "Improving prompt..." : "Improve prompt"}>
               <button
                 data-action="prompt-improve"
                 type="button"
                 disabled={!canImprovePrompt()}
-                class="size-8 rounded-lg! border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 backdrop-blur-sm"
+                class="size-8 rounded-lg! border border-border/30 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 classList={{
                   "is-busy": improvingPrompt(),
                 }}
@@ -1779,15 +1773,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 }}
               />
             </Show>
-            {/* Help Button (?) */}
-            <button
-              type="button"
-              disabled={improvingPrompt()}
-              class="size-8 flex items-center justify-center rounded-lg border border-border/30 bg-card/40 hover:bg-accent/50 text-foreground text-[12px] font-mono transition-colors duration-150 cursor-pointer outline-none backdrop-blur-sm"
-              aria-label="Help"
-            >
-              ?
-            </button>
           </div>
         </div>
       </DockShellForm>
