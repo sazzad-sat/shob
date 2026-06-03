@@ -53,18 +53,20 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     let queue: Queued[] = []
     let buffer: Queued[] = []
     const coalesced = new Map<string, number>()
-    const staleDeltas = new Set<string>()
+    const staleDeltasBefore = new Map<string, number>()
     let timer: ReturnType<typeof setTimeout> | undefined
     let last = 0
 
-    const deltaKey = (directory: string, messageID: string, partID: string) => `${directory}:${messageID}:${partID}`
+    const partKey = (directory: string, messageID: string, partID: string) => `${directory}:${messageID}:${partID}`
+    const deltaKey = (directory: string, messageID: string, partID: string, field: string) =>
+      `${partKey(directory, messageID, partID)}:${field}`
 
     const key = (directory: string, payload: Event) => {
       if (payload.type === "session.status") return `session.status:${directory}:${payload.properties.sessionID}`
       if (payload.type === "lsp.updated") return `lsp.updated:${directory}`
-      if (payload.type === "message.part.updated") {
-        const part = payload.properties.part
-        return `message.part.updated:${directory}:${part.messageID}:${part.id}`
+      if (payload.type === "message.part.delta") {
+        const props = payload.properties
+        return `message.part.delta:${deltaKey(directory, props.messageID, props.partID, props.field)}`
       }
     }
 
@@ -75,19 +77,20 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
       if (queue.length === 0) return
 
       const events = queue
-      const skip = staleDeltas.size > 0 ? new Set(staleDeltas) : undefined
+      const skipBefore = staleDeltasBefore.size > 0 ? new Map(staleDeltasBefore) : undefined
       queue = buffer
       buffer = events
       queue.length = 0
       coalesced.clear()
-      staleDeltas.clear()
+      staleDeltasBefore.clear()
 
       last = Date.now()
       batch(() => {
-        for (const event of events) {
-          if (skip && event.payload.type === "message.part.delta") {
+        for (const [index, event] of events.entries()) {
+          if (skipBefore && event.payload.type === "message.part.delta") {
             const props = event.payload.properties
-            if (skip.has(deltaKey(event.directory, props.messageID, props.partID))) continue
+            const staleIndex = skipBefore.get(partKey(event.directory, props.messageID, props.partID))
+            if (staleIndex !== undefined && index < staleIndex) continue
           }
           emitter.emit(event.directory, event.payload)
         }
@@ -160,15 +163,25 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
               const k = key(directory, payload)
               if (k) {
                 const i = coalesced.get(k)
-                if (i !== undefined) {
-                  queue[i] = { directory, payload }
-                  if (payload.type === "message.part.updated") {
-                    const part = payload.properties.part
-                    staleDeltas.add(deltaKey(directory, part.messageID, part.id))
+                if (payload.type === "message.part.delta") {
+                  const props = payload.properties
+                  const staleIndex = staleDeltasBefore.get(partKey(directory, props.messageID, props.partID))
+                  if (i !== undefined && (staleIndex === undefined || i > staleIndex)) {
+                    const existing = queue[i]?.payload
+                    if (existing?.type === "message.part.delta") {
+                      existing.properties.delta += props.delta
+                      continue
+                    }
                   }
+                } else if (i !== undefined) {
+                  queue[i] = { directory, payload }
                   continue
                 }
                 coalesced.set(k, queue.length)
+              }
+              if (payload.type === "message.part.updated") {
+                const part = payload.properties.part
+                staleDeltasBefore.set(partKey(directory, part.messageID, part.id), queue.length)
               }
               queue.push({ directory, payload })
               schedule()

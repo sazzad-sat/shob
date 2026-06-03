@@ -10,6 +10,8 @@ type Model = {
   name?: string
   limit: {
     context: number
+    input?: number
+    output?: number
   }
 }
 
@@ -27,6 +29,10 @@ export type Context = {
   cacheWrite: number
   total: number
   usage: number | null
+  remaining: number | null
+  autoCompactAt: number | null
+  autoCompactUsage: number | null
+  autoCompactRemaining: number | null
 }
 
 export type Metrics = {
@@ -34,8 +40,23 @@ export type Metrics = {
   context: Context | undefined
 }
 
+const COMPACTION_BUFFER = 20_000
+
 const tokenTotal = (msg: AssistantMessage) => {
-  return msg.tokens.input + msg.tokens.output + msg.tokens.reasoning + msg.tokens.cache.read + msg.tokens.cache.write
+  return (
+    msg.tokens.total ||
+    msg.tokens.input + msg.tokens.output + msg.tokens.reasoning + msg.tokens.cache.read + msg.tokens.cache.write
+  )
+}
+
+const autoCompactLimit = (model: Model | undefined) => {
+  const context = model?.limit.context
+  if (!context) return null
+
+  const output = model.limit.output ?? 0
+  const reserved = Math.min(COMPACTION_BUFFER, output || COMPACTION_BUFFER)
+  const usable = model.limit.input ? model.limit.input - reserved : context - (output || reserved)
+  return Math.max(0, Math.min(context, usable))
 }
 
 const lastAssistantWithTokens = (messages: Message[]) => {
@@ -56,6 +77,7 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Metrics =>
   const model = provider?.models[message.modelID]
   const limit = model?.limit.context
   const total = tokenTotal(message)
+  const autoCompactAt = autoCompactLimit(model)
 
   return {
     totalCost,
@@ -73,6 +95,10 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Metrics =>
       cacheWrite: message.tokens.cache.write,
       total,
       usage: limit ? Math.round((total / limit) * 100) : null,
+      remaining: limit ? Math.max(0, limit - total) : null,
+      autoCompactAt,
+      autoCompactUsage: autoCompactAt ? Math.round((total / autoCompactAt) * 100) : null,
+      autoCompactRemaining: autoCompactAt ? Math.max(0, autoCompactAt - total) : null,
     },
   }
 }

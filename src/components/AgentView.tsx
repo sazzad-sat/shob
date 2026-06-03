@@ -28,13 +28,15 @@ import { SessionRetry } from "@opencode-ai/ui/session-retry"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useSDK } from "@/context/sdk"
 import { formatServerError } from "@/utils/server-errors"
-import { Check, ChevronDown, Copy, MoreHorizontal, Pencil, Pin, X } from "lucide-solid"
+import { Check, ChevronDown, Copy, MoreHorizontal, Pencil, Pin, RefreshCw, ShieldCheck, TriangleAlert, X } from "lucide-solid"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useProviders } from "@/hooks/use-providers"
+import { getSessionContextMetrics, type Context as SessionContextMetricsContext } from "@/components/session/session-context-metrics"
 
 
 interface AgentViewProps {
@@ -67,6 +69,11 @@ const basename = (path?: string | null) => {
   if (!path) return "No project"
   const parts = path.split(/[\\/]/).filter(Boolean)
   return parts[parts.length - 1] || path
+}
+
+const formatCompactNumber = (value: number | null | undefined) => {
+  if (value === undefined || value === null) return "\u2014"
+  return value.toLocaleString()
 }
 
 const messageTextAsMarkdown = (message: ChatMessage, parts: Part[]) => {
@@ -156,6 +163,42 @@ function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
         </Button>
       </div>
     </div>
+  )
+}
+
+function AutoCompactStrip(props: { context: SessionContextMetricsContext | undefined; compacting: boolean }) {
+  const guardUsage = createMemo(() => props.context?.autoCompactUsage ?? props.context?.usage ?? null)
+  const full = createMemo(() => Boolean(props.context?.autoCompactAt && props.context.total >= props.context.autoCompactAt))
+  const visible = createMemo(() => props.compacting || full() || (guardUsage() ?? 0) >= 80)
+  const tone = createMemo(() => {
+    if (props.compacting || full()) return "var(--syntax-warning)"
+    return "var(--syntax-success)"
+  })
+
+  return (
+    <Show when={visible()}>
+      <div class="mb-2 flex min-h-8 items-center gap-2 rounded-md border border-border-weaker-base bg-surface-raised-base px-2.5 py-1.5 text-[12px] text-text-base shadow-sm">
+        <span class="shrink-0" style={{ color: tone() }}>
+          <Show
+            when={props.compacting}
+            fallback={full() ? <TriangleAlert size={14} /> : <ShieldCheck size={14} />}
+          >
+            <RefreshCw size={14} class="animate-spin" />
+          </Show>
+        </span>
+        <span class="min-w-0 flex-1 truncate">
+          <Show
+            when={props.compacting}
+            fallback={full() ? "Context full. Auto compact will run now." : "Auto compact armed."}
+          >
+            Auto compacting context...
+          </Show>
+        </span>
+        <span class="shrink-0 text-text-weaker">
+          {formatCompactNumber(props.context?.total)} / {formatCompactNumber(props.context?.autoCompactAt ?? props.context?.limit)}
+        </span>
+      </div>
+    </Show>
   )
 }
 
@@ -338,6 +381,7 @@ function AgentViewInner(props: AgentViewProps) {
   const params = useParams()
   const navigate = useNavigate()
   const settings = useSettings()
+  const providers = useProviders()
   const activeSidebarSessionId = useStore((s) => s.activeSessionId)
   const setActiveSidebarSession = useStore((s) => s.setActiveSession)
   const projects = useStore((s) => s.projects)
@@ -354,6 +398,8 @@ function AgentViewInner(props: AgentViewProps) {
   const [todoCollapsed, setTodoCollapsed] = createSignal(false)
   const [gitBranch, setGitBranch] = createSignal("")
   const [gitChanges, setGitChanges] = createSignal<number | null>(null)
+  const [autoCompactingContext, setAutoCompactingContext] = createSignal(false)
+  const [autoCompactKey, setAutoCompactKey] = createSignal("")
   let scrollRef: HTMLDivElement | undefined
   let rafId: number | undefined
   const composerState = createSessionComposerState({ closeMs: 320 })
@@ -376,6 +422,8 @@ function AgentViewInner(props: AgentViewProps) {
     const sessionID = activeSessionId()
     return sessionID ? (sync.data.message[sessionID] ?? []) : []
   })
+  const contextMetrics = createMemo(() => getSessionContextMetrics(messages(), providers.all()))
+  const contextInfo = createMemo(() => contextMetrics().context)
   const getParts = (messageID: string): Part[] => sync.data.part[messageID] ?? []
   const info = createMemo(() => {
     const sessionID = activeSessionId()
@@ -488,6 +536,39 @@ function AgentViewInner(props: AgentViewProps) {
       showToast({ variant: "error", title: "Copy failed", description: "Could not write session Markdown to clipboard." })
     }
   }
+
+  createEffect(() => {
+    const sessionID = activeSessionId()
+    const context = contextInfo()
+    if (!sessionID || !context?.autoCompactAt) return
+    if (status() !== "idle" || autoCompactingContext()) return
+    if (context.total < context.autoCompactAt) return
+
+    const key = `${sessionID}:${context.message.id}:${context.total}`
+    if (autoCompactKey() === key) return
+    setAutoCompactKey(key)
+    setAutoCompactingContext(true)
+
+    void sdk.client.session
+      .summarize({
+        sessionID,
+        providerID: context.message.providerID,
+        modelID: context.message.modelID,
+        auto: true,
+      })
+      .then(() => {
+        showToast({ title: "Context auto compacted" })
+        void sync.session.sync(sessionID)
+      })
+      .catch((error) => {
+        showToast({
+          variant: "error",
+          title: "Auto compact failed",
+          description: error instanceof Error ? error.message : String(error),
+        })
+      })
+      .finally(() => setAutoCompactingContext(false))
+  })
 
   createEffect(() => {
     const sessionID = activeSessionId()
@@ -1048,6 +1129,7 @@ function AgentViewInner(props: AgentViewProps) {
                     />
                   </div>
                 </Show>
+                <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
                 <PromptInput />
               </div>
             </div>

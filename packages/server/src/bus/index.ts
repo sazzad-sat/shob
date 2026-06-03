@@ -85,7 +85,8 @@ export namespace Bus {
         return Effect.gen(function* () {
           const s = yield* InstanceState.get(state)
           const payload: Payload = { type: def.type, properties }
-          log.info("publishing", { type: def.type })
+          if (def.type.endsWith(".delta")) log.debug("publishing", { type: def.type })
+          else log.info("publishing", { type: def.type })
 
           const ps = s.typed.get(def.type)
           if (ps) yield* PubSub.publish(ps, payload)
