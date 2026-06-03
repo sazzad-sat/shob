@@ -1,16 +1,13 @@
-import { Server } from "../../server/server"
 import { cmd } from "./cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "../../flag/flag"
-import { Workspace } from "../../control-plane/workspace"
-import { Project } from "../../project/project"
-import { Installation } from "../../installation"
 
 export const ServeCommand = cmd({
   command: "serve",
   builder: (yargs) => withNetworkOptions(yargs),
   describe: "starts a headless opencode server",
   handler: async (args) => {
+    const { Server } = await import("../../server/server")
     if (!Flag.SHOB_SERVER_PASSWORD) {
       console.log("Warning: SHOB_SERVER_PASSWORD is not set; server is unsecured.")
     }

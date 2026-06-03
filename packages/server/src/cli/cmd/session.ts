@@ -1,8 +1,6 @@
 import type { Argv } from "yargs"
 import { cmd } from "./cmd"
-import { Session } from "../../session"
-import { SessionID } from "../../session/schema"
-import { bootstrap } from "../bootstrap"
+import type { Session } from "../../session"
 import { UI } from "../ui"
 import { Locale } from "../../util/locale"
 import { Flag } from "../../flag/flag"
@@ -57,6 +55,11 @@ export const SessionDeleteCommand = cmd({
     })
   },
   handler: async (args) => {
+    const [{ bootstrap }, { Session }, { SessionID }] = await Promise.all([
+      import("../bootstrap"),
+      import("../../session"),
+      import("../../session/schema"),
+    ])
     await bootstrap(process.cwd(), async () => {
       const sessionID = SessionID.make(args.sessionID)
       try {
@@ -89,6 +92,7 @@ export const SessionListCommand = cmd({
       })
   },
   handler: async (args) => {
+    const [{ bootstrap }, { Session }] = await Promise.all([import("../bootstrap"), import("../../session")])
     await bootstrap(process.cwd(), async () => {
       const sessions = [...Session.list({ roots: true, limit: args.maxCount })]
 

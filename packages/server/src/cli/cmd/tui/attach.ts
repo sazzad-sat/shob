@@ -1,9 +1,5 @@
 import { cmd } from "../cmd"
 import { UI } from "@/cli/ui"
-import { tui } from "./app"
-import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
-import { TuiConfig } from "@/config/tui"
-import { Instance } from "@/project/instance"
 import { existsSync } from "fs"
 
 export const AttachCommand = cmd({
@@ -40,6 +36,8 @@ export const AttachCommand = cmd({
         describe: "basic auth password (defaults to SHOB_SERVER_PASSWORD)",
       }),
   handler: async (args) => {
+    const [{ tui }, { win32DisableProcessedInput, win32InstallCtrlCGuard }, { TuiConfig }, { Instance }] =
+      await Promise.all([import("./app"), import("./win32"), import("@/config/tui"), import("@/project/instance")])
     const unguard = win32InstallCtrlCGuard()
     try {
       win32DisableProcessedInput()

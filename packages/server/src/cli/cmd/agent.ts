@@ -2,13 +2,10 @@ import { cmd } from "./cmd"
 import * as prompts from "@clack/prompts"
 import { UI } from "../ui"
 import { Global } from "../../global"
-import { Agent } from "../../agent/agent"
-import { Provider } from "../../provider/provider"
 import path from "path"
 import fs from "fs/promises"
 import { Filesystem } from "../../util/filesystem"
 import matter from "gray-matter"
-import { Instance } from "../../project/instance"
 import { EOL } from "os"
 import type { Argv } from "yargs"
 
@@ -44,6 +41,11 @@ const AgentCreateCommand = cmd({
         describe: "model to use in the format of provider/model",
       }),
   async handler(args) {
+    const [{ Instance }, { Agent }, { Provider }] = await Promise.all([
+      import("../../project/instance"),
+      import("../../agent/agent"),
+      import("../../provider/provider"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
@@ -217,6 +219,7 @@ const AgentListCommand = cmd({
   command: "list",
   describe: "list all available agents",
   async handler() {
+    const [{ Instance }, { Agent }] = await Promise.all([import("../../project/instance"), import("../../agent/agent")])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {

@@ -1,5 +1,3 @@
-import { Snapshot } from "../../../snapshot"
-import { bootstrap } from "../../bootstrap"
 import { cmd } from "../cmd"
 
 export const SnapshotCommand = cmd({
@@ -13,6 +11,7 @@ const TrackCommand = cmd({
   command: "track",
   describe: "track current snapshot state",
   async handler() {
+    const [{ bootstrap }, { Snapshot }] = await Promise.all([import("../../bootstrap"), import("../../../snapshot")])
     await bootstrap(process.cwd(), async () => {
       console.log(await Snapshot.track())
     })
@@ -29,6 +28,7 @@ const PatchCommand = cmd({
       demandOption: true,
     }),
   async handler(args) {
+    const [{ bootstrap }, { Snapshot }] = await Promise.all([import("../../bootstrap"), import("../../../snapshot")])
     await bootstrap(process.cwd(), async () => {
       console.log(await Snapshot.patch(args.hash))
     })
@@ -45,6 +45,7 @@ const DiffCommand = cmd({
       demandOption: true,
     }),
   async handler(args) {
+    const [{ bootstrap }, { Snapshot }] = await Promise.all([import("../../bootstrap"), import("../../../snapshot")])
     await bootstrap(process.cwd(), async () => {
       console.log(await Snapshot.diff(args.hash))
     })

@@ -1,11 +1,7 @@
 import type { Argv } from "yargs"
 import { spawn } from "child_process"
-import { Database } from "../../storage/db"
-import { drizzle } from "drizzle-orm/bun-sqlite"
-import { Database as BunDatabase } from "bun:sqlite"
 import { UI } from "../ui"
 import { cmd } from "./cmd"
-import { JsonMigration } from "../../storage/json-migration"
 import { EOL } from "os"
 import { errorMessage } from "../../util/error"
 
@@ -26,6 +22,7 @@ const QueryCommand = cmd({
       })
   },
   handler: async (args: { query?: string; format: string }) => {
+    const [{ Database }, { Database: BunDatabase }] = await Promise.all([import("../../storage/db"), import("bun:sqlite")])
     const query = args.query as string | undefined
     if (query) {
       const db = new BunDatabase(Database.Path, { readonly: true })
@@ -57,7 +54,8 @@ const QueryCommand = cmd({
 const PathCommand = cmd({
   command: "path",
   describe: "print the database path",
-  handler: () => {
+  handler: async () => {
+    const { Database } = await import("../../storage/db")
     console.log(Database.Path)
   },
 })
@@ -66,6 +64,12 @@ const MigrateCommand = cmd({
   command: "migrate",
   describe: "migrate JSON data to SQLite (merges with existing data)",
   handler: async () => {
+    const [{ Database }, { Database: BunDatabase }, { drizzle }, { JsonMigration }] = await Promise.all([
+      import("../../storage/db"),
+      import("bun:sqlite"),
+      import("drizzle-orm/bun-sqlite"),
+      import("../../storage/json-migration"),
+    ])
     const sqlite = new BunDatabase(Database.Path)
     const tty = process.stderr.isTTY
     const width = 36

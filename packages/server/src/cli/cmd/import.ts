@@ -1,16 +1,8 @@
 import type { Argv } from "yargs"
 import type { Session as SDKSession, Message, Part } from "@opencode-ai/sdk/v2"
-import { Session } from "../../session"
-import { MessageV2 } from "../../session/message-v2"
 import { cmd } from "./cmd"
-import { bootstrap } from "../bootstrap"
-import { Database } from "../../storage/db"
-import { SessionTable, MessageTable, PartTable } from "../../session/session.sql"
-import { Instance } from "../../project/instance"
-import { ShareNext } from "../../share/share-next"
 import { EOL } from "os"
 import { Filesystem } from "../../util/filesystem"
-import { AppRuntime } from "@/effect/app-runtime"
 
 /** Discriminated union returned by the ShareNext API (GET /api/shares/:id/data) */
 export type ShareData =
@@ -85,6 +77,25 @@ export const ImportCommand = cmd({
     })
   },
   handler: async (args) => {
+    const [
+      { bootstrap },
+      { Session },
+      { MessageV2 },
+      { Database },
+      { SessionTable, MessageTable, PartTable },
+      { Instance },
+      { ShareNext },
+      { AppRuntime },
+    ] = await Promise.all([
+      import("../bootstrap"),
+      import("../../session"),
+      import("../../session/message-v2"),
+      import("../../storage/db"),
+      import("../../session/session.sql"),
+      import("../../project/instance"),
+      import("../../share/share-next"),
+      import("@/effect/app-runtime"),
+    ])
     await bootstrap(process.cwd(), async () => {
       let exportData:
         | {

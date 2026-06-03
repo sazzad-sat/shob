@@ -1,8 +1,5 @@
 import type { Argv } from "yargs"
-import { Session } from "../../session"
-import { SessionID } from "../../session/schema"
 import { cmd } from "./cmd"
-import { bootstrap } from "../bootstrap"
 import { UI } from "../ui"
 import * as prompts from "@clack/prompts"
 import { EOL } from "os"
@@ -17,6 +14,11 @@ export const ExportCommand = cmd({
     })
   },
   handler: async (args) => {
+    const [{ bootstrap }, { Session }, { SessionID }] = await Promise.all([
+      import("../bootstrap"),
+      import("../../session"),
+      import("../../session/schema"),
+    ])
     await bootstrap(process.cwd(), async () => {
       let sessionID = args.sessionID ? SessionID.make(args.sessionID) : undefined
       process.stderr.write(`Exporting session: ${sessionID ?? "latest"}\n`)

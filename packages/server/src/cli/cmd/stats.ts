@@ -1,11 +1,7 @@
 import type { Argv } from "yargs"
 import { cmd } from "./cmd"
-import { Session } from "../../session"
-import { bootstrap } from "../bootstrap"
-import { Database } from "../../storage/db"
-import { SessionTable } from "../../session/session.sql"
-import { Project } from "../../project/project"
-import { Instance } from "../../project/instance"
+import type { Session } from "../../session"
+import type { Project } from "../../project/project"
 
 interface SessionStats {
   totalSessions: number
@@ -68,6 +64,7 @@ export const StatsCommand = cmd({
       })
   },
   handler: async (args) => {
+    const { bootstrap } = await import("../bootstrap")
     await bootstrap(process.cwd(), async () => {
       const stats = await aggregateSessionStats(args.days, args.project)
 
@@ -84,15 +81,22 @@ export const StatsCommand = cmd({
 })
 
 async function getCurrentProject(): Promise<Project.Info> {
+  const { Instance } = await import("../../project/instance")
   return Instance.project
 }
 
 async function getAllSessions(): Promise<Session.Info[]> {
+  const [{ Database }, { SessionTable }, { Session }] = await Promise.all([
+    import("../../storage/db"),
+    import("../../session/session.sql"),
+    import("../../session"),
+  ])
   const rows = Database.use((db) => db.select().from(SessionTable).all())
   return rows.map((row) => Session.fromRow(row))
 }
 
 export async function aggregateSessionStats(days?: number, projectFilter?: string): Promise<SessionStats> {
+  const { Session } = await import("../../session")
   const sessions = await getAllSessions()
   const MS_IN_DAY = 24 * 60 * 60 * 1000
 

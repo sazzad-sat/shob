@@ -1,9 +1,6 @@
 import { Log } from "@/util/log"
-import { bootstrap } from "../bootstrap"
 import { cmd } from "./cmd"
 import { AgentSideConnection, ndJsonStream } from "@agentclientprotocol/sdk"
-import { ACP } from "@/acp/agent"
-import { Server } from "@/server/server"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 
@@ -21,7 +18,9 @@ export const AcpCommand = cmd({
   },
   handler: async (args) => {
     process.env.OPENCODE_CLIENT = "acp"
+    const { bootstrap } = await import("../bootstrap")
     await bootstrap(process.cwd(), async () => {
+      const [{ Server }, { ACP }] = await Promise.all([import("@/server/server"), import("@/acp/agent")])
       const opts = await resolveNetworkOptions(args)
       const server = await Server.listen(opts)
 

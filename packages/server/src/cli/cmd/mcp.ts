@@ -1,15 +1,8 @@
 import { cmd } from "./cmd"
-import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
 import * as prompts from "@clack/prompts"
 import { UI } from "../ui"
-import { MCP } from "../../mcp"
-import { McpAuth } from "../../mcp/auth"
-import { McpOAuthProvider } from "../../mcp/oauth-provider"
-import { Config } from "../../config/config"
-import { Instance } from "../../project/instance"
-import { Installation } from "../../installation"
+import type { MCP } from "../../mcp"
+import type { Config } from "../../config/config"
 import path from "path"
 import { Global } from "../../global"
 import { modify, applyEdits } from "jsonc-parser"
@@ -69,6 +62,11 @@ export const McpListCommand = cmd({
   aliases: ["ls"],
   describe: "list MCP servers and their status",
   async handler() {
+    const [{ Instance }, { Config }, { MCP }] = await Promise.all([
+      import("../../project/instance"),
+      import("../../config/config"),
+      import("../../mcp"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
@@ -146,6 +144,12 @@ export const McpAuthCommand = cmd({
       })
       .command(McpAuthListCommand),
   async handler(args) {
+    const [{ Instance }, { Config }, { MCP }, { Bus }] = await Promise.all([
+      import("../../project/instance"),
+      import("../../config/config"),
+      import("../../mcp"),
+      import("../../bus"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
@@ -283,6 +287,11 @@ export const McpAuthListCommand = cmd({
   aliases: ["ls"],
   describe: "list OAuth-capable MCP servers and their auth status",
   async handler() {
+    const [{ Instance }, { Config }, { MCP }] = await Promise.all([
+      import("../../project/instance"),
+      import("../../config/config"),
+      import("../../mcp"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
@@ -327,6 +336,11 @@ export const McpLogoutCommand = cmd({
       type: "string",
     }),
   async handler(args) {
+    const [{ Instance }, { McpAuth }, { MCP }] = await Promise.all([
+      import("../../project/instance"),
+      import("../../mcp/auth"),
+      import("../../mcp"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
@@ -419,6 +433,7 @@ export const McpAddCommand = cmd({
   command: "add",
   describe: "add an MCP server",
   async handler() {
+    const { Instance } = await import("../../project/instance")
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
@@ -589,6 +604,27 @@ export const McpDebugCommand = cmd({
       demandOption: true,
     }),
   async handler(args) {
+    const [
+      { Instance },
+      { Config },
+      { MCP },
+      { McpAuth },
+      { Installation },
+      { McpOAuthProvider },
+      { StreamableHTTPClientTransport },
+      { Client },
+      { UnauthorizedError },
+    ] = await Promise.all([
+      import("../../project/instance"),
+      import("../../config/config"),
+      import("../../mcp"),
+      import("../../mcp/auth"),
+      import("../../installation"),
+      import("../../mcp/oauth-provider"),
+      import("@modelcontextprotocol/sdk/client/streamableHttp.js"),
+      import("@modelcontextprotocol/sdk/client/index.js"),
+      import("@modelcontextprotocol/sdk/client/auth.js"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {

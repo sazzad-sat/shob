@@ -31,12 +31,9 @@ import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
 import path from "path"
 import { Global } from "./global"
-import { JsonMigration } from "./storage/json-migration"
-import { Database } from "./storage/db"
 import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
 import { Heap } from "./cli/heap"
-import { drizzle } from "drizzle-orm/bun-sqlite"
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -111,6 +108,11 @@ const cli = yargs(args)
 
     const marker = path.join(Global.Path.data, "opencode.db")
     if (!(await Filesystem.exists(marker))) {
+      const [{ JsonMigration }, { Database }, { drizzle }] = await Promise.all([
+        import("./storage/json-migration"),
+        import("./storage/db"),
+        import("drizzle-orm/bun-sqlite"),
+      ])
       const tty = process.stderr.isTTY
       process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
       const width = 36

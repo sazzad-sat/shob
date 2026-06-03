@@ -1,5 +1,4 @@
 import { cmd } from "@/cli/cmd/cmd"
-import { tui } from "./app"
 import { Rpc } from "@/util/rpc"
 import { type rpc } from "./worker"
 import path from "path"
@@ -12,10 +11,6 @@ import { withNetworkOptions, resolveNetworkOptions } from "@/cli/network"
 import { Filesystem } from "@/util/filesystem"
 import type { GlobalEvent } from "@opencode-ai/sdk/v2"
 import type { EventSource } from "./context/sdk"
-import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
-import { TuiConfig } from "@/config/tui"
-import { Instance } from "@/project/instance"
-import { writeHeapSnapshot } from "v8"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -102,6 +97,8 @@ export const TuiThreadCommand = cmd({
         describe: "agent to use",
       }),
   handler: async (args) => {
+    const [{ tui }, { win32DisableProcessedInput, win32InstallCtrlCGuard }, { TuiConfig }, { Instance }] =
+      await Promise.all([import("./app"), import("./win32"), import("@/config/tui"), import("@/project/instance")])
     // Keep ENABLE_PROCESSED_INPUT cleared even if other code flips it.
     // (Important when running under `bun run` wrappers on Windows.)
     const unguard = win32InstallCtrlCGuard()
@@ -205,6 +202,7 @@ export const TuiThreadCommand = cmd({
         await tui({
           url: transport.url,
           async onSnapshot() {
+            const { writeHeapSnapshot } = await import("v8")
             const tui = writeHeapSnapshot("tui.heapsnapshot")
             const server = await client.call("snapshot", undefined)
             return [tui, server]

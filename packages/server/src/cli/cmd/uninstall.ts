@@ -1,8 +1,7 @@
 import type { Argv } from "yargs"
 import { UI } from "../ui"
 import * as prompts from "@clack/prompts"
-import { AppRuntime } from "@/effect/app-runtime"
-import { Installation } from "../../installation"
+import type { Installation } from "../../installation"
 import { Global } from "../../global"
 import fs from "fs/promises"
 import path from "path"
@@ -53,6 +52,7 @@ export const UninstallCommand = {
       }),
 
   handler: async (args: UninstallArgs) => {
+    const [{ AppRuntime }, { Installation }] = await Promise.all([import("@/effect/app-runtime"), import("../../installation")])
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()

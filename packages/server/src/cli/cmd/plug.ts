@@ -3,9 +3,6 @@ import type { Argv } from "yargs"
 
 import { ConfigPaths } from "../../config/paths"
 import { Global } from "../../global"
-import { installPlugin, patchPluginConfig, readPluginManifest } from "../../plugin/install"
-import { resolvePluginTarget } from "../../plugin/shared"
-import { Instance } from "../../project/instance"
 import { errorMessage } from "../../util/error"
 import { Filesystem } from "../../util/filesystem"
 import { Process } from "../../util/process"
@@ -51,7 +48,10 @@ const defaultPlugDeps: PlugDeps = {
     info: (msg) => log.info(msg),
     success: (msg) => log.success(msg),
   },
-  resolve: (spec) => resolvePluginTarget(spec),
+  resolve: async (spec) => {
+    const { resolvePluginTarget } = await import("../../plugin/shared")
+    return resolvePluginTarget(spec)
+  },
   readText: (file) => Filesystem.readText(file),
   write: async (file, text) => {
     await Filesystem.write(file, text)
@@ -73,6 +73,7 @@ export function createPlugTask(input: PlugInput, dep: PlugDeps = defaultPlugDeps
   const global = Boolean(input.global)
 
   return async (ctx: PlugCtx) => {
+    const { installPlugin, patchPluginConfig, readPluginManifest } = await import("../../plugin/install")
     const install = dep.spinner()
     install.start("Installing plugin package...")
     const target = await installPlugin(mod, dep)
@@ -199,6 +200,7 @@ export const PluginCommand = cmd({
       })
   },
   handler: async (args) => {
+    const { Instance } = await import("../../project/instance")
     const mod = String(args.module ?? "").trim()
     if (!mod) {
       UI.error("module is required")

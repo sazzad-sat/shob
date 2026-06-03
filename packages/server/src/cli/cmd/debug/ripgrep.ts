@@ -1,7 +1,4 @@
 import { EOL } from "os"
-import { Ripgrep } from "../../../file/ripgrep"
-import { Instance } from "../../../project/instance"
-import { bootstrap } from "../../bootstrap"
 import { cmd } from "../cmd"
 
 export const RipgrepCommand = cmd({
@@ -19,6 +16,11 @@ const TreeCommand = cmd({
       type: "number",
     }),
   async handler(args) {
+    const [{ bootstrap }, { Instance }, { Ripgrep }] = await Promise.all([
+      import("../../bootstrap"),
+      import("../../../project/instance"),
+      import("../../../file/ripgrep"),
+    ])
     await bootstrap(process.cwd(), async () => {
       process.stdout.write((await Ripgrep.tree({ cwd: Instance.directory, limit: args.limit })) + EOL)
     })
@@ -43,6 +45,11 @@ const FilesCommand = cmd({
         description: "Limit number of results",
       }),
   async handler(args) {
+    const [{ bootstrap }, { Instance }, { Ripgrep }] = await Promise.all([
+      import("../../bootstrap"),
+      import("../../../project/instance"),
+      import("../../../file/ripgrep"),
+    ])
     await bootstrap(process.cwd(), async () => {
       const files: string[] = []
       for await (const file of Ripgrep.files({
@@ -76,6 +83,7 @@ const SearchCommand = cmd({
         description: "Limit number of results",
       }),
   async handler(args) {
+    const { Ripgrep } = await import("../../../file/ripgrep")
     const results = await Ripgrep.search({
       cwd: process.cwd(),
       pattern: args.pattern,

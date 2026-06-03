@@ -1,8 +1,5 @@
 import { UI } from "../ui"
 import { cmd } from "./cmd"
-import { AppRuntime } from "@/effect/app-runtime"
-import { Git } from "@/git"
-import { Instance } from "@/project/instance"
 import { Process } from "@/util/process"
 
 export const PrCommand = cmd({
@@ -15,6 +12,11 @@ export const PrCommand = cmd({
       demandOption: true,
     }),
   async handler(args) {
+    const [{ AppRuntime }, { Git }, { Instance }] = await Promise.all([
+      import("@/effect/app-runtime"),
+      import("@/git"),
+      import("@/project/instance"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {

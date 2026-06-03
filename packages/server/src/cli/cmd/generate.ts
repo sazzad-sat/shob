@@ -1,9 +1,9 @@
-import { Server } from "../../server/server"
 import type { CommandModule } from "yargs"
 
 export const GenerateCommand = {
   command: "generate",
   handler: async () => {
+    const { Server } = await import("../../server/server")
     const specs = await Server.openapi()
     for (const item of Object.values(specs.paths)) {
       for (const method of ["get", "post", "put", "delete", "patch"] as const) {

@@ -1,15 +1,10 @@
-import { Auth } from "../../auth"
 import { cmd } from "./cmd"
 import * as prompts from "@clack/prompts"
 import { UI } from "../ui"
-import { ModelsDev } from "../../provider/models"
 import { map, pipe, sortBy, values } from "remeda"
 import path from "path"
 import os from "os"
-import { Config } from "../../config/config"
 import { Global } from "../../global"
-import { Plugin } from "../../plugin"
-import { Instance } from "../../project/instance"
 import type { Hooks } from "@opencode-ai/plugin"
 import { Process } from "../../util/process"
 import { text } from "node:stream/consumers"
@@ -17,6 +12,7 @@ import { text } from "node:stream/consumers"
 type PluginAuth = NonNullable<Hooks["auth"]>
 
 async function handlePluginAuth(plugin: { auth: PluginAuth }, provider: string, methodName?: string): Promise<boolean> {
+  const { Auth } = await import("../../auth")
   let index = 0
   if (methodName) {
     const match = plugin.auth.methods.findIndex((x) => x.label.toLowerCase() === methodName.toLowerCase())
@@ -210,6 +206,7 @@ export const ProvidersListCommand = cmd({
   aliases: ["ls"],
   describe: "list providers and credentials",
   async handler(_args) {
+    const [{ Auth }, { ModelsDev }] = await Promise.all([import("../../auth"), import("../../provider/models")])
     UI.empty()
     const authPath = path.join(Global.Path.data, "auth.json")
     const homedir = os.homedir()
@@ -271,6 +268,13 @@ export const ProvidersLoginCommand = cmd({
         type: "string",
       }),
   async handler(args) {
+    const [{ Auth }, { Config }, { Instance }, { ModelsDev }, { Plugin }] = await Promise.all([
+      import("../../auth"),
+      import("../../config/config"),
+      import("../../project/instance"),
+      import("../../provider/models"),
+      import("../../plugin"),
+    ])
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
@@ -457,6 +461,7 @@ export const ProvidersLogoutCommand = cmd({
   command: "logout",
   describe: "log out from a configured provider",
   async handler(_args) {
+    const [{ Auth }, { ModelsDev }] = await Promise.all([import("../../auth"), import("../../provider/models")])
     UI.empty()
     const credentials = await Auth.all().then((x) => Object.entries(x))
     prompts.intro("Remove credential")

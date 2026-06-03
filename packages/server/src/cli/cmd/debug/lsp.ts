@@ -1,5 +1,3 @@
-import { LSP } from "../../../lsp"
-import { bootstrap } from "../../bootstrap"
 import { cmd } from "../cmd"
 import { Log } from "../../../util/log"
 import { EOL } from "os"
@@ -18,6 +16,7 @@ const DiagnosticsCommand = cmd({
   describe: "get diagnostics for a file",
   builder: (yargs) => yargs.positional("file", { type: "string", demandOption: true }),
   async handler(args) {
+    const [{ bootstrap }, { LSP }] = await Promise.all([import("../../bootstrap"), import("../../../lsp")])
     await bootstrap(process.cwd(), async () => {
       await LSP.touchFile(args.file, true)
       await sleep(1000)
@@ -31,6 +30,7 @@ export const SymbolsCommand = cmd({
   describe: "search workspace symbols",
   builder: (yargs) => yargs.positional("query", { type: "string", demandOption: true }),
   async handler(args) {
+    const [{ bootstrap }, { LSP }] = await Promise.all([import("../../bootstrap"), import("../../../lsp")])
     await bootstrap(process.cwd(), async () => {
       using _ = Log.Default.time("symbols")
       const results = await LSP.workspaceSymbol(args.query)
@@ -44,6 +44,7 @@ export const DocumentSymbolsCommand = cmd({
   describe: "get symbols from a document",
   builder: (yargs) => yargs.positional("uri", { type: "string", demandOption: true }),
   async handler(args) {
+    const [{ bootstrap }, { LSP }] = await Promise.all([import("../../bootstrap"), import("../../../lsp")])
     await bootstrap(process.cwd(), async () => {
       using _ = Log.Default.time("document-symbols")
       const results = await LSP.documentSymbol(args.uri)

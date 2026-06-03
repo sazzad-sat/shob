@@ -1,8 +1,4 @@
 import type { Argv } from "yargs"
-import { Instance } from "../../project/instance"
-import { Provider } from "../../provider/provider"
-import { ProviderID } from "../../provider/schema"
-import { ModelsDev } from "../../provider/models"
 import { cmd } from "./cmd"
 import { UI } from "../ui"
 import { EOL } from "os"
@@ -27,6 +23,12 @@ export const ModelsCommand = cmd({
       })
   },
   handler: async (args) => {
+    const [{ Instance }, { Provider }, { ProviderID }, { ModelsDev }] = await Promise.all([
+      import("../../project/instance"),
+      import("../../provider/provider"),
+      import("../../provider/schema"),
+      import("../../provider/models"),
+    ])
     if (args.refresh) {
       await ModelsDev.refresh(true)
       UI.println(UI.Style.TEXT_SUCCESS_BOLD + "Models cache refreshed" + UI.Style.TEXT_NORMAL)
@@ -37,7 +39,7 @@ export const ModelsCommand = cmd({
       async fn() {
         const providers = await Provider.list()
 
-        function printModels(providerID: ProviderID, verbose?: boolean) {
+        function printModels(providerID: string, verbose?: boolean) {
           const provider = providers[providerID]
           const sortedModels = Object.entries(provider.models).sort(([a], [b]) => a.localeCompare(b))
           for (const [modelID, model] of sortedModels) {
