@@ -3,7 +3,7 @@ import { nativeApi } from './services/native'
 import { TitleBar } from './components/TitleBar'
 import { MainView } from './components/MainView'
 import { useStore } from './store'
-import { getThemeById, resolveAppThemeTokens } from './theme'
+import { applyAppTheme, getThemeById, resolveThemeMode, type ResolvedThemeMode } from './theme'
 import { ErrorPage } from './pages/error'
 import { showToast } from '@opencode-ai/ui/toast'
 import { useSettings } from './context/settings'
@@ -14,7 +14,7 @@ function App() {
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
   const [isBooting, setIsBooting] = createSignal(true)
-  const [systemMode, setSystemMode] = createSignal<'light' | 'dark'>(
+  const [systemMode, setSystemMode] = createSignal<ResolvedThemeMode>(
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
   )
 
@@ -133,16 +133,9 @@ function App() {
   })
 
   createEffect(() => {
-    const scheme = colorScheme()
-    const isDark = scheme === 'dark' || (scheme === 'system' && systemMode() === 'dark')
-    const mode = isDark ? 'dark' : 'light'
+    const mode = resolveThemeMode(colorScheme(), systemMode())
     const theme = getThemeById(themeId())
-    const tokens = resolveAppThemeTokens(theme, mode)
-    Object.entries(tokens).forEach(([key, value]) => document.documentElement.style.setProperty(key, value))
-    document.documentElement.dataset.theme = theme.id
-    document.documentElement.dataset.colorScheme = mode
-    document.documentElement.style.colorScheme = mode
-    document.documentElement.classList.toggle('dark', mode === 'dark')
+    const tokens = applyAppTheme(theme, mode)
     const background = tokens['--background-base'] ?? tokens['--background']
     if (window.shob && background) {
       void nativeApi.invoke('set_window_background', { color: background }).catch(() => undefined)

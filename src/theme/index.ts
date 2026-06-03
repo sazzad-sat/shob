@@ -2,6 +2,7 @@ import { resolveThemeVariant } from "./resolve"
 import type { DesktopTheme, ResolvedTheme, ThemeVariant } from "./types"
 
 export type ThemeScheme = "system" | "light" | "dark"
+export type ResolvedThemeMode = "light" | "dark"
 export type OpenCodeThemeVariant = ThemeVariant
 export type OpenCodeTheme = DesktopTheme
 
@@ -67,6 +68,41 @@ export const resolveAppThemeTokens = (theme: OpenCodeTheme, mode: 'light' | 'dar
     '--icon-weaker': pick(tokens, "icon-weak-base", isDark ? "#343434" : "#c7c7c7"),
     '--icon-strong': pick(tokens, "icon-strong-base", foreground),
   }
+}
+
+export const resolveThemeMode = (scheme: ThemeScheme, systemMode: ResolvedThemeMode): ResolvedThemeMode =>
+  scheme === 'dark' || (scheme === 'system' && systemMode === 'dark') ? 'dark' : 'light'
+
+let lastAppliedThemeKey: string | null = null
+let lastAppliedThemeTokens: Record<string, string> | null = null
+
+export const applyAppTheme = (theme: OpenCodeTheme, mode: ResolvedThemeMode): Record<string, string> => {
+  const tokens = resolveAppThemeTokens(theme, mode)
+
+  if (typeof document !== 'undefined') {
+    const root = document.documentElement
+    const themeKey = `${theme.id}:${mode}`
+    const isAlreadyApplied =
+      lastAppliedThemeKey === themeKey &&
+      root.dataset.theme === theme.id &&
+      root.dataset.colorScheme === mode
+
+    if (!isAlreadyApplied) {
+      Object.entries(tokens).forEach(([key, value]) => {
+        if (lastAppliedThemeTokens?.[key] !== value) {
+          root.style.setProperty(key, value)
+        }
+      })
+      root.dataset.theme = theme.id
+      root.dataset.colorScheme = mode
+      root.style.colorScheme = mode
+      root.classList.toggle('dark', mode === 'dark')
+      lastAppliedThemeKey = themeKey
+      lastAppliedThemeTokens = tokens
+    }
+  }
+
+  return tokens
 }
 
 export const getThemeById = (id: string | null | undefined): OpenCodeTheme => OPEN_CODE_THEMES[id ?? ''] ?? OPEN_CODE_THEMES[FALLBACK_THEME_ID]
