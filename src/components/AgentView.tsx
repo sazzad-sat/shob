@@ -382,13 +382,13 @@ function AgentViewInner(props: AgentViewProps) {
   const navigate = useNavigate()
   const settings = useSettings()
   const providers = useProviders()
-  const activeSidebarSessionId = useStore((s) => s.activeSessionId)
   const setActiveSidebarSession = useStore((s) => s.setActiveSession)
   const projects = useStore((s) => s.projects)
   const currentProjectId = useStore((s) => s.currentProjectId)
   const setCurrentProject = useStore((s) => s.setCurrentProject)
   const renameSession = useStore((s) => s.renameSession)
   const updateSession = useStore((s) => s.updateSession)
+  const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
   const language = useLanguage()
   const [showJump, setShowJump] = createSignal(false)
   const [sessionMenuOpen, setSessionMenuOpen] = createSignal(false)
@@ -435,10 +435,6 @@ function AgentViewInner(props: AgentViewProps) {
     return sessionID ? currentProject()?.sessions.find((session) => session.id === sessionID) ?? null : null
   })
   const title = createMemo(() => currentLocalSession()?.name || sessionTitle(info()?.title) || "New session")
-  const parentSessionID = createMemo(() => {
-    const session = info() as { parentID?: string } | undefined
-    return session?.parentID
-  })
   const statusInfo = createMemo<SessionStatus>(() => {
     const sessionID = activeSessionId()
     return sessionID ? sync.data.session_status[sessionID] ?? idleStatus : idleStatus
@@ -711,15 +707,65 @@ function AgentViewInner(props: AgentViewProps) {
   }
 
   const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
-  const goToParentSession = () => {
-    const parentID = parentSessionID()
-    const dir = params.dir
-    if (!parentID || !dir) return
-    navigate(`/${dir}/session/${parentID}`)
+
+  const syncSessionIntoProject = async (targetSessionID: string) => {
+    const project = currentProject()
+    if (!project) return false
+    if (project.sessions.some((session) => session.id === targetSessionID)) return true
+
+    const syncedSession = sync.data.session.find((session) => session.id === targetSessionID)
+    if (!syncedSession) {
+      await sync.session.sync(targetSessionID).catch(() => undefined)
+    }
+
+    if (!sync.data.session.some((session) => session.id === targetSessionID)) return false
+
+    const syncedById = new Map(sync.data.session.map((session) => [session.id, session]))
+    const existingSessions = project.sessions
+      .filter((session) => !syncedById.has(session.id))
+      .map((session) => ({
+        id: session.id,
+        title: session.name,
+        parentID: session.parentSessionId ?? undefined,
+        time: {
+          created: session.createdAt ?? undefined,
+          updated: session.lastActiveAt ?? session.createdAt ?? undefined,
+        },
+      }))
+    await syncOpenCodeSessions(project.id, [...sync.data.session, ...existingSessions] as any)
+    return true
+  }
+
+  const navigateToSession = (targetSessionID: string) => {
+    if (!targetSessionID || targetSessionID === activeSessionId()) return
+    void syncSessionIntoProject(targetSessionID).then((ready) => {
+      if (!ready) {
+        showToast({
+          variant: "error",
+          title: "Subagent not ready",
+          description: "Could not find that subagent session yet.",
+        })
+        return
+      }
+      setActiveSidebarSession(targetSessionID)
+      const dir = params.dir
+      if (dir) navigate(`/${dir}/session/${targetSessionID}`)
+    })
+  }
+
+  const visibleAssistantPart = (part: Part) => {
+    if (part.type === "text") return Boolean(part.text?.trim())
+    if (part.type === "reasoning") return Boolean(part.text?.trim())
+    if (part.type === "tool") return part.tool !== "todowrite"
+    return false
   }
 
   return (
-    <DataProvider data={sync.data} directory={props.projectPath ?? ""}>
+    <DataProvider
+      data={sync.data}
+      directory={props.projectPath ?? ""}
+      onNavigateToSession={navigateToSession}
+    >
       <FileComponentProvider component={FilePreview}>
         <>
         <Show when={renameOpen()}>
@@ -913,15 +959,6 @@ function AgentViewInner(props: AgentViewProps) {
                     </div>
                     <div class="ml-auto flex shrink-0 items-center gap-2">
                       <AgentHeaderPanelControls projectPath={props.projectPath ?? currentProject()?.path} />
-                      <Show when={parentSessionID()}>
-                        <button
-                          type="button"
-                          class="shrink-0 rounded-[4px] border border-border px-2 py-1 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                          onClick={goToParentSession}
-                        >
-                          Back to parent
-                        </button>
-                      </Show>
                     </div>
                   </div>
                 </div>
@@ -941,8 +978,7 @@ function AgentViewInner(props: AgentViewProps) {
                           if (assistantMessageError(msg)) visible++
                           const parts = getParts(msg.id)
                           for (const part of parts) {
-                            if (part.type === "text" && part.text?.trim()) visible++
-                            if (part.type === "tool" && part.tool !== "todowrite") visible++
+                            if (visibleAssistantPart(part)) visible++
                           }
                         }
                         return visible
@@ -992,7 +1028,7 @@ function AgentViewInner(props: AgentViewProps) {
                                     >
                                       <AssistantParts
                                         messages={assistants() as any}
-                                        showReasoningSummaries={settings.general.showReasoningSummaries()}
+                                        showReasoningSummaries={true}
                                         working={working() && latestTurn()}
                                         turnDurationMs={turnDurationMs(message, assistants())}
                                         showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
@@ -1037,7 +1073,7 @@ function AgentViewInner(props: AgentViewProps) {
                               <Message
                                 message={message}
                                 parts={getParts(message.id)}
-                                showReasoningSummaries={settings.general.showReasoningSummaries()}
+                                showReasoningSummaries={true}
                               />
                             </div>
                             <Show when={assistantMessageError(message)} keyed>
