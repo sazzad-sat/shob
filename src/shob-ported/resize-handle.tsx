@@ -36,7 +36,7 @@ export function ResizeHandle(props: ResizeHandleProps) {
       role="separator"
       aria-orientation="vertical"
       onPointerDown={start as JSX.EventHandlerUnion<HTMLDivElement, PointerEvent>}
-      class={`opencode-resize-handle opencode-resize-handle-${props.edge} ${props.class ?? ""}`}
+      class={`shob-resize-handle shob-resize-handle-${props.edge} ${props.class ?? ""}`}
     />
   )
 }

@@ -14,12 +14,12 @@ import {
 } from '../utils';
 import { CLI_CATALOG, DEFAULT_CLI_ID, type CliProbeResult } from '../config/check';
 import type { Project, Session, CliTool } from '../types';
-import { toLocalOpenCodeSession } from '@/utils/opencode-session';
+import { toLocalShobSession } from '@/utils/shob-session';
 
 const SESSION_ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 let launchSessionQueue: Promise<unknown> = Promise.resolve();
 
-type OpenCodeSession = {
+type ShobSession = {
   id: string;
   parentID?: string;
   title?: string;
@@ -130,7 +130,7 @@ interface AppActions {
   renameSession: (projectId: string, sessionId: string, name: string) => Promise<void>;
   updateSession: (projectId: string, sessionId: string, updates: Partial<Session>) => Promise<void>;
   removeSession: (projectId: string, sessionId: string) => Promise<void>;
-  syncOpenCodeSessions: (projectId: string, sessions: OpenCodeSession[]) => Promise<void>;
+  syncShobSessions: (projectId: string, sessions: ShobSession[]) => Promise<void>;
   setActiveSession: (sessionId: string | null) => void;
   recordSessionActivity: (projectId: string, sessionId: string, at?: number) => Promise<void>;
   recordSessionCommand: (projectId: string, sessionId: string, at?: number) => Promise<void>;
@@ -542,7 +542,7 @@ export const actions: AppActions = {
     api.saveProject(updatedProject).catch(() => undefined);
   },
 
-  syncOpenCodeSessions: async (projectId: string, sessions: OpenCodeSession[]) => {
+  syncShobSessions: async (projectId: string, sessions: ShobSession[]) => {
     const project = store.projects.find((p) => p.id === projectId);
     if (!project) return;
 
@@ -551,7 +551,7 @@ export const actions: AppActions = {
       .filter((session) => session.id?.startsWith('ses'))
       .filter((session) => !session.time?.archived)
         .map((session): Session => {
-          return toLocalOpenCodeSession(session, {
+          return toLocalShobSession(session, {
             shell: store.preferredShell ?? (process.platform === 'win32' ? 'powershell.exe' : '/bin/sh'),
             pinned: existingPinned.get(session.id) ?? false,
           });

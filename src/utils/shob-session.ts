@@ -1,7 +1,7 @@
 import type { Session as LocalSession } from "@/types"
 import { sessionTitle } from "./session-title"
 
-export type OpenCodeSessionLike = {
+export type ShobSessionLike = {
   id: string
   parentID?: string
   title?: string
@@ -12,14 +12,14 @@ export type OpenCodeSessionLike = {
   }
 }
 
-export const openCodeSessionUpdatedAt = (session: OpenCodeSessionLike) =>
+export const shobSessionUpdatedAt = (session: ShobSessionLike) =>
   session.time?.updated ?? session.time?.created ?? 0
 
-export const sortOpenCodeSessionsById = <T extends { id: string }>(sessions: T[]) =>
+export const sortShobSessionsById = <T extends { id: string }>(sessions: T[]) =>
   [...sessions].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
 
-export function toLocalOpenCodeSession(
-  session: OpenCodeSessionLike,
+export function toLocalShobSession(
+  session: ShobSessionLike,
   options: { shell?: string | null; pinned?: boolean } = {},
 ): LocalSession {
   const now = Date.now()

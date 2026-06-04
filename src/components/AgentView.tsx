@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show } from "solid-js"
-import { PromptInput } from "../opencode-ported/prompt-input"
-import { sendFollowupDraft, type FollowupDraft } from "@/opencode-ported/prompt-input/submit"
-import { MockSessionProviders } from "../opencode-ported/mock-session-layout"
+import { PromptInput } from "../shob-ported/prompt-input"
+import { sendFollowupDraft, type FollowupDraft } from "@/shob-ported/prompt-input/submit"
+import { MockSessionProviders } from "../shob-ported/mock-session-layout"
 import { useSync } from "@/context/sync"
 import { useGlobalSync } from "@/context/global-sync"
 import { useNavigate, useParams } from "@solidjs/router"
@@ -10,13 +10,14 @@ import { DataProvider, FileComponentProvider } from "@opencode-ai/ui/context"
 import { AppIcon } from "@opencode-ai/ui/app-icon"
 import { Icon } from "@opencode-ai/ui/icon"
 import { sessionTitle } from "@/utils/session-title"
-import { createSessionComposerState } from "@/opencode-ported/composer/session-composer-state"
-import { SessionQuestionDock } from "@/opencode-ported/composer/session-question-dock"
-import { SessionPermissionDock } from "@/opencode-ported/composer/session-permission-dock"
-import { SessionTodoDock } from "@/opencode-ported/composer/session-todo-dock"
+import { createSessionComposerState } from "@/shob-ported/composer/session-composer-state"
+import { SessionQuestionDock } from "@/shob-ported/composer/session-question-dock"
+import { SessionPermissionDock } from "@/shob-ported/composer/session-permission-dock"
+import { SessionTodoDock } from "@/shob-ported/composer/session-todo-dock"
 import { useLanguage } from "@/context/language"
-import { File as OpenCodeFile } from "@opencode-ai/ui/file"
+import { File as ShobFile } from "@opencode-ai/ui/file"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
+import { createResizeObserver } from "@solid-primitives/resize-observer"
 import type { EventSessionError, Message as ChatMessage, Part, SessionStatus } from "@opencode-ai/sdk/v2/client"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Button } from "@opencode-ai/ui/button"
@@ -30,7 +31,7 @@ import { SessionRetry } from "@opencode-ai/ui/session-retry"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useSDK } from "@/context/sdk"
 import { formatServerError } from "@/utils/server-errors"
-import { Check, ChevronDown, Copy, MoreHorizontal, Pencil, Pin, RefreshCw, ShieldCheck, TriangleAlert, X } from "lucide-solid"
+import { Check, ChevronDown, Copy, MoreHorizontal, Pencil, Pin, RefreshCw, TriangleAlert, X } from "lucide-solid"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -169,21 +170,16 @@ function AgentErrorFallback(props: { error: unknown; reset: () => void }) {
 }
 
 function AutoCompactStrip(props: { context: SessionContextMetricsContext | undefined; compacting: boolean }) {
-  const guardUsage = createMemo(() => props.context?.autoCompactUsage ?? props.context?.usage ?? null)
   const full = createMemo(() => Boolean(props.context?.autoCompactAt && props.context.total >= props.context.autoCompactAt))
-  const visible = createMemo(() => props.compacting || full() || (guardUsage() ?? 0) >= 80)
-  const tone = createMemo(() => {
-    if (props.compacting || full()) return "var(--syntax-warning)"
-    return "var(--syntax-success)"
-  })
+  const visible = createMemo(() => props.compacting || full())
 
   return (
     <Show when={visible()}>
       <div class="mb-2 flex min-h-8 items-center gap-2 rounded-md border border-border-weaker-base bg-surface-raised-base px-2.5 py-1.5 text-[12px] text-text-base shadow-sm">
-        <span class="shrink-0" style={{ color: tone() }}>
+        <span class="shrink-0 text-[var(--syntax-warning)]">
           <Show
             when={props.compacting}
-            fallback={full() ? <TriangleAlert size={14} /> : <ShieldCheck size={14} />}
+            fallback={<TriangleAlert size={14} />}
           >
             <RefreshCw size={14} class="animate-spin" />
           </Show>
@@ -191,7 +187,7 @@ function AutoCompactStrip(props: { context: SessionContextMetricsContext | undef
         <span class="min-w-0 flex-1 truncate">
           <Show
             when={props.compacting}
-            fallback={full() ? "Context full. Auto compact will run now." : "Auto compact armed."}
+            fallback="Context full. Auto compact will run now."
           >
             Auto compacting context...
           </Show>
@@ -423,7 +419,7 @@ function AgentViewInner(props: AgentViewProps) {
   const currentProjectId = useStore((s) => s.currentProjectId)
   const renameSession = useStore((s) => s.renameSession)
   const updateSession = useStore((s) => s.updateSession)
-  const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
+  const syncShobSessions = useStore((s) => s.syncShobSessions)
   const language = useLanguage()
   const [showJump, setShowJump] = createSignal(false)
   const [sessionMenuOpen, setSessionMenuOpen] = createSignal(false)
@@ -434,8 +430,14 @@ function AgentViewInner(props: AgentViewProps) {
   const [autoCompactingContext, setAutoCompactingContext] = createSignal(false)
   const [autoCompactKey, setAutoCompactKey] = createSignal("")
   const [queuedFollowups, setQueuedFollowups] = createSignal<QueuedFollowup[]>([])
+  const [scrollEdge, setScrollEdge] = createSignal<"none" | "top" | "middle" | "bottom">("none")
   let scrollRef: HTMLDivElement | undefined
+  let contentRef: HTMLDivElement | undefined
+  let composerRegionRef: HTMLDivElement | undefined
+  let composerRegionHeight = 0
   let rafId: number | undefined
+  let scrollGestureAt = 0
+  let touchY: number | undefined
   const composerState = createSessionComposerState({ closeMs: 320 })
   const autoScroll = createAutoScroll({
     working: () => true,
@@ -466,9 +468,8 @@ function AgentViewInner(props: AgentViewProps) {
   })
   const autoCompactStripVisible = createMemo(() => {
     const context = contextInfo()
-    const guardUsage = context?.autoCompactUsage ?? context?.usage ?? null
     const full = Boolean(context?.autoCompactAt && context.total >= context.autoCompactAt)
-    return autoCompactingContext() || full || (guardUsage ?? 0) >= 80
+    return autoCompactingContext() || full
   })
   const composerDockVisible = createMemo(() =>
     Boolean(
@@ -689,11 +690,15 @@ function AgentViewInner(props: AgentViewProps) {
   // })
 
   const updateJumpState = () => {
-    if (!scrollRef) return
+    if (!scrollRef) {
+      setScrollEdge("none")
+      return
+    }
     const max = scrollRef.scrollHeight - scrollRef.clientHeight
     const distance = max - scrollRef.scrollTop
     const jumpThreshold = Math.max(400, scrollRef.clientHeight)
     setShowJump(max > 1 && distance > jumpThreshold)
+    setScrollEdge(max <= 1 ? "none" : scrollRef.scrollTop <= 1 ? "top" : distance <= 1 ? "bottom" : "middle")
   }
 
   const scheduleJumpStateUpdate = () => {
@@ -703,6 +708,100 @@ function AgentViewInner(props: AgentViewProps) {
       rafId = undefined
     })
   }
+
+  const isNestedScrollableTarget = (target: EventTarget | null) => {
+    const el = scrollRef
+    const current = target instanceof Element ? target : undefined
+    const nested = current?.closest("[data-scrollable]")
+    return !!(el && nested && nested !== el)
+  }
+
+  const markScrollGesture = (target?: EventTarget | null) => {
+    if (isNestedScrollableTarget(target ?? null)) return
+    scrollGestureAt = Date.now()
+  }
+
+  const hasScrollGesture = () => Date.now() - scrollGestureAt < 300
+
+  const handleTimelineScroll = () => {
+    scheduleJumpStateUpdate()
+    if (hasScrollGesture()) {
+      autoScroll.handleScroll()
+      return
+    }
+    if (!autoScroll.userScrolled()) autoScroll.scrollToBottom()
+  }
+
+  const handleTimelineWheel = (event: WheelEvent) => {
+    if (event.deltaY === 0) return
+    markScrollGesture(event.target)
+  }
+
+  const handleTimelineTouchStart = (event: TouchEvent) => {
+    if (isNestedScrollableTarget(event.target)) return
+    touchY = event.touches[0]?.clientY
+  }
+
+  const handleTimelineTouchMove = (event: TouchEvent) => {
+    if (isNestedScrollableTarget(event.target)) return
+    const next = event.touches[0]?.clientY
+    if (next === undefined || touchY === undefined) return
+    if (Math.abs(next - touchY) > 2) markScrollGesture(event.target)
+    touchY = next
+  }
+
+  const handleTimelineTouchEnd = () => {
+    touchY = undefined
+  }
+
+  const handleTimelinePointerDown = (event: PointerEvent) => {
+    if (event.target === event.currentTarget) markScrollGesture(event.target)
+  }
+
+  const handleTimelineKeyDown = (event: KeyboardEvent) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest("input, textarea, select, [contenteditable='true']")
+    ) {
+      return
+    }
+    if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) {
+      markScrollGesture(event.target)
+    }
+  }
+
+  const resumeScroll = () => {
+    autoScroll.forceScrollToBottom()
+    setShowJump(false)
+    queueMicrotask(scheduleJumpStateUpdate)
+  }
+
+  createResizeObserver(
+    () => contentRef,
+    () => {
+      if (!autoScroll.userScrolled()) autoScroll.scrollToBottom()
+      if (scrollRef) scheduleJumpStateUpdate()
+    },
+  )
+
+  createResizeObserver(
+    () => composerRegionRef,
+    ({ height }) => {
+      const next = Math.ceil(height)
+      if (next === composerRegionHeight) return
+
+      const el = scrollRef
+      const delta = next - composerRegionHeight
+      const stick = el
+        ? !autoScroll.userScrolled() || el.scrollHeight - el.clientHeight - el.scrollTop < 10 + Math.max(0, delta)
+        : false
+
+      composerRegionHeight = next
+
+      if (stick) autoScroll.forceScrollToBottom()
+      if (el) scheduleJumpStateUpdate()
+    },
+  )
 
   createEffect(() => {
     const sessionID = activeSessionId()
@@ -731,8 +830,7 @@ function AgentViewInner(props: AgentViewProps) {
   })
 
   const jumpToBottom = () => {
-    autoScroll.forceScrollToBottom()
-    setShowJump(false)
+    resumeScroll()
   }
 
   createEffect(() => {
@@ -752,6 +850,18 @@ function AgentViewInner(props: AgentViewProps) {
   const setScrollRef = (el: HTMLDivElement | undefined) => {
     scrollRef = el
     autoScroll.scrollRef(el)
+    if (el) queueMicrotask(scheduleJumpStateUpdate)
+  }
+
+  const setContentRef = (el: HTMLDivElement | undefined) => {
+    contentRef = el
+    autoScroll.contentRef(el)
+    if (scrollRef) queueMicrotask(scheduleJumpStateUpdate)
+  }
+
+  const setComposerRegionRef = (el: HTMLDivElement | undefined) => {
+    composerRegionRef = el
+    composerRegionHeight = 0
     if (el) queueMicrotask(scheduleJumpStateUpdate)
   }
 
@@ -780,7 +890,7 @@ function AgentViewInner(props: AgentViewProps) {
     return end - start
   }
 
-  const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
+  const FilePreview = (fileProps: any) => <ShobFile {...fileProps} />
 
   const syncSessionIntoProject = async (targetSessionID: string) => {
     const project = currentProject()
@@ -806,7 +916,7 @@ function AgentViewInner(props: AgentViewProps) {
           updated: session.lastActiveAt ?? session.createdAt ?? undefined,
         },
       }))
-    await syncOpenCodeSessions(project.id, [...sync.data.session, ...existingSessions] as any)
+    await syncShobSessions(project.id, [...sync.data.session, ...existingSessions] as any)
     return true
   }
 
@@ -973,16 +1083,22 @@ function AgentViewInner(props: AgentViewProps) {
             <div
               ref={setScrollRef}
               data-slot="session-turn-content"
-              class="agent-terminal-scroll h-full min-w-0 overflow-x-hidden overflow-y-auto thin-scrollbar"
+              data-scroll-edge={scrollEdge()}
+              class="agent-terminal-scroll agent-smart-scrollbar h-full min-w-0 overflow-x-hidden overflow-y-auto"
               classList={{ "agent-terminal-scroll-empty": isNewSession() }}
               style={{
                 "--session-title-height": "40px",
                 "--sticky-accordion-top": "48px",
               }}
               onScroll={() => {
-                autoScroll.handleScroll()
-                scheduleJumpStateUpdate()
+                handleTimelineScroll()
               }}
+              onWheel={handleTimelineWheel}
+              onTouchStart={handleTimelineTouchStart}
+              onTouchMove={handleTimelineTouchMove}
+              onTouchEnd={handleTimelineTouchEnd}
+              onPointerDown={handleTimelinePointerDown}
+              onKeyDown={handleTimelineKeyDown}
             >
               <div onClick={autoScroll.handleInteraction}>
                 <div
@@ -1038,7 +1154,7 @@ function AgentViewInner(props: AgentViewProps) {
                 </div>
 
                 <div
-                  ref={autoScroll.contentRef}
+                  ref={setContentRef}
                   class="agent-terminal-buffer min-h-full pb-56 pt-2"
                   classList={{ "agent-terminal-buffer-empty": isNewSession() }}
                 >
@@ -1169,7 +1285,7 @@ function AgentViewInner(props: AgentViewProps) {
                     <div class="agent-terminal-empty relative isolate flex min-h-0 flex-col items-stretch justify-center px-2 text-left overflow-visible md:mx-auto md:px-5">
                       <div class="agent-terminal-new-session relative z-10 w-full">
                         <div class="relative z-10 w-full text-left">
-                          <PromptInput />
+                          <PromptInput onSubmit={resumeScroll} />
                         </div>
                       </div>
                     </div>
@@ -1180,7 +1296,7 @@ function AgentViewInner(props: AgentViewProps) {
           </div>
 
           <Show when={showDockedComposer()}>
-            <>
+            <div ref={setComposerRegionRef} class="agent-terminal-composer-region">
               <Show when={composerDockVisible()}>
                 <div class="agent-terminal-composer-docks">
                   <Show when={activeQueuedFollowups().length > 0}>
@@ -1249,8 +1365,8 @@ function AgentViewInner(props: AgentViewProps) {
                   <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
                 </div>
               </Show>
-              <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} />
-            </>
+              <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
+            </div>
           </Show>
         </div>
         </>

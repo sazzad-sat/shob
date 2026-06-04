@@ -10,7 +10,7 @@ import { useStore } from '../store'
 import { createFileContext } from '@/context/file'
 import type { FileNode } from '@/types/file-node'
 import type { Session } from '@/types'
-import { ResizeHandle } from '@/opencode-ported/resize-handle'
+import { ResizeHandle } from '@/shob-ported/resize-handle'
 import { useGlobalSDK } from '@/context/global-sdk'
 import { useGlobalSync } from '@/context/global-sync'
 import { SDKProvider } from '@/context/sdk'
@@ -19,10 +19,10 @@ import { LayoutProvider, useLayout } from '@/context/layout'
 import type { SessionStatus, VcsFileDiff } from '@opencode-ai/sdk/v2'
 import { SessionReviewTab } from '@/pages/session/review-tab'
 import { FileComponentProvider } from '@opencode-ai/ui/context'
-import { File as OpenCodeFile } from '@opencode-ai/ui/file'
+import { File as ShobFile } from '@opencode-ai/ui/file'
 import { ScrollView } from '@opencode-ai/ui/scroll-view'
 import { SessionSidePanel } from '@/pages/session/session-side-panel'
-import { sortOpenCodeSessionsById } from '@/utils/opencode-session'
+import { sortShobSessionsById } from '@/utils/shob-session'
 
 
 const folderNameFromPath = (path: string) => {
@@ -69,7 +69,7 @@ function FileTabContent(props: { projectPath: () => string; filePath: string }) 
     }
   })
 
-  const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
+  const FilePreview = (fileProps: any) => <ShobFile {...fileProps} />
 
   return (
     <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background-base">
@@ -78,7 +78,7 @@ function FileTabContent(props: { projectPath: () => string; filePath: string }) 
           <Show when={content()} fallback={<div class="px-6 py-4 text-12-regular text-text-weak">Loading...</div>}>
             {(file) => (
               <div class="relative overflow-hidden pb-40">
-                <OpenCodeFile mode="text" file={file()} class="select-text" />
+                <ShobFile mode="text" file={file()} class="select-text" />
               </div>
             )}
           </Show>
@@ -88,7 +88,7 @@ function FileTabContent(props: { projectPath: () => string; filePath: string }) 
   )
 }
 
-function OpenCodeReviewContent(props: {
+function ShobReviewContent(props: {
   projectPath: () => string
   reviewDiffs: () => VcsFileDiff[]
   activeFilePath: () => string | null
@@ -108,7 +108,7 @@ function OpenCodeReviewContent(props: {
   const layout = useLayout()
   const sessionViewKey = createMemo(() => `${props.projectPath()}::workspace`)
   const view = createMemo(() => layout.view(sessionViewKey()))
-  const FilePreview = (fileProps: any) => <OpenCodeFile {...fileProps} />
+  const FilePreview = (fileProps: any) => <ShobFile {...fileProps} />
   const normalizeReviewPath = (path: string) => toPosix(path).replace(/^\/+/, "").toLowerCase()
   const activeDiffPath = createMemo(() => {
     const active = props.activeFilePath()
@@ -534,7 +534,7 @@ export function MainView() {
     setProjectStore("session", (sessions) =>
       hadSession
         ? sessions.map((session) => (session.id === created.id ? created : session))
-        : sortOpenCodeSessionsById([...sessions, created]),
+        : sortShobSessionsById([...sessions, created]),
     )
     setProjectStore("message", created.id, (messages) => messages ?? [])
     if (!projectStore.session_status[created.id]) {
@@ -543,7 +543,7 @@ export function MainView() {
     if (!hadSession && !created.parentID) {
       setProjectStore("sessionTotal", (total) => total + 1)
     }
-    void appStore.syncOpenCodeSessions(cpid, mergedSessions)
+    void appStore.syncShobSessions(cpid, mergedSessions)
     if (currentProjectId() !== cpid) appStore.setCurrentProject(cpid)
     appStore.setActiveSession(created.id)
     void globalSync.project.loadSessions(project.path)
@@ -662,7 +662,7 @@ export function MainView() {
                         <SDKProvider directory={projectPath}>
                           <SyncProvider>
                             <fileCtx.FileProvider>
-                              <OpenCodeReviewContent
+                              <ShobReviewContent
                                 projectPath={projectPath}
                                 reviewDiffs={reviewDiffs}
                                 activeFilePath={activeFilePath}

@@ -228,7 +228,7 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
 
   onMount(() => {
     const win = window as E2EWindow
-    if (!win.__opencode_e2e) return
+    if (!win.__shob_e2e) return
     const detail = formatError(props.error, language.t)
     console.error(`[e2e:error-boundary] ${window.location.pathname}\n${detail}`)
   })

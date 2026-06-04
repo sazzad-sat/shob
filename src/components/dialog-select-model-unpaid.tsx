@@ -20,7 +20,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
   const language = useLanguage()
 
   const connect = (provider: string) => {
-    void import("./opencode-settings/dialog-connect-provider").then((x) => {
+    void import("./shob-settings/dialog-connect-provider").then((x) => {
       dialog.show(() => <x.DialogConnectProvider provider={provider} />)
     })
   }

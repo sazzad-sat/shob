@@ -3,16 +3,16 @@ import type { DesktopTheme, ResolvedTheme, ThemeVariant } from "./types"
 
 export type ThemeScheme = "system" | "light" | "dark"
 export type ResolvedThemeMode = "light" | "dark"
-export type OpenCodeThemeVariant = ThemeVariant
-export type OpenCodeTheme = DesktopTheme
+export type ShobThemeVariant = ThemeVariant
+export type ShobTheme = DesktopTheme
 
-const files = import.meta.glob<{ default: OpenCodeTheme }>("./themes/*.json", { eager: true })
+const files = import.meta.glob<{ default: ShobTheme }>("./themes/*.json", { eager: true })
 
-export const OPEN_CODE_THEMES: Record<string, OpenCodeTheme> = Object.fromEntries(
+export const SHOB_THEMES: Record<string, ShobTheme> = Object.fromEntries(
   Object.values(files).map((mod) => [mod.default.id, mod.default]),
 )
 
-export const OPEN_CODE_THEME_LIST = Object.values(OPEN_CODE_THEMES).sort((a, b) => a.name.localeCompare(b.name))
+export const SHOB_THEME_LIST = Object.values(SHOB_THEMES).sort((a, b) => a.name.localeCompare(b.name))
 
 const FALLBACK_THEME_ID = 'oc-2'
 
@@ -21,7 +21,7 @@ const toCssVars = (tokens: ResolvedTheme): Record<string, string> =>
 
 const pick = (tokens: ResolvedTheme, key: string, fallback: string) => tokens[key] ?? fallback
 
-export const resolveAppThemeTokens = (theme: OpenCodeTheme, mode: 'light' | 'dark'): Record<string, string> => {
+export const resolveAppThemeTokens = (theme: ShobTheme, mode: 'light' | 'dark'): Record<string, string> => {
   const isDark = mode === 'dark'
   const tokens = resolveThemeVariant(isDark ? theme.dark : theme.light, isDark)
   const background = pick(tokens, "background-base", isDark ? "#101010" : "#f8f8f8")
@@ -76,7 +76,7 @@ export const resolveThemeMode = (scheme: ThemeScheme, systemMode: ResolvedThemeM
 let lastAppliedThemeKey: string | null = null
 let lastAppliedThemeTokens: Record<string, string> | null = null
 
-export const applyAppTheme = (theme: OpenCodeTheme, mode: ResolvedThemeMode): Record<string, string> => {
+export const applyAppTheme = (theme: ShobTheme, mode: ResolvedThemeMode): Record<string, string> => {
   const tokens = resolveAppThemeTokens(theme, mode)
 
   if (typeof document !== 'undefined') {
@@ -105,4 +105,4 @@ export const applyAppTheme = (theme: OpenCodeTheme, mode: ResolvedThemeMode): Re
   return tokens
 }
 
-export const getThemeById = (id: string | null | undefined): OpenCodeTheme => OPEN_CODE_THEMES[id ?? ''] ?? OPEN_CODE_THEMES[FALLBACK_THEME_ID]
+export const getThemeById = (id: string | null | undefined): ShobTheme => SHOB_THEMES[id ?? ''] ?? SHOB_THEMES[FALLBACK_THEME_ID]

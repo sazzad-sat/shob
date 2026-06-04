@@ -165,11 +165,11 @@ export function TitleBar() {
               <Icon size="small" name="download" />
             </Button>
           </Show>
-          <div id="opencode-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" style={{ "-webkit-app-region": "no-drag" }} />
+          <div id="shob-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" style={{ "-webkit-app-region": "no-drag" }} />
         </div>
 
         <div class="min-w-0 flex items-center justify-center pointer-events-none">
-          <div id="opencode-titlebar-center" class="pointer-events-auto min-w-0 flex justify-center w-fit max-w-full" />
+          <div id="shob-titlebar-center" class="pointer-events-auto min-w-0 flex justify-center w-fit max-w-full" />
         </div>
 
         <div
@@ -178,7 +178,7 @@ export function TitleBar() {
             "pr-2": !windows(),
           }}
         >
-          <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" style={{ "-webkit-app-region": "no-drag" }} />
+          <div id="shob-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" style={{ "-webkit-app-region": "no-drag" }} />
           {windows() && <div class="shrink-0" style={{ width: `${WINDOWS_CONTROLS_BASE_WIDTH}px` }} />}
         </div>
       </div>

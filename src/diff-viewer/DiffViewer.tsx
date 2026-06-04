@@ -1,7 +1,7 @@
 import { createMemo, createResource, createSignal, Show } from "solid-js"
 import { nativeApi } from "@/services/native"
 import { buildViewDiff } from "./session-diff"
-import { DiffChanges } from "@/opencode-ported/diff-changes"
+import { DiffChanges } from "@/shob-ported/diff-changes"
 import { Button } from "@/components/ui/button"
 
 type Props = {

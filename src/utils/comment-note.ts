@@ -26,7 +26,7 @@ function selection(selection: unknown) {
 
 export function createCommentMetadata(input: PromptComment) {
   return {
-    opencodeComment: {
+    shobComment: {
       path: input.path,
       selection: input.selection,
       comment: input.comment,
@@ -38,7 +38,7 @@ export function createCommentMetadata(input: PromptComment) {
 
 export function readCommentMetadata(value: unknown) {
   if (!value || typeof value !== "object") return
-  const meta = (value as { opencodeComment?: unknown }).opencodeComment
+  const meta = (value as { shobComment?: unknown }).shobComment
   if (!meta || typeof meta !== "object") return
   const path = (meta as { path?: unknown }).path
   const comment = (meta as { comment?: unknown }).comment

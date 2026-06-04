@@ -4,15 +4,15 @@ import { nativeApi } from "../services/native"
 import { useStore, setStore } from "../store"
 import type { Project } from "../types"
 import { api } from "../services/api"
-import { ResizeHandle } from "@/opencode-ported/resize-handle"
+import { ResizeHandle } from "@/shob-ported/resize-handle"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
-import type { Session as OpenCodeSession, SessionStatus } from "@opencode-ai/sdk/v2/client"
+import type { Session as ShobSession, SessionStatus } from "@opencode-ai/sdk/v2/client"
 import { DotsSpinner } from "./DotsSpinner"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
-import { sessionPermissionRequest } from "@/opencode-ported/composer/session-request-tree"
-import { sortOpenCodeSessionsById, toLocalOpenCodeSession } from "@/utils/opencode-session"
+import { sessionPermissionRequest } from "@/shob-ported/composer/session-request-tree"
+import { sortShobSessionsById, toLocalShobSession } from "@/utils/shob-session"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -290,7 +290,7 @@ function FolderSection(props: {
   onCreateSession: (projectId: string) => void
   onDeleteSession: (projectId: string, sessionId: string) => void
   onDeleteProject: (projectId: string) => void
-  onSyncOpenCodeSessions: (projectId: string, sessions: OpenCodeSession[]) => void
+  onSyncShobSessions: (projectId: string, sessions: ShobSession[]) => void
   onRenameSession: (projectId: string, sessionId: string, newName: string) => void
   onRenameProject: (projectId: string, name: string) => void | Promise<void>
   onToggleProjectPin: (projectId: string) => void | Promise<void>
@@ -309,7 +309,7 @@ function FolderSection(props: {
   const [renameProjectValue, setRenameProjectValue] = createSignal(props.project.name)
   const [renameProjectSaving, setRenameProjectSaving] = createSignal(false)
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
-  const openCodeSessions = createMemo(() => projectStore().session)
+  const shobSessions = createMemo(() => projectStore().session)
 
   // Periodic sortNow signal to dynamically recalculate session ages and keep sorting stable/reactive.
   const [sortNow, setSortNow] = createSignal(Date.now())
@@ -559,9 +559,9 @@ function FolderSection(props: {
   })
 
   createEffect(() => {
-    const sessions = openCodeSessions()
+    const sessions = shobSessions()
     if (projectStore().status === "loading" && sessions.length === 0) return
-    props.onSyncOpenCodeSessions(props.project.id, sessions)
+    props.onSyncShobSessions(props.project.id, sessions)
   })
 
   return (
@@ -818,7 +818,7 @@ export function Sidebar(props: {
   const addProject = useStore((s) => s.addProject)
   const preferredShell = useStore((s) => s.preferredShell)
   const removeSession = useStore((s) => s.removeSession)
-  const syncOpenCodeSessions = useStore((s) => s.syncOpenCodeSessions)
+  const syncShobSessions = useStore((s) => s.syncShobSessions)
   const deleteProject = useStore((s) => s.deleteProject)
   const updateProject = useStore((s) => s.updateProject)
   const renameSession = useStore((s) => s.renameSession)
@@ -920,7 +920,7 @@ export function Sidebar(props: {
     setProjectStore("session", (sessions) =>
       hadSession
         ? sessions.map((session) => (session.id === created.id ? created : session))
-        : sortOpenCodeSessionsById([...sessions, created]),
+        : sortShobSessionsById([...sessions, created]),
     )
     setProjectStore("message", created.id, (messages) => messages ?? [])
     if (!projectStore.session_status[created.id]) {
@@ -930,7 +930,7 @@ export function Sidebar(props: {
       setProjectStore("sessionTotal", (total) => total + 1)
     }
 
-    const localSession = toLocalOpenCodeSession(created, { shell: preferredShell() ?? "powershell.exe" })
+    const localSession = toLocalShobSession(created, { shell: preferredShell() ?? "powershell.exe" })
 
     const currentProject = projects().find((p) => p.id === projectId)
     if (currentProject) {
@@ -943,7 +943,7 @@ export function Sidebar(props: {
     }
     setActiveSession(created.id)
 
-    void syncOpenCodeSessions(projectId, mergedSessions)
+    void syncShobSessions(projectId, mergedSessions)
     void globalSync.project.loadSessions(project.path)
   }
 
@@ -977,10 +977,10 @@ export function Sidebar(props: {
     }
   }
 
-  const handleSyncOpenCodeSessions = (projectId: string, sessions: OpenCodeSession[]) => {
+  const handleSyncShobSessions = (projectId: string, sessions: ShobSession[]) => {
     const pendingDelete = pendingDeleteSessionIDs()
     const filtered = pendingDelete.size > 0 ? sessions.filter((s) => !pendingDelete.has(s.id)) : sessions
-    void syncOpenCodeSessions(projectId, filtered)
+    void syncShobSessions(projectId, filtered)
   }
 
   const handleDeleteProject = async (projectId: string) => {
@@ -1120,7 +1120,7 @@ export function Sidebar(props: {
                         onCreateSession={handleCreateSession}
                         onDeleteSession={handleDeleteSession}
                         onDeleteProject={handleDeleteProject}
-                        onSyncOpenCodeSessions={handleSyncOpenCodeSessions}
+                        onSyncShobSessions={handleSyncShobSessions}
                         onRenameSession={renameSession}
                         onRenameProject={handleRenameProject}
                         onToggleProjectPin={handleToggleProjectPin}

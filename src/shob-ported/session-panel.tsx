@@ -5,7 +5,7 @@ import { FileIcon } from "@/components/ui/file-icon"
 import { nativeApi } from "@/services/native"
 import { Icon } from "@/components/ui/icon"
 import FileTree from "@/components/FileTree"
-import { ResizeHandle } from "@/opencode-ported/resize-handle"
+import { ResizeHandle } from "@/shob-ported/resize-handle"
 
 type DiffKind = "add" | "del" | "mix"
 type DiffStats = { additions: number; deletions: number }
@@ -308,7 +308,7 @@ function SplitDiff(props: { chunks: Change[] }) {
   )
 }
 
-export function OpencodeSessionPanel(props: Props) {
+export function ShobSessionPanel(props: Props) {
   const file = createMemo(() => props.activeFile ?? "")
   const openFiles = createMemo(() => props.openFiles ?? (file() ? [file()] : []))
   

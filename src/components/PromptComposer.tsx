@@ -1,6 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 import { Send, CornerDownLeft, Plus, Globe } from 'lucide-solid'
-import { createGithubPill, parseTextWithGithubLinks } from '../opencode-ported/prompt-input/github-pill'
+import { createGithubPill, parseTextWithGithubLinks } from '../shob-ported/prompt-input/github-pill'
 
 interface PromptComposerProps {
   onSubmit: (text: string) => void

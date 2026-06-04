@@ -5,9 +5,9 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Tag } from "@opencode-ai/ui/tag"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
-import { DialogConnectProvider } from "./opencode-settings/dialog-connect-provider"
+import { DialogConnectProvider } from "./shob-settings/dialog-connect-provider"
 import { useLanguage } from "@/context/language"
-import { DialogCustomProvider } from "./opencode-settings/dialog-custom-provider"
+import { DialogCustomProvider } from "./shob-settings/dialog-custom-provider"
 
 const CUSTOM_ID = "_custom"
 

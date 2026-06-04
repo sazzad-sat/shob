@@ -1,10 +1,10 @@
 import { createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import { Boxes, SlidersHorizontal, Box, CircleHelp } from "lucide-solid"
-import { SettingsProviders } from "./opencode-settings/settings-providers"
-import { SettingsModels } from "./opencode-settings/settings-models"
+import { SettingsProviders } from "./shob-settings/settings-providers"
+import { SettingsModels } from "./shob-settings/settings-models"
 import { SettingsAbout } from "./settings-about"
 import { useStore } from "../store"
-import { applyAppTheme, getThemeById, OPEN_CODE_THEME_LIST, resolveThemeMode, type OpenCodeTheme } from "../theme"
+import { applyAppTheme, getThemeById, SHOB_THEME_LIST, resolveThemeMode, type ShobTheme } from "../theme"
 import { Combobox, ComboboxContent, ComboboxControl, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -227,16 +227,16 @@ export function SettingsPage() {
                 <SettingsRow title="Theme" description="Color palette">
                   <label class="sr-only" for="settings-theme-select">Theme</label>
                   <Combobox
-                    options={OPEN_CODE_THEME_LIST}
+                    options={SHOB_THEME_LIST}
                     optionValue="id"
                     optionTextValue="name"
                     optionLabel="name"
                     value={committedTheme()}
-                    onChange={(theme: OpenCodeTheme | null) => {
+                    onChange={(theme: ShobTheme | null) => {
                       if (theme) applyThemeSelection(theme.id)
                     }}
                     onOpenChange={handleThemeSelectOpenChange}
-                    itemComponent={(props: { item: { rawValue: OpenCodeTheme } }) => {
+                    itemComponent={(props: { item: { rawValue: ShobTheme } }) => {
                       const theme = props.item.rawValue
                       const colors = getThemeColors(theme, isDark())
 

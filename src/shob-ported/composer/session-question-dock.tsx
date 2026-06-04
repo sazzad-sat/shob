@@ -65,10 +65,10 @@ export function SessionQuestionDock(props: { request: QuestionRequest; onSubmit:
       header={<div data-slot="question-header-title">{language.t("ui.tool.questions")}</div>}
       footer={
         <>
-          <Button variant="ghost" size="large" disabled={sending()} onClick={reject}>
+          <Button variant="ghost" size="small" disabled={sending()} onClick={reject}>
             {language.t("ui.common.dismiss")}
           </Button>
-          <Button variant="primary" size="large" disabled={sending()} onClick={submit}>
+          <Button variant="primary" size="small" disabled={sending()} onClick={submit}>
             {language.t("ui.common.submit")}
           </Button>
         </>
@@ -98,11 +98,11 @@ export function SessionQuestionDock(props: { request: QuestionRequest; onSubmit:
         </For>
         <textarea
           data-slot="question-custom-input"
-          class="w-full rounded-md border border-border-weak-base bg-background-base px-3 py-2 text-13-regular text-text-strong"
+          class="w-full"
           placeholder={language.t("ui.question.custom.placeholder")}
           value={custom()}
           disabled={sending()}
-          rows={2}
+          rows={1}
           onInput={(e) => setCustom(e.currentTarget.value)}
         />
       </div>
