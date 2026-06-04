@@ -1012,6 +1012,17 @@ export function Sidebar(props: {
     void handleCreateSession(projectId)
   }
 
+  onMount(() => {
+    const handleCreateSessionRequest = () => {
+      handleCreateNewChat()
+    }
+
+    window.addEventListener("gg-create-session", handleCreateSessionRequest)
+    onCleanup(() => {
+      window.removeEventListener("gg-create-session", handleCreateSessionRequest)
+    })
+  })
+
   const handleSelectProjectOnly = (projectId: string) => {
     props.onOpenWorkspacePage?.()
     setCurrentProject(projectId)

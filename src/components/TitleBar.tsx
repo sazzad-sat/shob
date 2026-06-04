@@ -141,6 +141,18 @@ export function TitleBar() {
           >
             <Icon size="small" name={isSidebarVisible() ? "sidebar-active" : "sidebar"} />
           </Button>
+          <Show when={!isSidebarVisible()}>
+            <Button
+              variant="ghost"
+              class="titlebar-icon"
+              style={{ "-webkit-app-region": "no-drag" }}
+              onClick={() => window.dispatchEvent(new Event("gg-create-session"))}
+              title="Start a new session"
+              aria-label="Start a new session"
+            >
+              <Icon size="small" name="new-session" />
+            </Button>
+          </Show>
           <Show when={updateState() === "downloaded"}>
             <Button
               variant="ghost"
