@@ -1,7 +1,6 @@
 # Shob — The Open AI Agent Workspace
 
-<img width="1130" height="830" alt="image" src="https://github.com/user-attachments/assets/1e15ab35-afb3-4f52-a351-8b741723195e" />
-
+<img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/b96f3c9e-7ce8-4d22-8ffa-1b26d4ff7802" />
 
 Build faster. Automate more. Stay in control.
 
