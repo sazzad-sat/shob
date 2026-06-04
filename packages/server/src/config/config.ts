@@ -1085,6 +1085,22 @@ export namespace Config {
         .object({
           auto: z.boolean().optional().describe("Enable automatic compaction when context is full (default: true)"),
           prune: z.boolean().optional().describe("Enable pruning of old tool outputs (default: true)"),
+          profile: z
+            .string()
+            .optional()
+            .describe("Compaction profile to use. Built-ins: default, comprehensive, technical, minimal."),
+          profiles: z
+            .record(
+              z.string(),
+              z
+                .object({
+                  prompt: z.string().optional().describe("Custom compaction prompt for this profile."),
+                  context: z.array(z.string()).optional().describe("Extra context appended to the compaction prompt."),
+                })
+                .strict(),
+            )
+            .optional()
+            .describe("Custom compaction profiles keyed by profile name."),
           reserved: z
             .number()
             .int()
@@ -1093,6 +1109,20 @@ export namespace Config {
             .describe("Token buffer for compaction. Leaves enough window to avoid overflow during compaction."),
         })
         .optional(),
+      memory: z
+        .object({
+          enabled: z.boolean().optional().describe("Enable project-scoped long-term memory (default: true)"),
+          max_items: z.number().int().min(1).max(20).optional().describe("Maximum memories injected per turn"),
+          max_context_chars: z
+            .number()
+            .int()
+            .min(500)
+            .max(20_000)
+            .optional()
+            .describe("Maximum characters of memory context injected per turn"),
+        })
+        .optional()
+        .describe("Long-term memory configuration"),
       experimental: z
         .object({
           disable_paste_summary: z.boolean().optional(),

@@ -14,6 +14,8 @@ import { AppFileSystem } from "../filesystem"
 import DESCRIPTION from "./apply_patch.txt"
 import { File } from "../file"
 import { Format } from "../format"
+import { FileTime } from "../file/time"
+import { FileMutationQueue } from "./file-mutation-queue"
 
 const PatchParams = z.object({
   patchText: z.string().describe("The full patch text that describes all changes to be made"),
@@ -26,6 +28,7 @@ export const ApplyPatchTool = Tool.define(
     const afs = yield* AppFileSystem.Service
     const format = yield* Format.Service
     const bus = yield* Bus.Service
+    const filetime = yield* FileTime.Service
 
     const run = Effect.fn("ApplyPatchTool.execute")(function* (params: z.infer<typeof PatchParams>, ctx: Tool.Context) {
       if (!params.patchText) {
@@ -49,6 +52,13 @@ export const ApplyPatchTool = Tool.define(
         return yield* Effect.fail(new Error("apply_patch verification failed: no hunks found"))
       }
 
+      const lockPaths = hunks.flatMap((hunk) => [
+        path.resolve(Instance.directory, hunk.path),
+        ...(hunk.type === "update" && hunk.move_path ? [path.resolve(Instance.directory, hunk.move_path)] : []),
+      ])
+
+      return yield* FileMutationQueue.files(filetime, ctx, lockPaths, () =>
+        Effect.gen(function* () {
       // Validate file paths and check permissions
       const fileChanges: Array<{
         filePath: string
@@ -275,6 +285,8 @@ export const ApplyPatchTool = Tool.define(
         },
         output,
       }
+        }),
+      )
     })
 
     return {

@@ -103,6 +103,94 @@ describe("session.llm.hasToolCalls", () => {
   })
 })
 
+describe("session.llm.repairToolCall", () => {
+  test("lowercases tool names when the matching tool exists", async () => {
+    const result = await LLM.repairToolCall({
+      toolCall: {
+        type: "tool-call",
+        toolCallId: "call-1",
+        toolName: "READ",
+        input: JSON.stringify({ filePath: "src/index.ts" }),
+      },
+      tools: {
+        read: tool({
+          description: "Read file",
+          inputSchema: z.object({ filePath: z.string() }),
+        }),
+      },
+      error: new Error("Unknown tool"),
+    })
+
+    expect(result?.toolName).toBe("read")
+    expect(JSON.parse(result!.input)).toEqual({ filePath: "src/index.ts" })
+  })
+
+  test("repairs invalid tool input with shared normalization rules", async () => {
+    const result = await LLM.repairToolCall({
+      toolCall: {
+        type: "tool-call",
+        toolCallId: "call-2",
+        toolName: "read",
+        input: JSON.stringify({
+          args: {
+            filePath: "[demo.ts](file:///demo.ts)",
+            limit: "25",
+            replaceAll: "false",
+            ignore: "*.ts",
+          },
+        }),
+      },
+      tools: {
+        read: tool({
+          description: "Read file",
+          inputSchema: z.object({
+            filePath: z.string(),
+            limit: z.number(),
+            replaceAll: z.boolean(),
+            ignore: z.array(z.string()),
+          }),
+        }),
+      },
+      error: new Error("Invalid input"),
+    })
+
+    expect(result?.toolName).toBe("read")
+    expect(JSON.parse(result!.input)).toEqual({
+      filePath: "demo.ts",
+      limit: 25,
+      replaceAll: false,
+      ignore: ["*.ts"],
+    })
+  })
+
+  test("routes unrecoverable invalid input to invalid tool", async () => {
+    const result = await LLM.repairToolCall({
+      toolCall: {
+        type: "tool-call",
+        toolCallId: "call-3",
+        toolName: "read",
+        input: JSON.stringify({ limit: "not-a-number" }),
+      },
+      tools: {
+        read: tool({
+          description: "Read file",
+          inputSchema: z.object({ filePath: z.string(), limit: z.number() }),
+        }),
+        invalid: tool({
+          description: "Invalid tool",
+          inputSchema: z.object({ tool: z.string(), error: z.string() }),
+        }),
+      },
+      error: new Error("Invalid input"),
+    })
+
+    expect(result?.toolName).toBe("invalid")
+    expect(JSON.parse(result!.input)).toMatchObject({
+      tool: "read",
+    })
+  })
+})
+
 type Capture = {
   url: URL
   headers: Headers

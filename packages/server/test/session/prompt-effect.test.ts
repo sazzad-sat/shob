@@ -24,6 +24,7 @@ import { MessageV2 } from "../../src/session/message-v2"
 import { AppFileSystem } from "../../src/filesystem"
 import { SessionCompaction } from "../../src/session/compaction"
 import { Instruction } from "../../src/session/instruction"
+import { SessionMemory } from "../../src/session/memory"
 import { SessionProcessor } from "../../src/session/processor"
 import { SessionPrompt } from "../../src/session/prompt"
 import { SessionRevert } from "../../src/session/revert"
@@ -182,12 +183,14 @@ function makeHttp() {
   )
   const trunc = Truncate.layer.pipe(Layer.provideMerge(deps))
   const proc = SessionProcessor.layer.pipe(Layer.provideMerge(deps))
-  const compact = SessionCompaction.layer.pipe(Layer.provideMerge(proc), Layer.provideMerge(deps))
+  const memory = SessionMemory.layer.pipe(Layer.provideMerge(deps))
+  const compact = SessionCompaction.layer.pipe(Layer.provideMerge(memory), Layer.provideMerge(proc), Layer.provideMerge(deps))
   return Layer.mergeAll(
     TestLLMServer.layer,
     SessionPrompt.layer.pipe(
       Layer.provide(SessionRevert.defaultLayer),
       Layer.provideMerge(run),
+      Layer.provideMerge(memory),
       Layer.provideMerge(compact),
       Layer.provideMerge(proc),
       Layer.provideMerge(registry),
@@ -361,6 +364,41 @@ it.live("loop calls LLM and returns assistant message", () =>
       const parts = result.parts.filter((p) => p.type === "text")
       expect(parts.some((p) => p.type === "text" && p.text === "world")).toBe(true)
       expect(yield* llm.hits).toHaveLength(1)
+    }),
+    { git: true, config: providerCfg },
+  ),
+)
+
+it.live("loop injects relevant long-term memory into model input", () =>
+  provideTmpdirServer(
+    Effect.fnUntraced(function* ({ llm }) {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const memory = yield* SessionMemory.Service
+      const chat = yield* sessions.create({
+        title: "Pinned",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      yield* memory.add({
+        sessionID: chat.id,
+        type: "semantic",
+        source: "test",
+        title: "Payment retry cache",
+        content: "When debugging payment retry cache issues, remember the blue harpoon cache key.",
+        weight: 9,
+      })
+      yield* prompt.prompt({
+        sessionID: chat.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "text", text: "debug the payment retry cache" }],
+      })
+      yield* llm.text("ok")
+
+      yield* prompt.loop({ sessionID: chat.id })
+      const body = JSON.stringify((yield* llm.inputs)[0])
+      expect(body).toContain("<memory-context>")
+      expect(body).toContain("blue harpoon cache key")
     }),
     { git: true, config: providerCfg },
   ),

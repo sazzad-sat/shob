@@ -301,12 +301,13 @@ describe("tool.task", () => {
           },
         )
 
+        const sessionId = result.metadata.sessionId!
         const kids = yield* sessions.children(chat.id)
         expect(kids).toHaveLength(1)
-        expect(kids[0]?.id).toBe(result.metadata.sessionId)
-        expect(result.metadata.sessionId).not.toBe("ses_missing")
-        expect(result.output).toContain(`task_id: ${result.metadata.sessionId}`)
-        expect(seen?.sessionID).toBe(result.metadata.sessionId)
+        expect(kids[0]?.id).toBe(sessionId)
+        expect(sessionId).not.toBe("ses_missing")
+        expect(result.output).toContain(`task_id: ${sessionId}`)
+        expect(seen?.sessionID).toBe(sessionId)
       }),
     ),
   )
@@ -340,7 +341,8 @@ describe("tool.task", () => {
             },
           )
 
-          const child = yield* sessions.get(result.metadata.sessionId)
+          const sessionId = result.metadata.sessionId!
+          const child = yield* sessions.get(sessionId)
           expect(child.parentID).toBe(chat.id)
           expect(child.permission).toEqual([
             {
@@ -380,6 +382,114 @@ describe("tool.task", () => {
           },
         },
       },
+    ),
+  )
+
+  it.live("execute runs independent tasks in parallel mode", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* Effect.promise(() => tool.init())
+        const prompts: SessionPrompt.PromptInput[] = []
+        const promptOps = stubOps({ text: "parallel done", onPrompt: (input) => prompts.push(input) })
+
+        const result = yield* def.execute(
+          {
+            tasks: [
+              {
+                description: "inspect cache",
+                prompt: "inspect cache path",
+                subagent_type: "general",
+              },
+              {
+                description: "review api",
+                prompt: "review api path",
+                subagent_type: "general",
+              },
+            ],
+            concurrency: 2,
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        const kids = yield* sessions.children(chat.id)
+        expect(kids).toHaveLength(2)
+        expect(prompts).toHaveLength(2)
+        expect((result.metadata as any).mode).toBe("parallel")
+        expect((result.metadata as any).results).toHaveLength(2)
+        expect(result.output).toContain("Parallel tasks: 2/2 succeeded")
+        expect(result.output).toContain('index="1"')
+        expect(result.output).toContain('index="2"')
+      }),
+    ),
+  )
+
+  it.live("execute passes previous step output through chain mode", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* Effect.promise(() => tool.init())
+        const resolved: string[] = []
+        const promptOps: TaskPromptOps = {
+          cancel() {},
+          resolvePromptParts: (template) =>
+            Effect.sync(() => {
+              resolved.push(template)
+              return [{ type: "text" as const, text: template }]
+            }),
+          prompt: (input) =>
+            Effect.sync(() => {
+              const text = input.parts.find((part) => part.type === "text")?.text ?? ""
+              return reply(input, `result(${text})`)
+            }),
+        }
+
+        const result = yield* def.execute(
+          {
+            chain: [
+              {
+                description: "first step",
+                prompt: "find issue",
+                subagent_type: "general",
+              },
+              {
+                description: "second step",
+                prompt: "fix using {previous}",
+                subagent_type: "general",
+              },
+            ],
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        expect(resolved).toHaveLength(2)
+        expect(resolved[0]).toBe("find issue")
+        expect(resolved[1]).toContain("result(find issue)")
+        expect((result.metadata as any).mode).toBe("chain")
+        expect(result.output).toContain("Chain tasks: 2 completed")
+        expect(result.output).toContain('step="2"')
+      }),
     ),
   )
 })

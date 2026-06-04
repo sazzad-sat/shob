@@ -5,8 +5,12 @@ import type { Permission } from "../permission"
 import type { SessionID, MessageID } from "../session/schema"
 import { Truncate } from "./truncate"
 import { Agent } from "@/agent/agent"
+import { Log } from "@/util/log"
+import { parseToolInput } from "./input"
 
 export namespace Tool {
+  const log = Log.create({ service: "tool.input" })
+
   interface Metadata {
     [key: string]: any
   }
@@ -75,19 +79,37 @@ export namespace Tool {
       const execute = toolInfo.execute
       toolInfo.execute = (args, ctx) =>
         Effect.gen(function* () {
-          yield* Effect.try({
-            try: () => toolInfo.parameters.parse(args),
-            catch: (error) => {
-              if (error instanceof z.ZodError && toolInfo.formatValidationError) {
-                return new Error(toolInfo.formatValidationError(error), { cause: error })
-              }
-              return new Error(
-                `The ${id} tool was called with invalid arguments: ${error}.\nPlease rewrite the input so it satisfies the expected schema.`,
-                { cause: error },
-              )
-            },
+          const parsed = parseToolInput(id, toolInfo.parameters, args)
+          log.info("tool input parsed", {
+            tool: id,
+            agent: ctx.agent,
+            providerID: ctx.extra?.model?.providerID,
+            modelID: ctx.extra?.model?.id,
+            status: parsed.success ? (parsed.repaired ? "repaired" : "valid") : "invalid",
+            repairCount: parsed.success ? parsed.notes.length : parsed.notes.length,
           })
-          const result = yield* execute(args, ctx)
+          if (!parsed.success) {
+            const first = toolInfo.parameters.safeParse(args)
+            if (!first.success && toolInfo.formatValidationError) {
+              return yield* Effect.fail(new Error(toolInfo.formatValidationError(first.error), { cause: first.error }))
+            }
+            return yield* Effect.fail(new Error(parsed.error))
+          }
+
+          let result = yield* execute(parsed.data, ctx)
+          if (parsed.repaired) {
+            result = {
+              ...result,
+              output: appendRepairNote(result.output, parsed.notes),
+              metadata: {
+                ...result.metadata,
+                inputRepair: {
+                  repaired: true,
+                  notes: parsed.notes,
+                },
+              },
+            }
+          }
           if (result.metadata.truncated !== undefined) {
             return result
           }
@@ -105,6 +127,11 @@ export namespace Tool {
         }).pipe(Effect.orDie)
       return toolInfo
     }
+  }
+
+  function appendRepairNote(output: string, notes: string[]) {
+    const suffix = `Note: Tool input was normalized before execution (${notes.join("; ")}).`
+    return output ? `${output}\n\n${suffix}` : suffix
   }
 
   export function define<Parameters extends z.ZodType, Result extends Metadata, R, ID extends string = string>(

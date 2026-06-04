@@ -5,12 +5,15 @@ import { EditTool } from "./edit"
 import DESCRIPTION from "./multiedit.txt"
 import path from "path"
 import { Instance } from "../project/instance"
+import { FileTime } from "../file/time"
+import { FileMutationQueue } from "./file-mutation-queue"
 
 export const MultiEditTool = Tool.define(
   "multiedit",
   Effect.gen(function* () {
     const editInfo = yield* EditTool
     const edit = yield* Effect.promise(() => editInfo.init())
+    const filetime = yield* FileTime.Service
 
     return {
       description: DESCRIPTION,
@@ -35,26 +38,33 @@ export const MultiEditTool = Tool.define(
         ctx: Tool.Context,
       ) =>
         Effect.gen(function* () {
-          const results = []
-          for (const [, entry] of params.edits.entries()) {
-            const result = yield* edit.execute(
-              {
-                filePath: params.filePath,
-                oldString: entry.oldString,
-                newString: entry.newString,
-                replaceAll: entry.replaceAll,
-              },
-              ctx,
-            )
-            results.push(result)
-          }
-          return {
-            title: path.relative(Instance.worktree, params.filePath),
-            metadata: {
-              results: results.map((r) => r.metadata),
-            },
-            output: results.at(-1)!.output,
-          }
+          const filePath = path.isAbsolute(params.filePath)
+            ? params.filePath
+            : path.join(Instance.directory, params.filePath)
+          return yield* FileMutationQueue.file(filetime, ctx, filePath, () =>
+            Effect.gen(function* () {
+              const results = []
+              for (const [, entry] of params.edits.entries()) {
+                const result = yield* edit.execute(
+                  {
+                    filePath: params.filePath,
+                    oldString: entry.oldString,
+                    newString: entry.newString,
+                    replaceAll: entry.replaceAll,
+                  },
+                  ctx,
+                )
+                results.push(result)
+              }
+              return {
+                title: path.relative(Instance.worktree, filePath),
+                metadata: {
+                  results: results.map((r) => r.metadata),
+                },
+                output: results.at(-1)!.output,
+              }
+            }),
+          )
         }),
     }
   }),

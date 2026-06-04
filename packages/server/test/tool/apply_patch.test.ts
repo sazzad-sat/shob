@@ -10,9 +10,10 @@ import { Format } from "../../src/format"
 import { Bus } from "../../src/bus"
 import { tmpdir } from "../fixture/fixture"
 import { SessionID, MessageID } from "../../src/session/schema"
+import { FileTime } from "../../src/file/time"
 
 const runtime = ManagedRuntime.make(
-  Layer.mergeAll(LSP.defaultLayer, AppFileSystem.defaultLayer, Format.defaultLayer, Bus.layer),
+  Layer.mergeAll(LSP.defaultLayer, AppFileSystem.defaultLayer, FileTime.defaultLayer, Format.defaultLayer, Bus.layer),
 )
 
 const baseCtx = {

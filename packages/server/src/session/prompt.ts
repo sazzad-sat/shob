@@ -15,6 +15,7 @@ import { Bus } from "../bus"
 import { ProviderTransform } from "../provider/transform"
 import { SystemPrompt } from "./system"
 import { Instruction } from "./instruction"
+import { SessionMemory } from "./memory"
 import { Plugin } from "../plugin"
 import PROMPT_PLAN from "../session/prompt/plan.txt"
 import BUILD_SWITCH from "../session/prompt/build-switch.txt"
@@ -88,6 +89,7 @@ export namespace SessionPrompt {
       const provider = yield* Provider.Service
       const processor = yield* SessionProcessor.Service
       const compaction = yield* SessionCompaction.Service
+      const memory = yield* SessionMemory.Service
       const plugin = yield* Plugin.Service
       const commands = yield* Command.Service
       const permission = yield* Permission.Service
@@ -342,6 +344,36 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           synthetic: true,
         })
         userMessage.parts.push(part)
+        return input.messages
+      })
+
+      const insertMemoryContext = Effect.fn("SessionPrompt.insertMemoryContext")(function* (input: {
+        messages: MessageV2.WithParts[]
+        session: Session.Info
+      }) {
+        const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
+        if (!userMessage) return input.messages
+        const query = userMessage.parts
+          .filter((part): part is MessageV2.TextPart => part.type === "text" && !part.synthetic && !part.ignored)
+          .map((part) => part.text)
+          .join("\n\n")
+          .trim()
+        if (!query) return input.messages
+        const context = yield* memory.context({ sessionID: input.session.id, query }).pipe(
+          Effect.catchCause((cause) => {
+            log.error("failed to retrieve memory context", { error: Cause.squash(cause) })
+            return Effect.succeed(undefined)
+          }),
+        )
+        if (!context) return input.messages
+        userMessage.parts.push({
+          id: PartID.ascending(),
+          messageID: userMessage.info.id,
+          sessionID: userMessage.info.sessionID,
+          type: "text",
+          text: context,
+          synthetic: true,
+        })
         return input.messages
       })
 
@@ -1395,6 +1427,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             const maxSteps = agent.steps ?? Infinity
             const isLastStep = step >= maxSteps
             msgs = yield* insertReminders({ messages: msgs, agent, session })
+            msgs = yield* insertMemoryContext({ messages: msgs, session })
 
             const msg: MessageV2.Assistant = {
               id: MessageID.ascending(),
@@ -1670,30 +1703,35 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     }),
   )
 
-  export const defaultLayer = Layer.suspend(() =>
-    layer.pipe(
-      Layer.provide(SessionRunState.defaultLayer),
-      Layer.provide(SessionStatus.defaultLayer),
-      Layer.provide(SessionCompaction.defaultLayer),
-      Layer.provide(SessionProcessor.defaultLayer),
-      Layer.provide(Command.defaultLayer),
-      Layer.provide(Permission.defaultLayer),
-      Layer.provide(MCP.defaultLayer),
-      Layer.provide(LSP.defaultLayer),
-      Layer.provide(FileTime.defaultLayer),
-      Layer.provide(ToolRegistry.defaultLayer),
-      Layer.provide(Truncate.defaultLayer),
-      Layer.provide(Provider.defaultLayer),
-      Layer.provide(Instruction.defaultLayer),
-      Layer.provide(AppFileSystem.defaultLayer),
-      Layer.provide(Plugin.defaultLayer),
-      Layer.provide(Session.defaultLayer),
-      Layer.provide(SessionRevert.defaultLayer),
-      Layer.provide(Agent.defaultLayer),
-      Layer.provide(Bus.layer),
-      Layer.provide(CrossSpawnSpawner.defaultLayer),
+  const DefaultDependencies = Layer.mergeAll(
+    Layer.mergeAll(
+      SessionRunState.defaultLayer,
+      SessionStatus.defaultLayer,
+      SessionMemory.defaultLayer,
+      SessionCompaction.defaultLayer,
+      SessionProcessor.defaultLayer,
+      Command.defaultLayer,
+      Permission.defaultLayer,
+      MCP.defaultLayer,
+      LSP.defaultLayer,
+      FileTime.defaultLayer,
+    ),
+    Layer.mergeAll(
+      ToolRegistry.defaultLayer,
+      Truncate.defaultLayer,
+      Provider.defaultLayer,
+      Instruction.defaultLayer,
+      AppFileSystem.defaultLayer,
+      Plugin.defaultLayer,
+      Session.defaultLayer,
+      SessionRevert.defaultLayer,
+      Agent.defaultLayer,
+      Bus.layer,
+      CrossSpawnSpawner.defaultLayer,
     ),
   )
+
+  export const defaultLayer = Layer.suspend(() => layer.pipe(Layer.provide(DefaultDependencies)))
   const { runPromise } = makeRuntime(Service, defaultLayer)
 
   export const PromptInput = z.object({

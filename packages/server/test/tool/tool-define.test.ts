@@ -52,4 +52,28 @@ describe("Tool.define", () => {
 
     expect(first).not.toBe(second)
   })
+
+  test("execute receives parsed and transformed args", async () => {
+    let received: number | undefined
+    const info = await Effect.runPromise(
+      Tool.define(
+        "test-transform",
+        Effect.succeed({
+          description: "test tool",
+          parameters: z.object({
+            count: z.string().transform((value) => Number(value)),
+          }),
+          execute(args: { count: number }) {
+            received = args.count
+            return Effect.succeed({ title: "test", output: "ok", metadata: { truncated: false } })
+          },
+        }),
+      ),
+    )
+    const tool = await info.init()
+
+    await Effect.runPromise(tool.execute({ count: "42" } as any, { agent: "build", extra: {} } as any))
+
+    expect(received).toBe(42)
+  })
 })

@@ -8,6 +8,7 @@ import { Config } from "../../src/config/config"
 import { Agent } from "../../src/agent/agent"
 import { LLM } from "../../src/session/llm"
 import { SessionCompaction } from "../../src/session/compaction"
+import { SessionMemory } from "../../src/session/memory"
 import { Token } from "../../src/util/token"
 import { Instance } from "../../src/project/instance"
 import { Log } from "../../src/util/log"
@@ -162,6 +163,7 @@ function runtime(result: "continue" | "compact", plugin = Plugin.defaultLayer, p
       Layer.provide(Session.defaultLayer),
       Layer.provide(layer(result)),
       Layer.provide(Agent.defaultLayer),
+      Layer.provide(SessionMemory.defaultLayer),
       Layer.provide(plugin),
       Layer.provide(bus),
       Layer.provide(Config.defaultLayer),
@@ -203,6 +205,7 @@ function liveRuntime(layer: Layer.Layer<LLM.Service>, provider = ProviderTest.fa
       Layer.provide(layer),
       Layer.provide(Permission.defaultLayer),
       Layer.provide(Agent.defaultLayer),
+      Layer.provide(SessionMemory.defaultLayer),
       Layer.provide(Plugin.defaultLayer),
       Layer.provide(status),
       Layer.provide(bus),
@@ -577,6 +580,86 @@ describe("session.compaction.process", () => {
           expect(seen).toBe(true)
         } finally {
           unsub?.()
+          await rt.dispose()
+        }
+      },
+    })
+  })
+
+  test("uses configured custom compaction profile prompt and context", async () => {
+    let seenPrompt = ""
+    const captureProcessor = Layer.succeed(
+      SessionProcessorModule.SessionProcessor.Service,
+      SessionProcessorModule.SessionProcessor.Service.of({
+        create: Effect.fn("TestSessionProcessor.create")((input) =>
+          Effect.succeed({
+            ...fake(input, "continue"),
+            process: Effect.fn("TestSessionProcessor.process")((processInput) =>
+              Effect.sync(() => {
+                const last = processInput.messages.at(-1) as any
+                seenPrompt = Array.isArray(last?.content)
+                  ? last.content.map((part: any) => part.text ?? "").join("\n")
+                  : String(last?.content ?? "")
+                return "continue" as const
+              }),
+            ),
+          }),
+        ),
+      }),
+    )
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({
+            compaction: {
+              profile: "handoff",
+              profiles: {
+                handoff: {
+                  prompt: "CUSTOM HANDOFF PROMPT",
+                  context: ["EXTRA CUSTOM CONTEXT"],
+                },
+              },
+            },
+          }),
+        )
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bus = Bus.layer
+        const rt = ManagedRuntime.make(
+          Layer.mergeAll(SessionCompaction.layer, bus).pipe(
+            Layer.provide(wide().layer),
+            Layer.provide(Session.defaultLayer),
+            Layer.provide(captureProcessor),
+            Layer.provide(Agent.defaultLayer),
+            Layer.provide(SessionMemory.defaultLayer),
+            Layer.provide(Plugin.defaultLayer),
+            Layer.provide(bus),
+            Layer.provide(Config.defaultLayer),
+          ),
+        )
+        const session = await Session.create({})
+        const msg = await user(session.id, "hello")
+        try {
+          const msgs = await Session.messages({ sessionID: session.id })
+          await rt.runPromise(
+            SessionCompaction.Service.use((svc) =>
+              svc.process({
+                parentID: msg.id,
+                messages: msgs,
+                sessionID: session.id,
+                auto: false,
+              }),
+            ),
+          )
+
+          expect(seenPrompt).toContain("CUSTOM HANDOFF PROMPT")
+          expect(seenPrompt).toContain("EXTRA CUSTOM CONTEXT")
+          expect(seenPrompt).not.toContain("Provide a detailed prompt for continuing")
+        } finally {
           await rt.dispose()
         }
       },

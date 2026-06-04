@@ -9,13 +9,14 @@ import z from "zod"
 import { Token } from "../util/token"
 import { Log } from "../util/log"
 import { SessionProcessor } from "./processor"
+import { SessionMemory } from "./memory"
 import { fn } from "@/util/fn"
 import { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
 import { Config } from "@/config/config"
 import { NotFoundError } from "@/storage/db"
 import { ModelID, ProviderID } from "@/provider/schema"
-import { Effect, Layer, Context } from "effect"
+import { Cause, Effect, Layer, Context } from "effect"
 import { makeRuntime } from "@/effect/run-service"
 import { InstanceState } from "@/effect/instance-state"
 import { isOverflow as overflow } from "./overflow"
@@ -35,6 +36,37 @@ export namespace SessionCompaction {
   export const PRUNE_MINIMUM = 20_000
   export const PRUNE_PROTECT = 40_000
   const PRUNE_PROTECTED_TOOLS = ["skill"]
+
+  function profilePrompt(name: string, fallback: string) {
+    switch (name) {
+      case "comprehensive":
+        return `Create a comprehensive continuation summary for this conversation.
+Capture goals, user instructions, decisions and rationale, files changed or inspected, important tool results, blockers, and exact next steps.
+The summary will replace older context, so include enough detail for another agent to continue without rereading the full transcript.
+Use structured markdown with clear sections.`
+      case "technical":
+        return `Create a technical continuation summary focused on implementation state.
+Prioritize repository structure, files and symbols touched, commands/tests run, errors observed, pending edits, assumptions, and concrete next steps.
+Avoid generic conversation recap unless it affects the engineering work.
+Use concise structured markdown.`
+      case "minimal":
+        return `Create a brief continuation summary.
+Keep only the active goal, important user instructions, files involved, completed work, blockers, and immediate next step.
+Use concise bullets.`
+      default:
+        return fallback
+    }
+  }
+
+  function resolveProfile(cfg: Config.Info, fallback: string) {
+    const name = cfg.compaction?.profile ?? "default"
+    const custom = cfg.compaction?.profiles?.[name]
+    return {
+      name,
+      prompt: custom?.prompt ?? profilePrompt(name, fallback),
+      context: custom?.context ?? [],
+    }
+  }
 
   export interface Interface {
     readonly isOverflow: (input: {
@@ -67,6 +99,7 @@ export namespace SessionCompaction {
     | Config.Service
     | Session.Service
     | Agent.Service
+    | SessionMemory.Service
     | Plugin.Service
     | SessionProcessor.Service
     | Provider.Service
@@ -77,6 +110,7 @@ export namespace SessionCompaction {
       const config = yield* Config.Service
       const session = yield* Session.Service
       const agents = yield* Agent.Service
+      const memory = yield* SessionMemory.Service
       const plugin = yield* Plugin.Service
       const processors = yield* SessionProcessor.Service
       const provider = yield* Provider.Service
@@ -180,12 +214,6 @@ export namespace SessionCompaction {
         const model = agent.model
           ? yield* provider.getModel(agent.model.providerID, agent.model.modelID)
           : yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
-        // Allow plugins to inject context or replace compaction prompt.
-        const compacting = yield* plugin.trigger(
-          "experimental.session.compacting",
-          { sessionID: input.sessionID },
-          { context: [], prompt: undefined },
-        )
         const defaultPrompt = `Provide a detailed prompt for continuing our conversation above.
 Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.
 The summary that you construct will be used so that another agent can read it and continue the work.
@@ -216,7 +244,15 @@ When constructing the summary, try to stick to this template:
 [Construct a structured list of relevant files that have been read, edited, or created that pertain to the task at hand. If all the files in a directory are relevant, include the path to the directory.]
 ---`
 
-        const prompt = compacting.prompt ?? [defaultPrompt, ...compacting.context].join("\n\n")
+        const cfg = yield* config.get()
+        const profile = resolveProfile(cfg, defaultPrompt)
+        // Allow plugins to inject context or replace compaction prompt.
+        const compacting = yield* plugin.trigger(
+          "experimental.session.compacting",
+          { sessionID: input.sessionID, profile: profile.name },
+          { context: profile.context, prompt: undefined },
+        )
+        const prompt = compacting.prompt ?? [profile.prompt, ...compacting.context].join("\n\n")
         const msgs = structuredClone(messages)
         yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
         const modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, { stripMedia: true })
@@ -339,7 +375,38 @@ When constructing the summary, try to stick to this template:
         }
 
         if (processor.message.error) return "stop"
-        if (result === "continue") yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
+        if (result === "continue") {
+          const summaryText = yield* Effect.sync(() => MessageV2.get({ sessionID: input.sessionID, messageID: msg.id }))
+            .pipe(
+              Effect.map((summary) =>
+                summary.parts
+                  .filter((part): part is MessageV2.TextPart => part.type === "text")
+                  .map((part) => part.text)
+                  .join("\n\n")
+                  .trim(),
+              ),
+              Effect.catchCause((cause) => {
+                log.error("failed to read compaction summary for memory", { error: Cause.squash(cause) })
+                return Effect.succeed("")
+              }),
+            )
+          if (summaryText) {
+            yield* memory
+              .rememberCompaction({
+                sessionID: input.sessionID,
+                messageID: msg.id,
+                summary: summaryText,
+                profile: profile.name,
+              })
+              .pipe(
+                Effect.catchCause((cause) => {
+                  log.error("failed to store compaction memory", { error: Cause.squash(cause) })
+                  return Effect.void
+                }),
+              )
+          }
+          yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
+        }
         return result
       })
 
@@ -382,6 +449,7 @@ When constructing the summary, try to stick to this template:
       Layer.provide(Provider.defaultLayer),
       Layer.provide(Session.defaultLayer),
       Layer.provide(SessionProcessor.defaultLayer),
+      Layer.provide(SessionMemory.defaultLayer),
       Layer.provide(Agent.defaultLayer),
       Layer.provide(Plugin.defaultLayer),
       Layer.provide(Bus.layer),

@@ -3,9 +3,12 @@ import { Log } from "@/util/log"
 import { Cause, Effect, Layer, Record, Context } from "effect"
 import * as Queue from "effect/Queue"
 import * as Stream from "effect/Stream"
+import type { JSONSchema7, LanguageModelV3ToolCall } from "@ai-sdk/provider"
+import { asSchema, safeValidateTypes } from "@ai-sdk/provider-utils"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
 import { mergeDeep, pipe } from "remeda"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
+import z from "zod"
 import { ProviderTransform } from "@/provider/transform"
 import { Config } from "@/config/config"
 import { Instance } from "@/project/instance"
@@ -21,6 +24,7 @@ import { Wildcard } from "@/util/wildcard"
 import { SessionID } from "@/session/schema"
 import { Auth } from "@/auth"
 import { Installation } from "@/installation"
+import { repairToolInputCandidate, type JSONSchemaLike } from "@/tool/input"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
@@ -49,6 +53,13 @@ export namespace LLM {
 
   export interface Interface {
     readonly stream: (input: StreamInput) => Stream.Stream<Event, unknown>
+  }
+
+  export type RepairToolCallInput = {
+    toolCall: LanguageModelV3ToolCall
+    tools: Record<string, Tool>
+    inputSchema?: (options: { toolName: string }) => PromiseLike<JSONSchema7>
+    error: { message: string }
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/LLM") {}
@@ -321,27 +332,7 @@ export namespace LLM {
           error,
         })
       },
-      async experimental_repairToolCall(failed) {
-        const lower = failed.toolCall.toolName.toLowerCase()
-        if (lower !== failed.toolCall.toolName && tools[lower]) {
-          l.info("repairing tool call", {
-            tool: failed.toolCall.toolName,
-            repaired: lower,
-          })
-          return {
-            ...failed.toolCall,
-            toolName: lower,
-          }
-        }
-        return {
-          ...failed.toolCall,
-          input: JSON.stringify({
-            tool: failed.toolCall.toolName,
-            error: failed.error.message,
-          }),
-          toolName: "invalid",
-        }
-      },
+      experimental_repairToolCall: (failed) => repairToolCall(failed, l),
       temperature: params.temperature,
       topP: params.topP,
       topK: params.topK,
@@ -392,6 +383,89 @@ export namespace LLM {
         },
       },
     })
+  }
+
+  export async function repairToolCall(
+    input: RepairToolCallInput,
+    logger?: Pick<Log.Logger, "info">,
+  ): Promise<LanguageModelV3ToolCall | null> {
+    const original = input.toolCall.toolName
+    const lower = original.toLowerCase()
+    const toolName = input.tools[original] ? original : lower !== original && input.tools[lower] ? lower : original
+    const tool = input.tools[toolName]
+
+    let repairedName = toolName !== original
+    let repairedInput: ToolInputRepair | undefined
+    let originalInputValid = false
+
+    if (tool) {
+      originalInputValid = await validateToolInput(tool, parseToolCallInput(input.toolCall.input))
+      const schema = await resolveToolSchema(input, toolName, tool)
+      const candidate = repairToolInputCandidate(toolName, input.toolCall.input, schema)
+      if (candidate.repaired && (await validateToolInput(tool, candidate.input))) {
+        repairedInput = {
+          input: candidate.input,
+          notes: candidate.notes,
+        }
+      }
+    }
+
+    if (repairedInput || (repairedName && originalInputValid)) {
+      logger?.info("repairing tool call", {
+        tool: original,
+        repaired: toolName,
+        inputRepaired: Boolean(repairedInput),
+        repairCount: repairedInput?.notes.length ?? 0,
+      })
+      return {
+        ...input.toolCall,
+        toolName,
+        input: repairedInput ? JSON.stringify(repairedInput.input) : input.toolCall.input,
+      }
+    }
+
+    if (!input.tools.invalid) return null
+    logger?.info("routing invalid tool call", { tool: original, repaired: "invalid" })
+    return {
+      ...input.toolCall,
+      input: JSON.stringify({
+        tool: original,
+        error: `Tool call failed. Please retry with valid arguments. ${input.error.message}`,
+      }),
+      toolName: "invalid",
+    }
+  }
+
+  type ToolInputRepair = {
+    input: unknown
+    notes: string[]
+  }
+
+  async function resolveToolSchema(input: RepairToolCallInput, toolName: string, tool: Tool) {
+    if (input.inputSchema) {
+      return (await input.inputSchema({ toolName })) as JSONSchemaLike
+    }
+
+    const schema = (tool as { inputSchema?: unknown }).inputSchema
+    if (schema && typeof (schema as z.ZodType).safeParse === "function") return schema as z.ZodType
+    return undefined
+  }
+
+  async function validateToolInput(tool: Tool, input: unknown) {
+    const schema = (tool as { inputSchema?: unknown }).inputSchema
+    if (!schema) return false
+    const result = await safeValidateTypes({ value: input, schema: asSchema(schema as any) })
+    return result.success
+  }
+
+  function parseToolCallInput(input: string) {
+    const trimmed = input.trim()
+    if (!trimmed) return {}
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return input
+    }
   }
 
   function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "permission" | "user">) {

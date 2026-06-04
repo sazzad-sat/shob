@@ -28,6 +28,7 @@ import { SessionStatus } from "@/session/status"
 import { SessionRunState } from "@/session/run-state"
 import { SessionProcessor } from "@/session/processor"
 import { SessionCompaction } from "@/session/compaction"
+import { SessionMemory } from "@/session/memory"
 import { SessionRevert } from "@/session/revert"
 import { SessionSummary } from "@/session/summary"
 import { SessionPrompt } from "@/session/prompt"
@@ -48,7 +49,7 @@ import { Installation } from "@/installation"
 import { ShareNext } from "@/share/share-next"
 import { SessionShare } from "@/share/session"
 
-export const AppLayer = Layer.mergeAll(
+const FoundationLayer = Layer.mergeAll(
   Observability.layer,
   AppFileSystem.defaultLayer,
   Bus.defaultLayer,
@@ -71,10 +72,14 @@ export const AppLayer = Layer.mergeAll(
   Question.defaultLayer,
   Permission.defaultLayer,
   Todo.defaultLayer,
+)
+
+const SessionLayer = Layer.mergeAll(
   Session.defaultLayer,
   SessionStatus.defaultLayer,
   SessionRunState.defaultLayer,
   SessionProcessor.defaultLayer,
+  SessionMemory.defaultLayer,
   SessionCompaction.defaultLayer,
   SessionRevert.defaultLayer,
   SessionSummary.defaultLayer,
@@ -84,6 +89,9 @@ export const AppLayer = Layer.mergeAll(
   LSP.defaultLayer,
   MCP.defaultLayer,
   McpAuth.defaultLayer,
+)
+
+const ToolingLayer = Layer.mergeAll(
   Command.defaultLayer,
   Truncate.defaultLayer,
   ToolRegistry.defaultLayer,
@@ -96,5 +104,7 @@ export const AppLayer = Layer.mergeAll(
   ShareNext.defaultLayer,
   SessionShare.defaultLayer,
 )
+
+export const AppLayer = Layer.mergeAll(FoundationLayer, SessionLayer, ToolingLayer)
 
 export const AppRuntime = ManagedRuntime.make(AppLayer, { memoMap })
