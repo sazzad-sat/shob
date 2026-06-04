@@ -438,12 +438,14 @@ function AgentViewInner(props: AgentViewProps) {
   const [autoCompactingContext, setAutoCompactingContext] = createSignal(false)
   const [autoCompactKey, setAutoCompactKey] = createSignal("")
   const [queuedFollowups, setQueuedFollowups] = createSignal<QueuedFollowup[]>([])
-  const [scrollEdge, setScrollEdge] = createSignal<"none" | "top" | "middle" | "bottom">("none")
   let scrollRef: HTMLDivElement | undefined
   let contentRef: HTMLDivElement | undefined
   let composerRegionRef: HTMLDivElement | undefined
   let composerRegionHeight = 0
   let rafId: number | undefined
+  let cachedScrollHeight = 0
+  let cachedClientHeight = 0
+  let userScrollPending = false
   let scrollGestureAt = 0
   let touchY: number | undefined
   const composerState = createSessionComposerState({ closeMs: 320 })
@@ -621,7 +623,7 @@ function AgentViewInner(props: AgentViewProps) {
       },
     ])
     showToast({ title: "Follow-up queued", description: "It will send when the current run finishes." })
-    queueMicrotask(scheduleJumpStateUpdate)
+    queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
   }
 
   const removeQueuedFollowup = (queueID: string) => {
@@ -714,23 +716,41 @@ function AgentViewInner(props: AgentViewProps) {
   //   setActiveSidebarSession(routeSessionID)
   // })
 
-  const updateJumpState = () => {
+  const refreshScrollMetrics = () => {
     if (!scrollRef) {
-      setScrollEdge("none")
+      cachedScrollHeight = 0
+      cachedClientHeight = 0
       return
     }
-    const max = scrollRef.scrollHeight - scrollRef.clientHeight
-    const distance = max - scrollRef.scrollTop
-    const jumpThreshold = Math.max(400, scrollRef.clientHeight)
-    setShowJump(max > 1 && distance > jumpThreshold)
-    setScrollEdge(max <= 1 ? "none" : scrollRef.scrollTop <= 1 ? "top" : distance <= 1 ? "bottom" : "middle")
+
+    cachedScrollHeight = scrollRef.scrollHeight
+    cachedClientHeight = scrollRef.clientHeight
   }
 
-  const scheduleJumpStateUpdate = () => {
-    if (rafId !== undefined) cancelAnimationFrame(rafId)
+  const updateJumpState = () => {
+    if (!scrollRef) {
+      setShowJump(false)
+      return
+    }
+
+    const max = Math.max(0, cachedScrollHeight - cachedClientHeight)
+    const distance = max - scrollRef.scrollTop
+    const jumpThreshold = Math.max(400, cachedClientHeight)
+    setShowJump(max > 1 && distance > jumpThreshold)
+  }
+
+  const scheduleJumpStateUpdate = (options: { measure?: boolean; userScroll?: boolean } = {}) => {
+    if (options.measure) refreshScrollMetrics()
+    if (options.userScroll) userScrollPending = true
+    if (rafId !== undefined) return
+
     rafId = requestAnimationFrame(() => {
-      updateJumpState()
       rafId = undefined
+      updateJumpState()
+      if (userScrollPending) {
+        userScrollPending = false
+        autoScroll.handleScroll()
+      }
     })
   }
 
@@ -749,12 +769,7 @@ function AgentViewInner(props: AgentViewProps) {
   const hasScrollGesture = () => Date.now() - scrollGestureAt < 300
 
   const handleTimelineScroll = () => {
-    scheduleJumpStateUpdate()
-    if (hasScrollGesture()) {
-      autoScroll.handleScroll()
-      return
-    }
-    if (!autoScroll.userScrolled()) autoScroll.scrollToBottom()
+    scheduleJumpStateUpdate({ userScroll: hasScrollGesture() })
   }
 
   const handleTimelineWheel = (event: WheelEvent) => {
@@ -798,14 +813,22 @@ function AgentViewInner(props: AgentViewProps) {
   const resumeScroll = () => {
     autoScroll.forceScrollToBottom()
     setShowJump(false)
-    queueMicrotask(scheduleJumpStateUpdate)
+    queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
   }
 
   createResizeObserver(
     () => contentRef,
     () => {
+      refreshScrollMetrics()
       if (!autoScroll.userScrolled()) autoScroll.scrollToBottom()
-      if (scrollRef) scheduleJumpStateUpdate()
+      if (scrollRef) scheduleJumpStateUpdate({ measure: true })
+    },
+  )
+
+  createResizeObserver(
+    () => scrollRef,
+    () => {
+      scheduleJumpStateUpdate({ measure: true })
     },
   )
 
@@ -816,15 +839,16 @@ function AgentViewInner(props: AgentViewProps) {
       if (next === composerRegionHeight) return
 
       const el = scrollRef
+      if (el) refreshScrollMetrics()
       const delta = next - composerRegionHeight
       const stick = el
-        ? !autoScroll.userScrolled() || el.scrollHeight - el.clientHeight - el.scrollTop < 10 + Math.max(0, delta)
+        ? !autoScroll.userScrolled() || cachedScrollHeight - cachedClientHeight - el.scrollTop < 10 + Math.max(0, delta)
         : false
 
       composerRegionHeight = next
 
       if (stick) autoScroll.forceScrollToBottom()
-      if (el) scheduleJumpStateUpdate()
+      if (el) scheduleJumpStateUpdate({ measure: true })
     },
   )
 
@@ -849,7 +873,7 @@ function AgentViewInner(props: AgentViewProps) {
           language.t("notification.session.error.fallbackDescription"),
         ),
       })
-      queueMicrotask(scheduleJumpStateUpdate)
+      queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
     })
     onCleanup(unsub)
   })
@@ -860,7 +884,7 @@ function AgentViewInner(props: AgentViewProps) {
 
   createEffect(() => {
     messages()
-    queueMicrotask(scheduleJumpStateUpdate)
+    queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
   })
 
   createEffect(() => {
@@ -875,19 +899,19 @@ function AgentViewInner(props: AgentViewProps) {
   const setScrollRef = (el: HTMLDivElement | undefined) => {
     scrollRef = el
     autoScroll.scrollRef(el)
-    if (el) queueMicrotask(scheduleJumpStateUpdate)
+    if (el) queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
   }
 
   const setContentRef = (el: HTMLDivElement | undefined) => {
     contentRef = el
     autoScroll.contentRef(el)
-    if (scrollRef) queueMicrotask(scheduleJumpStateUpdate)
+    if (scrollRef) queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
   }
 
   const setComposerRegionRef = (el: HTMLDivElement | undefined) => {
     composerRegionRef = el
     composerRegionHeight = 0
-    if (el) queueMicrotask(scheduleJumpStateUpdate)
+    if (el) queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
   }
 
   const assistantCopyPartID = (assistants: ChatMessage[], showCopy: boolean) => {
@@ -1108,7 +1132,6 @@ function AgentViewInner(props: AgentViewProps) {
             <div
               ref={setScrollRef}
               data-slot="session-turn-content"
-              data-scroll-edge={scrollEdge()}
               class="agent-terminal-scroll agent-smart-scrollbar h-full min-w-0 overflow-x-hidden overflow-y-auto"
               classList={{ "agent-terminal-scroll-empty": isNewSession() }}
               style={{
