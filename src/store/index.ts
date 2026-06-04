@@ -121,6 +121,7 @@ interface AppActions {
   loadProjects: () => Promise<void>;
   addProject: (name: string, path: string) => Promise<Project>;
   updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>;
+  reorderProjects: (projectIds: string[]) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   setCurrentProject: (id: string | null) => void;
   setCurrentProjectId: (id: string | null) => void;
@@ -258,6 +259,38 @@ export const actions: AppActions = {
         item.id === projectId ? updatedProject : item
       )),
     );
+  },
+
+  reorderProjects: async (projectIds: string[]) => {
+    const previousProjects = [...store.projects];
+    const projectById = new Map(previousProjects.map((project) => [project.id, project]));
+    const seenIds = new Set<string>();
+    const orderedProjects: Project[] = [];
+
+    for (const projectId of projectIds) {
+      const project = projectById.get(projectId);
+      if (!project || seenIds.has(projectId)) continue;
+      seenIds.add(projectId);
+      orderedProjects.push(project);
+    }
+
+    for (const project of previousProjects) {
+      if (seenIds.has(project.id)) continue;
+      orderedProjects.push(project);
+    }
+
+    if (orderedProjects.length === 0) return;
+
+    const nextProjects = sortProjects(orderedProjects);
+    setStore({ projects: nextProjects });
+
+    try {
+      const savedProjects = sortProjects(normalizeProjects(await api.reorderProjects(nextProjects.map((project) => project.id))));
+      setStore({ projects: savedProjects });
+    } catch (error) {
+      setStore({ projects: previousProjects });
+      throw error;
+    }
   },
 
   setCurrentProject: (id: string | null) => {

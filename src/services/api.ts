@@ -11,6 +11,9 @@ export const api = {
   
   saveProject: (project: Project) =>
     invokeNative('save_project', { project: toSerializableProject(project) }),
+
+  reorderProjects: (projectIds: string[]) =>
+    invokeNative('reorder_projects', { projectIds }),
   
   deleteProject: (projectId: string) => invokeNative('delete_project', { projectId }),
 

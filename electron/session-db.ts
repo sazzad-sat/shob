@@ -176,6 +176,9 @@ function ensureProjectColumns(db: DatabaseSync) {
   if (!names.has("pinned")) {
     db.exec("ALTER TABLE projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
   }
+  if (!names.has("sort_order")) {
+    db.exec("ALTER TABLE projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 function ensureSessionColumns(db: DatabaseSync) {
@@ -399,6 +402,36 @@ export function saveProject(project: StoredProject): StoredProject {
   });
 
   return loadProjects().find((item) => item.id === project.id) ?? project;
+}
+
+export function reorderProjects(projectIds: string[] = []): StoredProject[] {
+  const database = db();
+  const rows = database
+    .prepare("SELECT id FROM projects ORDER BY sort_order ASC, time_updated DESC")
+    .all() as Array<{ id: string }>;
+  const knownIds = new Set(rows.map((row) => row.id));
+  const seenIds = new Set<string>();
+  const orderedIds: string[] = [];
+
+  for (const projectId of projectIds) {
+    if (typeof projectId !== "string" || !knownIds.has(projectId) || seenIds.has(projectId)) continue;
+    seenIds.add(projectId);
+    orderedIds.push(projectId);
+  }
+
+  for (const row of rows) {
+    if (seenIds.has(row.id)) continue;
+    orderedIds.push(row.id);
+  }
+
+  withTransaction(database, () => {
+    const update = database.prepare("UPDATE projects SET sort_order = ? WHERE id = ?");
+    orderedIds.forEach((projectId, index) => {
+      update.run(index, projectId);
+    });
+  });
+
+  return loadProjects();
 }
 
 export function deleteProject(projectId: string) {

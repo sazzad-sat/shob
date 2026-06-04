@@ -137,6 +137,7 @@ export interface NativeCommandMap {
   opencode_server_start: { args: undefined; result: string }
   get_projects: { args: undefined; result: Project[] }
   save_project: { args: { project: Project }; result: Project }
+  reorder_projects: { args: { projectIds: string[] }; result: Project[] }
   delete_project: { args: { projectId: string }; result: void }
   save_session_output: { args: { sessionId: string; output: string }; result: void }
   load_session_output: { args: { sessionId: string }; result: string }

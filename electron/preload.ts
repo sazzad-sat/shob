@@ -4,6 +4,7 @@ const allowedCommands = new Set([
   "opencode_server_start",
   "get_projects",
   "save_project",
+  "reorder_projects",
   "delete_project",
   "save_session_output",
   "load_session_output",

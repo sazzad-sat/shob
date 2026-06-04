@@ -18,6 +18,7 @@ import {
   initSessionDatabase,
   loadProjects as loadPersistedProjects,
   loadSessionOutput as loadPersistedSessionOutput,
+  reorderProjects as reorderPersistedProjects,
   saveProject as savePersistedProject,
   saveSessionOutput as savePersistedSessionOutput,
 } from "./session-db.js";
@@ -799,6 +800,9 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
   get_projects: async () => loadPersistedProjects(),
   save_project: async ({ project }) => {
     return savePersistedProject(project);
+  },
+  reorder_projects: async ({ projectIds }) => {
+    return reorderPersistedProjects(Array.isArray(projectIds) ? projectIds : []);
   },
   delete_project: async ({ projectId }) => {
     deletePersistedProject(projectId);

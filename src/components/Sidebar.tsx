@@ -1,5 +1,15 @@
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
 import { Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Search, Settings, SquarePen, X } from "lucide-solid"
+import {
+  DragDropProvider,
+  DragDropSensors,
+  SortableProvider,
+  closestCenter,
+  createSortable,
+  maybeTransformStyle,
+  useDragDropContext,
+  useSortableContext,
+} from "@thisbeyond/solid-dnd"
 import { nativeApi } from "../services/native"
 import { useStore, setStore } from "../store"
 import type { Project } from "../types"
@@ -53,6 +63,9 @@ type SidebarSearchResult =
 
 const latestSessionTime = (session: Project["sessions"][number]) => session.lastActiveAt ?? session.createdAt ?? 0
 const PROJECT_SESSION_PREVIEW_LIMIT = 5
+
+const areSameProjectOrder = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((projectId, index) => projectId === right[index])
 
 const SidebarSectionTitle = (props: { children: string }) => (
   <div class="shob-sidebar-section-label px-3 pb-2 pt-4 text-[13px] font-normal leading-4 text-text-weaker">
@@ -328,6 +341,7 @@ function FolderSection(props: {
   const [renameProjectSaving, setRenameProjectSaving] = createSignal(false)
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
   const shobSessions = createMemo(() => projectStore().session)
+  const sortable = createSortable(props.project.id)
 
   // Periodic sortNow signal to dynamically recalculate session ages and keep sorting stable/reactive.
   const [sortNow, setSortNow] = createSignal(Date.now())
@@ -454,6 +468,10 @@ function FolderSection(props: {
 
   const handleToggleProjectOpen = () => {
     props.onToggleProjectOpen(props.project.id)
+  }
+
+  const handleProjectTitlePointerDown = (event: PointerEvent) => {
+    sortable.dragActivators.onpointerdown?.(event)
   }
 
   const runProjectMenuAction = (event: MouseEvent, action: () => void) => {
@@ -583,7 +601,13 @@ function FolderSection(props: {
   })
 
   return (
-    <div class="flex flex-col">
+    <div
+      ref={sortable.ref}
+      style={maybeTransformStyle(sortable.transform)}
+      class={`relative flex flex-col rounded-[6px] transition-[background-color,opacity] duration-150 ${
+        sortable.isActiveDraggable ? "z-10 bg-surface-raised-base/45 opacity-75" : ""
+      }`}
+    >
       <Show when={renameProjectOpen()}>
         <div
           class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
@@ -704,8 +728,10 @@ function FolderSection(props: {
       >
         <button
           type="button"
-          class="flex h-full min-w-0 flex-1 items-center gap-2 rounded-[5px] pl-3 pr-2 text-left text-text-weak select-none"
+          class="flex h-full min-w-0 flex-1 cursor-grab touch-none items-center gap-2 rounded-[5px] pl-3 pr-2 text-left text-text-weak select-none active:cursor-grabbing"
           aria-expanded={props.isOpen}
+          aria-label={`${props.isOpen ? "Collapse" : "Expand"} ${props.project.name}`}
+          onPointerDown={handleProjectTitlePointerDown}
           onClick={handleToggleProjectOpen}
         >
           <span class="text-text-weak transition-colors group-hover/project:text-text-strong">
@@ -823,6 +849,115 @@ function FolderSection(props: {
   )
 }
 
+type SortableProjectGroupProps = {
+  projects: Project[]
+  currentProjectId: string | null
+  activeSessionId: string | null
+  onSelectSession: (projectId: string, sessionId: string) => void
+  onCreateSession: (projectId: string) => void
+  onDeleteSession: (projectId: string, sessionId: string) => void
+  onDeleteProject: (projectId: string) => void
+  onSyncShobSessions: (projectId: string, sessions: ShobSession[]) => void
+  onRenameSession: (projectId: string, sessionId: string, newName: string) => void
+  onRenameProject: (projectId: string, name: string) => void | Promise<void>
+  onToggleProjectPin: (projectId: string) => void | Promise<void>
+  isProjectOpen: (projectId: string) => boolean
+  onToggleProjectOpen: (projectId: string) => void
+  onReorderProjects: (groupProjectIds: string[], reorderedGroupIds: string[]) => void
+}
+
+type SortableProjectItemsProps = Omit<SortableProjectGroupProps, "onReorderProjects"> & {
+  projectIds: string[]
+  onSortedProjectIdsChange: (projectIds: string[]) => void
+}
+
+function SortableProjectItems(props: SortableProjectItemsProps) {
+  const dragDropContext = useDragDropContext()
+  const sortableContext = useSortableContext()
+
+  if (!dragDropContext || !sortableContext) return null
+
+  const [dragDropState] = dragDropContext
+  const [sortableState] = sortableContext
+
+  createEffect(() => {
+    const activeProjectId = dragDropState.active.draggableId
+    const currentProjectIds = props.projectIds
+    if (!activeProjectId || !currentProjectIds.includes(String(activeProjectId))) return
+
+    const sortedProjectIds = sortableState.sortedIds.map((projectId) => String(projectId))
+    if (sortedProjectIds.length !== currentProjectIds.length) return
+
+    props.onSortedProjectIdsChange(sortedProjectIds)
+  })
+
+  return (
+    <For each={props.projects}>
+      {(project) => (
+        <FolderSection
+          project={project}
+          currentProjectId={props.currentProjectId}
+          activeSessionId={props.activeSessionId}
+          onSelectSession={props.onSelectSession}
+          onCreateSession={props.onCreateSession}
+          onDeleteSession={props.onDeleteSession}
+          onDeleteProject={props.onDeleteProject}
+          onSyncShobSessions={props.onSyncShobSessions}
+          onRenameSession={props.onRenameSession}
+          onRenameProject={props.onRenameProject}
+          onToggleProjectPin={props.onToggleProjectPin}
+          isOpen={props.isProjectOpen(project.id)}
+          onToggleProjectOpen={props.onToggleProjectOpen}
+          hidePinnedSessions
+        />
+      )}
+    </For>
+  )
+}
+
+function SortableProjectGroup(props: SortableProjectGroupProps) {
+  const projectIds = createMemo(() => props.projects.map((project) => project.id))
+  const [sortedProjectIds, setSortedProjectIds] = createSignal<string[]>([])
+
+  const handleDragStart = () => {
+    setSortedProjectIds(projectIds())
+  }
+
+  const handleDragEnd = () => {
+    const reorderedGroupIds = sortedProjectIds()
+    if (reorderedGroupIds.length > 0) {
+      props.onReorderProjects(projectIds(), reorderedGroupIds)
+    }
+    setSortedProjectIds([])
+  }
+
+  return (
+    <DragDropProvider collisionDetector={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DragDropSensors>
+        <SortableProvider ids={projectIds()}>
+          <SortableProjectItems
+            projects={props.projects}
+            projectIds={projectIds()}
+            currentProjectId={props.currentProjectId}
+            activeSessionId={props.activeSessionId}
+            onSelectSession={props.onSelectSession}
+            onCreateSession={props.onCreateSession}
+            onDeleteSession={props.onDeleteSession}
+            onDeleteProject={props.onDeleteProject}
+            onSyncShobSessions={props.onSyncShobSessions}
+            onRenameSession={props.onRenameSession}
+            onRenameProject={props.onRenameProject}
+            onToggleProjectPin={props.onToggleProjectPin}
+            isProjectOpen={props.isProjectOpen}
+            onToggleProjectOpen={props.onToggleProjectOpen}
+            onSortedProjectIdsChange={(nextProjectIds) => setSortedProjectIds(nextProjectIds)}
+          />
+        </SortableProvider>
+      </DragDropSensors>
+    </DragDropProvider>
+  )
+}
+
 export function Sidebar(props: {
   onOpenSettingsPage?: () => void
   onOpenWorkspacePage?: () => void
@@ -834,6 +969,7 @@ export function Sidebar(props: {
   const setCurrentProjectId = useStore((s) => s.setCurrentProjectId)
   const setActiveSession = useStore((s) => s.setActiveSession)
   const addProject = useStore((s) => s.addProject)
+  const reorderProjects = useStore((s) => s.reorderProjects)
   const preferredShell = useStore((s) => s.preferredShell)
   const removeSession = useStore((s) => s.removeSession)
   const syncShobSessions = useStore((s) => s.syncShobSessions)
@@ -859,6 +995,8 @@ export function Sidebar(props: {
       .filter((hit) => hit.session.pinned)
       .sort((left, right) => latestSessionTime(right.session) - latestSessionTime(left.session)),
   )
+  const pinnedProjects = createMemo(() => projects().filter((project) => project.pinned))
+  const unpinnedProjects = createMemo(() => projects().filter((project) => !project.pinned))
 
   const isProjectOpen = (projectId: string) => projectOpenById()[projectId] ?? true
 
@@ -867,6 +1005,30 @@ export function Sidebar(props: {
       ...current,
       [projectId]: !(current[projectId] ?? true),
     }))
+  }
+
+  const handleReorderProjects = (groupProjectIds: string[], reorderedGroupIds: string[]) => {
+    if (areSameProjectOrder(groupProjectIds, reorderedGroupIds)) return
+
+    const groupIds = new Set(groupProjectIds)
+    const reorderedIds = new Set(reorderedGroupIds)
+    if (
+      groupIds.size !== reorderedIds.size ||
+      reorderedGroupIds.length !== groupProjectIds.length ||
+      reorderedGroupIds.some((projectId) => !groupIds.has(projectId))
+    ) {
+      return
+    }
+
+    let nextGroupIndex = 0
+    const nextProjectIds = projects().map((project) => {
+      if (!groupIds.has(project.id)) return project.id
+      return reorderedGroupIds[nextGroupIndex++] ?? project.id
+    })
+
+    void reorderProjects(nextProjectIds).catch((error) => {
+      console.error("Failed to reorder projects:", error)
+    })
   }
 
   const searchResults = createMemo<SidebarSearchResult[]>(() => {
@@ -1132,26 +1294,38 @@ export function Sidebar(props: {
                 }
               >
                 <div class="flex flex-col gap-2">
-                  <For each={projects()}>
-                    {(project) => (
-                      <FolderSection
-                        project={project}
-                        currentProjectId={currentProjectId()}
-                        activeSessionId={activeSessionId()}
-                        onSelectSession={handleSelectSession}
-                        onCreateSession={handleCreateSession}
-                        onDeleteSession={handleDeleteSession}
-                        onDeleteProject={handleDeleteProject}
-                        onSyncShobSessions={handleSyncShobSessions}
-                        onRenameSession={renameSession}
-                        onRenameProject={handleRenameProject}
-                        onToggleProjectPin={handleToggleProjectPin}
-                        isOpen={isProjectOpen(project.id)}
-                        onToggleProjectOpen={handleToggleProjectOpen}
-                        hidePinnedSessions
-                      />
-                    )}
-                  </For>
+                  <SortableProjectGroup
+                    projects={pinnedProjects()}
+                    currentProjectId={currentProjectId()}
+                    activeSessionId={activeSessionId()}
+                    onSelectSession={handleSelectSession}
+                    onCreateSession={handleCreateSession}
+                    onDeleteSession={handleDeleteSession}
+                    onDeleteProject={handleDeleteProject}
+                    onSyncShobSessions={handleSyncShobSessions}
+                    onRenameSession={renameSession}
+                    onRenameProject={handleRenameProject}
+                    onToggleProjectPin={handleToggleProjectPin}
+                    isProjectOpen={isProjectOpen}
+                    onToggleProjectOpen={handleToggleProjectOpen}
+                    onReorderProjects={handleReorderProjects}
+                  />
+                  <SortableProjectGroup
+                    projects={unpinnedProjects()}
+                    currentProjectId={currentProjectId()}
+                    activeSessionId={activeSessionId()}
+                    onSelectSession={handleSelectSession}
+                    onCreateSession={handleCreateSession}
+                    onDeleteSession={handleDeleteSession}
+                    onDeleteProject={handleDeleteProject}
+                    onSyncShobSessions={handleSyncShobSessions}
+                    onRenameSession={renameSession}
+                    onRenameProject={handleRenameProject}
+                    onToggleProjectPin={handleToggleProjectPin}
+                    isProjectOpen={isProjectOpen}
+                    onToggleProjectOpen={handleToggleProjectOpen}
+                    onReorderProjects={handleReorderProjects}
+                  />
                 </div>
               </Show>
             </div>
