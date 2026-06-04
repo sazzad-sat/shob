@@ -1323,6 +1323,11 @@ b {
   color: var(--foreground) !important;
 }
 
+.titlebar-window-close[data-variant="ghost"]:hover:not(:disabled) {
+  background-color: var(--destructive) !important;
+  color: #fff !important;
+}
+
 .titlebar-update-ready[data-variant="ghost"] {
   color: var(--accent-foreground, var(--foreground)) !important;
   background-color: color-mix(in srgb, var(--primary) 18%, transparent) !important;

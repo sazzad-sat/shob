@@ -30,17 +30,27 @@ export function TitleBar() {
   const [platform, setPlatform] = createSignal<OsPlatform>("unknown")
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
   const [isFullscreen, setIsFullscreen] = createSignal(false)
+  const [isMaximized, setIsMaximized] = createSignal(false)
   const [updateState, setUpdateState] = createSignal<"idle" | "checking" | "available" | "downloading" | "downloaded" | "error" | "dev">("idle")
   const [updateVersion, setUpdateVersion] = createSignal<string | null>(null)
   const [downloadPercent, setDownloadPercent] = createSignal(0)
 
   const mac = () => platform() === "macos"
   const windows = () => platform() === "windows"
+  const linux = () => platform() === "linux"
 
   onMount(() => {
     setPlatform(mapPlatform(nativeApi.platform()))
-    void currentWindow()
+    const win = currentWindow()
+    void win
+      .isMaximized()
+      .then(setIsMaximized)
+      .catch(() => undefined)
+    void win
       .onResized((state) => {
+        if (typeof state?.maximized === "boolean") {
+          setIsMaximized(state.maximized)
+        }
         if (typeof state?.fullscreen === "boolean") {
           setIsFullscreen(state.fullscreen)
         }
@@ -106,12 +116,37 @@ export function TitleBar() {
 
   const maximize = (e: MouseEvent) => {
     if (interactive(e.target)) return
-    void currentWindow().toggleMaximize().catch(() => undefined)
+    void currentWindow()
+      .toggleMaximize()
+      .then((maximized) => {
+        if (typeof maximized === "boolean") setIsMaximized(maximized)
+      })
+      .catch(() => undefined)
   }
 
   const installUpdate = (e: MouseEvent) => {
     e.stopPropagation()
     void nativeApi.invoke("install_update").catch(() => undefined)
+  }
+
+  const minimizeWindow = (e: MouseEvent) => {
+    e.stopPropagation()
+    void currentWindow().minimize().catch(() => undefined)
+  }
+
+  const toggleMaximizeWindow = (e: MouseEvent) => {
+    e.stopPropagation()
+    void currentWindow()
+      .toggleMaximize()
+      .then((maximized) => {
+        if (typeof maximized === "boolean") setIsMaximized(maximized)
+      })
+      .catch(() => undefined)
+  }
+
+  const closeWindow = (e: MouseEvent) => {
+    e.stopPropagation()
+    void currentWindow().close().catch(() => undefined)
   }
 
   return (
@@ -191,6 +226,40 @@ export function TitleBar() {
           }}
         >
           <div id="shob-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" style={{ "-webkit-app-region": "no-drag" }} />
+          <Show when={linux()}>
+            <div class="flex shrink-0 items-center gap-0.5" style={{ "-webkit-app-region": "no-drag" }}>
+              <Button
+                variant="ghost"
+                class="titlebar-icon"
+                style={{ "-webkit-app-region": "no-drag" }}
+                onClick={minimizeWindow}
+                title="Minimize"
+                aria-label="Minimize"
+              >
+                <Icon size="small" name="dash" />
+              </Button>
+              <Button
+                variant="ghost"
+                class="titlebar-icon"
+                style={{ "-webkit-app-region": "no-drag" }}
+                onClick={toggleMaximizeWindow}
+                title={isMaximized() ? "Restore" : "Maximize"}
+                aria-label={isMaximized() ? "Restore" : "Maximize"}
+              >
+                <Icon size="small" name={isMaximized() ? "collapse" : "expand"} />
+              </Button>
+              <Button
+                variant="ghost"
+                class="titlebar-icon titlebar-window-close"
+                style={{ "-webkit-app-region": "no-drag" }}
+                onClick={closeWindow}
+                title="Close"
+                aria-label="Close"
+              >
+                <Icon size="small" name="close" />
+              </Button>
+            </div>
+          </Show>
           {windows() && <div class="shrink-0" style={{ width: `${WINDOWS_CONTROLS_BASE_WIDTH}px` }} />}
         </div>
       </div>
