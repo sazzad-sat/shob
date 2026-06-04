@@ -91,6 +91,14 @@ const messageTextAsMarkdown = (message: ChatMessage, parts: Part[]) => {
 }
 
 const idleStatus: SessionStatus = { type: "idle" }
+const NEW_SESSION_TITLE_KEYS = [
+  "session.new.title.build",
+  "session.new.title.making",
+  "session.new.title.next",
+  "session.new.title.fromHere",
+  "session.new.title.improve",
+  "session.new.title.ship",
+] as const
 
 function isAbortError(error: EventSessionError["properties"]["error"] | undefined) {
   return error?.name === "MessageAbortedError"
@@ -507,6 +515,8 @@ function AgentViewInner(props: AgentViewProps) {
     const current = currentProject()
     return current?.name || basename(current?.path || props.projectPath)
   })
+  const [newSessionTitleIndexes, setNewSessionTitleIndexes] = createSignal<Record<string, number>>({})
+  const pickNewSessionTitleIndex = () => Math.floor(Math.random() * NEW_SESSION_TITLE_KEYS.length)
   const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
   const sessionID = createMemo(() => activeSessionId() ?? "")
   const renameValueTrimmed = createMemo(() => renameValue().trim())
@@ -532,6 +542,21 @@ function AgentViewInner(props: AgentViewProps) {
   const sessionContentLoading = createMemo(() => Boolean(activeSessionId() && messageState() === undefined))
   const isNewSession = createMemo(() => !sessionContentLoading() && messages().length === 0)
   const showDockedComposer = createMemo(() => !sessionContentLoading() && !isNewSession())
+  const newSessionTitle = createMemo(() => {
+    const key = sessionID()
+    const index = key ? newSessionTitleIndexes()[key] ?? 0 : 0
+    return language.t(NEW_SESSION_TITLE_KEYS[index], { project: currentProjectName() })
+  })
+
+  createEffect(() => {
+    const key = sessionID()
+    if (!key || !isNewSession()) return
+
+    setNewSessionTitleIndexes((current) => {
+      if (current[key] !== undefined) return current
+      return { ...current, [key]: pickNewSessionTitleIndex() }
+    })
+  })
 
   const runSessionMenuAction = (event: MouseEvent, action: () => void) => {
     event.preventDefault()
@@ -1284,6 +1309,9 @@ function AgentViewInner(props: AgentViewProps) {
                   <Show when={isNewSession()}>
                     <div class="agent-terminal-empty relative isolate flex min-h-0 flex-col items-stretch justify-center px-2 text-left overflow-visible md:mx-auto md:px-5">
                       <div class="agent-terminal-new-session relative z-10 w-full">
+                        <div class="agent-terminal-new-session-heading">
+                          <h1>{newSessionTitle()}</h1>
+                        </div>
                         <div class="relative z-10 w-full text-left">
                           <PromptInput onSubmit={resumeScroll} />
                         </div>

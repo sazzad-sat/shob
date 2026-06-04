@@ -583,6 +583,12 @@ export const dict = {
   "session.revertDock.restore": "Restore message",
 
   "session.new.title": "Build anything",
+  "session.new.title.build": "What should we build in {{project}}?",
+  "session.new.title.making": "What are we making in {{project}}?",
+  "session.new.title.next": "What should {{project}} do next?",
+  "session.new.title.fromHere": "Where should {{project}} go from here?",
+  "session.new.title.improve": "What should we improve in {{project}}?",
+  "session.new.title.ship": "What should we ship in {{project}}?",
   "session.new.worktree.main": "Main branch",
   "session.new.worktree.mainWithBranch": "Main branch ({{branch}})",
   "session.new.worktree.create": "Create new worktree",
