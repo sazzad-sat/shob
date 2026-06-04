@@ -32,6 +32,7 @@ async function improvePrompt(input: z.infer<typeof PromptImproveBody>) {
   const language = await Provider.getLanguage(model)
   const auth = await Auth.get(model.providerID)
   const sessionID = "prompt-improve"
+  const requestID = `${sessionID}-${Date.now()}-${Math.random().toString(36).slice(2)}`
   const system = [
     [
       "You are an expert prompt engineer that rewrites user prompts before they are sent to a coding agent.",
@@ -98,7 +99,7 @@ async function improvePrompt(input: z.infer<typeof PromptImproveBody>) {
         ? {
             "x-opencode-project": Instance.project.id,
             "x-opencode-session": sessionID,
-            "x-opencode-request": sessionID,
+            "x-opencode-request": requestID,
             "x-opencode-client": Flag.OPENCODE_CLIENT,
           }
         : {

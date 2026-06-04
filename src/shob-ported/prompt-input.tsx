@@ -60,6 +60,7 @@ import { promptPlaceholder } from "./prompt-input/placeholder"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { useQueries } from "@tanstack/solid-query"
 import { useQueryOptions, pathKey } from "./mock-session-layout"
+import { formatServerError } from "@/utils/server-errors"
 
 interface PromptInputProps {
   class?: string
@@ -101,6 +102,58 @@ const EXAMPLES = [
   "prompt.example.24",
   "prompt.example.25",
 ] as const
+
+const PROMPT_IMPROVE_TIMEOUT_MS = 45_000
+const PROMPT_IMPROVE_MAX_ATTEMPTS = 4
+const PROMPT_IMPROVE_RETRY_BASE_MS = 500
+
+const createAbortError = () => new DOMException("Prompt improve aborted.", "AbortError")
+
+const isAbortError = (error: unknown) =>
+  error instanceof DOMException ? error.name === "AbortError" : error instanceof Error && error.name === "AbortError"
+
+const errorStatus = (error: unknown) => {
+  if (!(error instanceof Error) || typeof error.cause !== "object" || error.cause === null) return undefined
+  const status = (error.cause as { status?: unknown }).status
+  return typeof status === "number" ? status : undefined
+}
+
+const isTransientImproveError = (error: unknown) => {
+  if (isAbortError(error)) return false
+  const status = errorStatus(error)
+  if (status !== undefined) return status === 408 || status === 425 || status === 429 || status >= 500
+  if (error instanceof TypeError) return true
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return (
+    message.includes("network") ||
+    message.includes("failed to fetch") ||
+    message.includes("timeout") ||
+    message.includes("temporar") ||
+    message.includes("socket") ||
+    message.includes("econn") ||
+    message.includes("rate limit") ||
+    message.includes("429")
+  )
+}
+
+const waitForImproveRetry = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(createAbortError())
+      return
+    }
+
+    const onAbort = () => {
+      window.clearTimeout(timer)
+      reject(createAbortError())
+    }
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener("abort", onAbort, { once: true })
+  })
 
 const PromptImproveMark: Component<{ class?: string }> = (props) => (
   <svg
@@ -306,17 +359,41 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       .join("")
     return text.trim().length === 0 && imageAttachments().length === 0 && commentCount() === 0
   })
-  const promptText = createMemo(() =>
-    prompt
-      .current()
-      .map((part) => ("content" in part ? part.content : ""))
-      .join(""),
-  )
+  const promptPlainText = (parts: Prompt) => parts.map((part) => ("content" in part ? part.content : "")).join("")
+  const promptText = createMemo(() => promptPlainText(prompt.current()))
   const [improvingPrompt, setImprovingPrompt] = createSignal(false)
-  const canImprovePrompt = createMemo(
-    () => store.mode === "normal" && !working() && !improvingPrompt() && promptText().trim().length > 0,
-  )
+  const improveModel = createMemo(() => local.model.current())
+  const improveUnavailableReason = createMemo(() => {
+    if (improvingPrompt()) return "Improving prompt..."
+    if (store.mode !== "normal") return "Switch to prompt mode to improve prompts"
+    if (working()) return "Wait for the current run to finish"
+    if (promptText().trim().length === 0) return "Type a prompt to improve"
+    if (!improveModel()) return "Select a model first"
+    return undefined
+  })
   const improveStatusText = () => "Improving prompt"
+  let improveRequestID = 0
+  let improveAbort: AbortController | undefined
+
+  const abortImproveRequest = () => {
+    improveRequestID += 1
+    improveAbort?.abort()
+    improveAbort = undefined
+  }
+
+  onCleanup(abortImproveRequest)
+
+  createEffect(
+    on(
+      () => params.sessionId,
+      () => {
+        if (!improvingPrompt()) return
+        abortImproveRequest()
+        setImprovingPrompt(false)
+      },
+      { defer: true },
+    ),
+  )
   const stopping = createMemo(() => working() && blank())
   const tip = () => {
     if (stopping()) {
@@ -738,32 +815,78 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const improvePrompt = async () => {
-    if (!canImprovePrompt()) return
-    const model = local.model.current()
-    if (!model) {
-      showToast({ variant: "error", title: "Select a model first" })
+    if (improvingPrompt()) return
+
+    const liveParts = parseFromDOM()
+    const nextPrompt = [...liveParts, ...imageAttachments()]
+    const liveText = promptPlainText(nextPrompt)
+    const liveCursor = getCursorPosition(editorRef)
+    if (!isPromptEqual(prompt.current(), nextPrompt) || prompt.cursor() !== liveCursor) {
+      mirror.input = true
+      prompt.set(nextPrompt, liveCursor)
+    }
+
+    const model = improveModel()
+    const reason =
+      store.mode !== "normal"
+        ? "Switch to prompt mode to improve prompts"
+        : working()
+          ? "Wait for the current run to finish"
+          : liveText.trim().length === 0
+            ? "Type a prompt to improve"
+            : !model
+              ? "Select a model first"
+              : undefined
+
+    if (reason) {
+      showToast({ variant: "error", title: "Cannot improve prompt", description: reason })
       restoreFocus()
       return
     }
+
+    const requestID = improveRequestID + 1
+    improveRequestID = requestID
+    improveAbort?.abort()
+    const abort = new AbortController()
+    improveAbort = abort
+    const timeout = window.setTimeout(() => abort.abort(), PROMPT_IMPROVE_TIMEOUT_MS)
 
     setImprovingPrompt(true)
     closePopover()
 
     try {
-      const response = await (sdk.client as any).client.post({
-        url: "/prompt/improve",
-        throwOnError: true,
-        body: {
-          prompt: promptText().trim(),
-          model: {
-            providerID: model.provider.id,
-            modelID: model.id,
-          },
-          variant: local.model.variant.current() ?? undefined,
-        },
-      })
-      const body = response?.data as { prompt?: string } | undefined
-      const improved = body.prompt?.trim()
+      let response: { data?: { prompt?: string } } | undefined
+      for (let attempt = 1; attempt <= PROMPT_IMPROVE_MAX_ATTEMPTS; attempt++) {
+        try {
+          response = await (sdk.client as any).client.post({
+            url: "/prompt/improve",
+            throwOnError: true,
+            signal: abort.signal,
+            body: {
+              prompt: liveText.trim(),
+              model: {
+                providerID: model.provider.id,
+                modelID: model.id,
+              },
+              variant: local.model.variant.current() ?? undefined,
+            },
+          })
+          break
+        } catch (error) {
+          if (
+            requestID !== improveRequestID ||
+            attempt >= PROMPT_IMPROVE_MAX_ATTEMPTS ||
+            !isTransientImproveError(error)
+          ) {
+            throw error
+          }
+          await waitForImproveRetry(PROMPT_IMPROVE_RETRY_BASE_MS * attempt, abort.signal)
+        }
+      }
+      if (requestID !== improveRequestID) return
+
+      const body = response?.data
+      const improved = body?.prompt?.trim()
       if (!improved) throw new Error("The model returned an empty prompt.")
       const next = buildImprovedPromptParts(improved)
       prompt.set(next, promptLength(next))
@@ -775,11 +898,20 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       })
       showToast({ title: "Prompt improved" })
     } catch (error) {
-      const description = error instanceof Error ? error.message : String(error)
+      if (requestID !== improveRequestID) return
+
+      const aborted = isAbortError(error)
+      const description = aborted
+        ? "Prompt improve timed out. Try again, or choose a faster model."
+        : formatServerError(error, language.t, "Could not improve the prompt.")
       showToast({ variant: "error", title: "Improve prompt failed", description })
       restoreFocus()
     } finally {
-      setImprovingPrompt(false)
+      window.clearTimeout(timeout)
+      if (requestID === improveRequestID) {
+        if (improveAbort === abort) improveAbort = undefined
+        setImprovingPrompt(false)
+      }
     }
   }
 
@@ -1740,17 +1872,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           <div class="agent-terminal-toolbar-divider" aria-hidden="true" />
 
           <div class="agent-terminal-toolbar-secondary flex items-center gap-2 shrink-0">
-            <Tooltip placement="top" value={improvingPrompt() ? "Improving prompt..." : "Improve prompt"}>
+            <Tooltip placement="top" value={improveUnavailableReason() ?? "Improve prompt"}>
               <button
                 data-action="prompt-improve"
                 type="button"
-                disabled={!canImprovePrompt()}
+                disabled={improvingPrompt()}
                 class="size-8 rounded-lg! border border-border/30 hover:bg-accent/50 text-foreground transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 classList={{
                   "is-busy": improvingPrompt(),
                 }}
-                aria-label="Improve prompt"
+                aria-disabled={improveUnavailableReason() ? "true" : undefined}
+                aria-label={improveUnavailableReason() ?? "Improve prompt"}
                 aria-busy={improvingPrompt()}
+                title={improveUnavailableReason() ?? "Improve prompt"}
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
