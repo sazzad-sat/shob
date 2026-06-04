@@ -91,6 +91,24 @@ const SidebarSectionHeader = (props: {
   )
 }
 
+const SidebarProjectsEmptyAction = (props: { onAddProject: () => void }) => (
+  <div class="flex min-h-0 flex-1 items-center justify-center px-2 py-8">
+    <button
+      type="button"
+      aria-label="Add new project"
+      class="group flex min-w-0 flex-col items-center gap-3 text-center"
+      onClick={props.onAddProject}
+    >
+      <span class="max-w-full truncate text-[13px] font-medium leading-4 text-text-base transition-colors group-hover:text-text-strong">
+        Add new project
+      </span>
+      <span class="glass-button flex size-10 items-center justify-center rounded-[8px] border-border-weak-base bg-surface-raised-base/35 text-text-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_6px_18px_rgba(0,0,0,0.22)] backdrop-blur">
+        <Plus size={18} strokeWidth={1.85} />
+      </span>
+    </button>
+  </div>
+)
+
 const SidebarActionButton = (props: {
   label: string
   title?: string
@@ -1078,7 +1096,7 @@ export function Sidebar(props: {
           </div>
 
           <div class="shob-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto">
-            <div class="flex flex-col gap-0.5 px-1.5 pb-4 pt-1">
+            <div class="flex min-h-full flex-col gap-0.5 px-1.5 pb-4 pt-1">
               <Show when={pinnedSessionHits().length > 0}>
                 <div class="mb-2">
                   <SidebarSectionTitle>Pinned</SidebarSectionTitle>
@@ -1110,14 +1128,7 @@ export function Sidebar(props: {
               <Show
                 when={projects().length > 0}
                 fallback={
-                  <button
-                    type="button"
-                    class="mx-1 flex h-8 items-center gap-2 rounded-[5px] px-3 text-left text-[13px] font-normal text-text-base transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
-                    onClick={() => void handleAddProject()}
-                  >
-                    <Plus size={14} />
-                    Add project
-                  </button>
+                  <SidebarProjectsEmptyAction onAddProject={() => void handleAddProject()} />
                 }
               >
                 <div class="flex flex-col gap-2">
