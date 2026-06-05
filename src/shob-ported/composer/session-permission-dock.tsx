@@ -1,16 +1,47 @@
-import { For, Show } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import type { PermissionRequest } from "@opencode-ai/sdk/v2/client"
-import { Button } from "@opencode-ai/ui/button"
-import { DockPrompt } from "@opencode-ai/ui/dock-prompt"
-import { Icon } from "@opencode-ai/ui/icon"
 import { useLanguage } from "@/context/language"
+import { SessionChoicePrompt, type SessionChoiceOption } from "./session-choice-prompt"
+
+export type PermissionDecision = "once" | "always" | "reject"
+
+export function permissionDecisionFromChoice(id: string): PermissionDecision | undefined {
+  if (id === "once" || id === "always" || id === "reject") return id
+  return undefined
+}
+
+export function buildPermissionChoiceOptions(labels: {
+  allowAlways: string
+  allowOnce: string
+  deny: string
+}): SessionChoiceOption[] {
+  return [
+    {
+      id: "once",
+      label: `${labels.allowOnce} (Recommended)`,
+      description: "Approve this permission request one time.",
+    },
+    {
+      id: "always",
+      label: labels.allowAlways,
+      description: "Approve future requests that match this permission pattern.",
+    },
+    {
+      id: "reject",
+      label: labels.deny,
+      description: "Reject this request and leave the action blocked.",
+    },
+  ]
+}
 
 export function SessionPermissionDock(props: {
   request: PermissionRequest
   responding: boolean
-  onDecide: (response: "once" | "always" | "reject") => void
+  onDecide: (response: PermissionDecision) => void
 }) {
   const language = useLanguage()
+  const [selected, setSelected] = createSignal<PermissionDecision>("once")
+  const [activeIndex, setActiveIndex] = createSignal(0)
 
   const toolDescription = () => {
     const key = `settings.permissions.tool.${props.request.permission}.description`
@@ -19,57 +50,48 @@ export function SessionPermissionDock(props: {
     return value
   }
 
-  return (
-    <DockPrompt
-      kind="permission"
-      header={
-        <div data-slot="permission-row" data-variant="header">
-          <span data-slot="permission-icon">
-            <Icon name="warning" size="normal" />
-          </span>
-          <div data-slot="permission-header-title">{language.t("notification.permission.title")}</div>
-        </div>
-      }
-      footer={
-        <>
-          <div />
-          <div data-slot="permission-footer-actions">
-            <Button variant="ghost" size="normal" onClick={() => props.onDecide("reject")} disabled={props.responding}>
-              {language.t("ui.permission.deny")}
-            </Button>
-            <Button
-              variant="secondary"
-              size="normal"
-              onClick={() => props.onDecide("always")}
-              disabled={props.responding}
-            >
-              {language.t("ui.permission.allowAlways")}
-            </Button>
-            <Button variant="primary" size="normal" onClick={() => props.onDecide("once")} disabled={props.responding}>
-              {language.t("ui.permission.allowOnce")}
-            </Button>
-          </div>
-        </>
-      }
-    >
-      <Show when={toolDescription()}>
-        <div data-slot="permission-row">
-          <span data-slot="permission-spacer" aria-hidden="true" />
-          <div data-slot="permission-hint">{toolDescription()}</div>
-        </div>
-      </Show>
+  const options = createMemo<SessionChoiceOption[]>(() =>
+    buildPermissionChoiceOptions({
+      allowAlways: language.t("ui.permission.allowAlways"),
+      allowOnce: language.t("ui.permission.allowOnce"),
+      deny: language.t("ui.permission.deny"),
+    }),
+  )
 
+  const details = createMemo<JSX.Element>(() => (
+    <>
+      <Show when={toolDescription()}>
+        <p>{toolDescription()}</p>
+      </Show>
       <Show when={props.request.patterns.length > 0}>
-        <div data-slot="permission-row">
-          <span data-slot="permission-spacer" aria-hidden="true" />
-          <div data-slot="permission-patterns">
-            <For each={props.request.patterns}>
-              {(pattern) => <code class="text-12-regular text-text-base break-all">{pattern}</code>}
-            </For>
-          </div>
+        <div data-slot="choice-patterns">
+          <For each={props.request.patterns}>{(pattern) => <code>{pattern}</code>}</For>
         </div>
       </Show>
-    </DockPrompt>
+    </>
+  ))
+
+  const select = (id: string, index: number) => {
+    if (props.responding) return
+    const decision = permissionDecisionFromChoice(id)
+    if (!decision) return
+    setSelected(decision)
+    setActiveIndex(index)
+  }
+
+  return (
+    <SessionChoicePrompt
+      title={language.t("notification.permission.title")}
+      options={options()}
+      selectedIds={[selected()]}
+      activeIndex={activeIndex()}
+      disabled={props.responding}
+      details={details()}
+      dismissLabel={language.t("ui.common.dismiss")}
+      onActiveIndexChange={setActiveIndex}
+      onSelect={select}
+      onDismiss={() => props.onDecide("reject")}
+      onContinue={() => props.onDecide(selected())}
+    />
   )
 }
-

@@ -1,21 +1,61 @@
-import { For, Show, createMemo, createSignal } from "solid-js"
+import { createEffect, createMemo, createSignal } from "solid-js"
 import { useMutation } from "@tanstack/solid-query"
-import { Button } from "@opencode-ai/ui/button"
-import { DockPrompt } from "@opencode-ai/ui/dock-prompt"
 import { showToast } from "@opencode-ai/ui/toast"
 import type { QuestionAnswer, QuestionRequest } from "@opencode-ai/sdk/v2/client"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
+import { SessionChoicePrompt, type SessionChoiceOption } from "./session-choice-prompt"
+
+export const CUSTOM_ANSWER_ID = "custom"
+export const CUSTOM_ANSWER_LABEL = "No, and tell Codex what to do differently"
+
+type QuestionItem = QuestionRequest["questions"][number]
+
+export function questionDefaultSelection(question: QuestionItem | undefined) {
+  if (!question || question.multiple === true) return []
+  if (question.options[0]) return ["option:0"]
+  return question.custom !== false ? [CUSTOM_ANSWER_ID] : []
+}
+
+export function toggleQuestionSelection(current: string[], id: string, multiple: boolean) {
+  if (!multiple) return [id]
+  return current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+}
+
+export function buildQuestionAnswer(question: QuestionItem | undefined, selectedIds: string[], customValue: string) {
+  if (!question) return []
+
+  const answers = selectedIds.flatMap((id) => {
+    if (id === CUSTOM_ANSWER_ID) {
+      const custom = customValue.trim()
+      return custom ? [custom] : []
+    }
+    const optionIndex = Number(id.slice("option:".length))
+    const label = question.options[optionIndex]?.label
+    return label ? [label] : []
+  })
+
+  return Array.from(new Set(answers))
+}
 
 export function SessionQuestionDock(props: { request: QuestionRequest; onSubmit: () => void }) {
   const sdk = useSDK()
   const language = useLanguage()
-  const [custom, setCustom] = createSignal("")
-  const [selected, setSelected] = createSignal<string[]>([])
+  const [tab, setTab] = createSignal(0)
+  const [activeIndex, setActiveIndex] = createSignal(0)
+  const [selectedByQuestion, setSelectedByQuestion] = createSignal<string[][]>([])
+  const [customByQuestion, setCustomByQuestion] = createSignal<string[]>([])
 
-  const question = createMemo(() => props.request.questions[0])
+  const questions = createMemo(() => props.request.questions)
+  const question = createMemo(() => questions()[tab()])
   const options = createMemo(() => question()?.options ?? [])
+  const customEnabled = createMemo(() => question()?.custom !== false)
   const multi = createMemo(() => question()?.multiple === true)
+
+  const defaultSelection = (index: number) => questionDefaultSelection(questions()[index])
+
+  const selected = (index = tab()) => selectedByQuestion()[index] ?? defaultSelection(index)
+  const customValue = (index = tab()) => customByQuestion()[index] ?? ""
 
   const fail = (err: unknown) => {
     const message = err instanceof Error ? err.message : String(err)
@@ -36,22 +76,82 @@ export function SessionQuestionDock(props: { request: QuestionRequest; onSubmit:
 
   const sending = createMemo(() => replyMutation.isPending || rejectMutation.isPending)
 
-  const toggle = (label: string) => {
+  let resetRequestID: string | undefined
+  createEffect(() => {
+    const requestID = props.request.id
+    if (requestID === resetRequestID) return
+    resetRequestID = requestID
+    setTab(0)
+    setActiveIndex(0)
+    setSelectedByQuestion([])
+    setCustomByQuestion([])
+  })
+
+  const choices = createMemo<SessionChoiceOption[]>(() => {
+    const regular = options().map((opt, index) => ({
+      id: `option:${index}`,
+      label: opt.label,
+      description: opt.description,
+    }))
+    if (!customEnabled()) return regular
+    return [
+      ...regular,
+      {
+        id: CUSTOM_ANSWER_ID,
+        label: CUSTOM_ANSWER_LABEL,
+        customValue: customValue(),
+        customPlaceholder: language.t("ui.question.custom.placeholder"),
+        onCustomInput(value: string) {
+          const next = [...customByQuestion()]
+          next[tab()] = value
+          setCustomByQuestion(next)
+        },
+      },
+    ]
+  })
+
+  createEffect(() => {
+    const max = Math.max(choices().length - 1, 0)
+    if (activeIndex() > max) setActiveIndex(max)
+  })
+
+  const setSelected = (index: number, ids: string[]) => {
+    const next = [...selectedByQuestion()]
+    next[index] = ids
+    setSelectedByQuestion(next)
+  }
+
+  const select = (id: string) => {
     if (sending()) return
-    if (!multi()) {
-      setSelected([label])
-      return
-    }
-    setSelected((prev) => (prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]))
+    setSelected(tab(), toggleQuestionSelection(selected(), id, multi()))
+  }
+
+  const answerFor = (index: number): string[] => {
+    return buildQuestionAnswer(questions()[index], selected(index), customValue(index))
+  }
+
+  const canContinue = createMemo(() => {
+    if (sending()) return false
+    const answers = answerFor(tab())
+    return answers.length > 0
+  })
+
+  const goTo = (index: number) => {
+    const next = Math.min(Math.max(index, 0), Math.max(questions().length - 1, 0))
+    setTab(next)
+    const active = selected(next)[0]
+    const optionIndex = choices().findIndex((choice) => choice.id === active)
+    setActiveIndex(Math.max(optionIndex, 0))
   }
 
   const submit = async () => {
-    if (sending()) return
-    const answers = [...selected()]
-    const customText = custom().trim()
-    if (customText) answers.push(customText)
-    if (answers.length === 0) return
-    await replyMutation.mutateAsync([answers])
+    if (!canContinue()) return
+    if (tab() < questions().length - 1) {
+      goTo(tab() + 1)
+      return
+    }
+    const answers = questions().map((_, index) => answerFor(index))
+    await replyMutation.mutateAsync(answers)
   }
 
   const reject = async () => {
@@ -60,52 +160,32 @@ export function SessionQuestionDock(props: { request: QuestionRequest; onSubmit:
   }
 
   return (
-    <DockPrompt
-      kind="question"
-      header={<div data-slot="question-header-title">{language.t("ui.tool.questions")}</div>}
-      footer={
-        <>
-          <Button variant="ghost" size="small" disabled={sending()} onClick={reject}>
-            {language.t("ui.common.dismiss")}
-          </Button>
-          <Button variant="primary" size="small" disabled={sending()} onClick={submit}>
-            {language.t("ui.common.submit")}
-          </Button>
-        </>
+    <SessionChoicePrompt
+      title={question()?.question ?? language.t("ui.tool.questions")}
+      options={choices()}
+      selectedIds={selected()}
+      activeIndex={activeIndex()}
+      disabled={sending()}
+      progress={
+        questions().length > 1
+          ? {
+              current: tab() + 1,
+              total: questions().length,
+              previousDisabled: tab() === 0,
+              nextDisabled: tab() >= questions().length - 1 || !canContinue(),
+              onPrevious: () => goTo(tab() - 1),
+              onNext: () => {
+                if (canContinue()) goTo(tab() + 1)
+              },
+            }
+          : undefined
       }
-    >
-      <div data-slot="question-text" class="overflow-auto">
-        {question()?.question}
-      </div>
-      <div data-slot="question-options">
-        <For each={options()}>
-          {(opt) => (
-            <button
-              type="button"
-              data-slot="question-option"
-              data-picked={selected().includes(opt.label)}
-              disabled={sending()}
-              onClick={() => toggle(opt.label)}
-            >
-              <span data-slot="question-option-main">
-                <span data-slot="option-label">{opt.label}</span>
-                <Show when={opt.description}>
-                  <span data-slot="option-description">{opt.description}</span>
-                </Show>
-              </span>
-            </button>
-          )}
-        </For>
-        <textarea
-          data-slot="question-custom-input"
-          class="w-full"
-          placeholder={language.t("ui.question.custom.placeholder")}
-          value={custom()}
-          disabled={sending()}
-          rows={1}
-          onInput={(e) => setCustom(e.currentTarget.value)}
-        />
-      </div>
-    </DockPrompt>
+      continueDisabled={!canContinue()}
+      dismissLabel={language.t("ui.common.dismiss")}
+      onActiveIndexChange={setActiveIndex}
+      onSelect={select}
+      onDismiss={reject}
+      onContinue={submit}
+    />
   )
 }

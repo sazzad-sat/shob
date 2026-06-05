@@ -443,8 +443,11 @@ function AgentViewInner(props: AgentViewProps) {
   let contentRef: HTMLDivElement | undefined
   let viewRef: HTMLDivElement | undefined
   let composerRegionRef: HTMLDivElement | undefined
+  let composerDockRef: HTMLDivElement | undefined
   let composerRegionHeight = 0
+  let composerDockHeightValue = 0
   const [composerHeight, setComposerHeight] = createSignal(132)
+  const [composerDockHeight, setComposerDockHeight] = createSignal(0)
   const [composerFrame, setComposerFrame] = createSignal({
     left: "0px",
     width: "100%",
@@ -863,6 +866,36 @@ function AgentViewInner(props: AgentViewProps) {
     },
   )
 
+  const updateComposerDockHeight = (height: number) => {
+    const next = Math.ceil(height)
+    if (next === composerDockHeightValue) return
+
+    const el = scrollRef
+    if (el) refreshScrollMetrics()
+    const delta = next - composerDockHeightValue
+    const stick = el
+      ? !autoScroll.userScrolled() || cachedScrollHeight - cachedClientHeight - el.scrollTop < 10 + Math.max(0, delta)
+      : false
+
+    composerDockHeightValue = next
+    setComposerDockHeight(next)
+
+    if (stick) scheduleComposerStickScroll()
+    if (el) scheduleJumpStateUpdate({ measure: true })
+  }
+
+  createResizeObserver(
+    () => composerDockRef,
+    ({ height }) => {
+      updateComposerDockHeight(height)
+    },
+  )
+
+  createEffect(() => {
+    if (composerDockVisible()) return
+    updateComposerDockHeight(0)
+  })
+
   const measureComposerFrame = () => {
     const el = viewRef
     if (!el) return
@@ -995,6 +1028,13 @@ function AgentViewInner(props: AgentViewProps) {
     composerRegionHeight = 0
     setComposerHeight(132)
     if (el) queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
+  }
+
+  const setComposerDockRef = (el: HTMLDivElement | undefined) => {
+    composerDockRef = el
+    composerDockHeightValue = 0
+    setComposerDockHeight(0)
+    if (el) queueMicrotask(() => updateComposerDockHeight(el.getBoundingClientRect().height))
   }
 
   const assistantCopyPartID = (assistants: ChatMessage[], showCopy: boolean) => {
@@ -1188,9 +1228,11 @@ function AgentViewInner(props: AgentViewProps) {
         <div
           ref={setViewRef}
           class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground"
+          data-composer-dock-visible={composerDockVisible() ? "true" : "false"}
           data-docked-composer={showDockedComposer() ? "true" : "false"}
           style={{
             "--agent-composer-bottom": composerFrame().bottom,
+            "--agent-composer-dock-height": `${composerDockHeight()}px`,
             "--agent-composer-height": `${composerHeight()}px`,
             "--agent-composer-left": composerFrame().left,
             "--agent-composer-width": composerFrame().width,
@@ -1444,13 +1486,14 @@ function AgentViewInner(props: AgentViewProps) {
                 data-agent-docked="true"
                 style={{
                   "--agent-composer-bottom": composerFrame().bottom,
+                  "--agent-composer-dock-height": `${composerDockHeight()}px`,
                   "--agent-composer-height": `${composerHeight()}px`,
                   "--agent-composer-left": composerFrame().left,
                   "--agent-composer-width": composerFrame().width,
                 }}
               >
                 <Show when={composerDockVisible()}>
-                  <div class="agent-terminal-composer-docks">
+                  <div ref={setComposerDockRef} class="agent-terminal-composer-docks">
                     <Show when={activeQueuedFollowups().length > 0}>
                       <div class="agent-terminal-followup-queue" aria-live="polite">
                         <div class="agent-terminal-followup-queue-header">
@@ -1485,26 +1528,8 @@ function AgentViewInner(props: AgentViewProps) {
                         </For>
                       </div>
                     </Show>
-                    <Show when={composerState.questionRequest()} keyed>
-                      {(request) => (
-                        <div class="pb-2">
-                          <SessionQuestionDock request={request} onSubmit={() => undefined} />
-                        </div>
-                      )}
-                    </Show>
-                    <Show when={composerState.permissionRequest()} keyed>
-                      {(request) => (
-                        <div class="pb-2">
-                          <SessionPermissionDock
-                            request={request}
-                            responding={composerState.permissionResponding()}
-                            onDecide={composerState.decide}
-                          />
-                        </div>
-                      )}
-                    </Show>
                     <Show when={composerState.dock() && composerState.todos().length > 0}>
-                      <div class="pb-2">
+                      <div class="agent-terminal-composer-dock-block">
                         <SessionTodoDock
                           todos={composerState.todos()}
                           collapsed={todoCollapsed()}
@@ -1515,6 +1540,24 @@ function AgentViewInner(props: AgentViewProps) {
                       </div>
                     </Show>
                     <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
+                    <Show when={composerState.questionRequest()} keyed>
+                      {(request) => (
+                        <div class="agent-terminal-composer-dock-block">
+                          <SessionQuestionDock request={request} onSubmit={() => undefined} />
+                        </div>
+                      )}
+                    </Show>
+                    <Show when={composerState.permissionRequest()} keyed>
+                      {(request) => (
+                        <div class="agent-terminal-composer-dock-block">
+                          <SessionPermissionDock
+                            request={request}
+                            responding={composerState.permissionResponding()}
+                            onDecide={composerState.decide}
+                          />
+                        </div>
+                      )}
+                    </Show>
                   </div>
                 </Show>
                 <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
