@@ -442,6 +442,303 @@ async function revealInFinder(targetPath: string) {
 
 type OpenProjectTarget = "vscode" | "explorer" | "terminal" | "git-bash" | "wsl";
 
+type SkillStoreCatalogItem = {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  category: string;
+  iconKey: string;
+  skillMarkdown: string;
+};
+
+const SHOB_SKILL_STORE_MARKER = "<!-- shob-skill-store";
+const SHOB_SKILL_STORE_MARKER_FILE = ".shob-skill-store.json";
+const SHOB_SKILL_STORE_SOURCE = "shob/builtin-skills";
+const LEGACY_DUMMY_SKILL_TEXT = "This Shob store skill provides workflow guidance only.";
+
+function skillStoreRoot() {
+  return path.join(os.homedir(), ".agents", "skills");
+}
+
+function displayNameFromSkillName(value: string) {
+  return value
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || value;
+}
+
+function normalizeSkillDescription(value?: string | null) {
+  return value?.replace(/\s+/g, " ").replace(/\.$/, "").trim() || "Built-in Shob skill";
+}
+
+function cleanFrontMatterValue(value: string) {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).replace(/\\"/g, '"').replace(/\\'/g, "'");
+  }
+  return trimmed;
+}
+
+function parseSkillFrontMatter(markdown: string) {
+  const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const result: { name?: string; description?: string } = {};
+  if (!match) return result;
+
+  const lines = match[1].split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const block = lines[index].match(/^([A-Za-z0-9_-]+):\s*[>|]\s*$/);
+    if (block) {
+      const key = block[1];
+      const chunks: string[] = [];
+      while (index + 1 < lines.length && (/^\s+/.test(lines[index + 1]) || lines[index + 1].trim() === "")) {
+        index += 1;
+        const value = lines[index].trim();
+        if (value) chunks.push(value);
+      }
+      if (key === "name") result.name = chunks.join(" ");
+      if (key === "description") result.description = chunks.join(" ");
+      continue;
+    }
+
+    const field = lines[index].match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!field) continue;
+    const [, key, value] = field;
+    if (key === "name") result.name = cleanFrontMatterValue(value);
+    if (key === "description") result.description = cleanFrontMatterValue(value);
+  }
+
+  return result;
+}
+
+function builtInSkillRootCandidates() {
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const packagedRoot = resourcesPath ? path.join(resourcesPath, "skills") : null;
+  const devRoots = [path.join(process.cwd(), "skills"), path.resolve(__dirname, "..", "skills")];
+  return app.isPackaged ? [packagedRoot, ...devRoots].filter(Boolean) as string[] : [...devRoots, packagedRoot].filter(Boolean) as string[];
+}
+
+async function resolveBuiltInSkillRoot() {
+  for (const candidate of builtInSkillRootCandidates()) {
+    try {
+      const stats = await fs.stat(candidate);
+      if (stats.isDirectory()) return candidate;
+    } catch {
+      // Try next candidate.
+    }
+  }
+  return null;
+}
+
+function iconKeyForBuiltInSkill(skillId: string) {
+  if (skillId.includes("caveman")) return "speech";
+  if (skillId.includes("frontend-design")) return "palette";
+  return "sparkles";
+}
+
+async function readBuiltInSkillCatalog() {
+  const root = await resolveBuiltInSkillRoot();
+  if (!root) return [];
+
+  const entries = await fs.readdir(root, { withFileTypes: true });
+  const items = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory() && /^[a-z0-9][a-z0-9._-]*$/i.test(entry.name))
+      .map(async (entry) => {
+        const skillFile = path.join(root, entry.name, "SKILL.md");
+        try {
+          const skillMarkdown = await fs.readFile(skillFile, "utf8");
+          const metadata = parseSkillFrontMatter(skillMarkdown);
+          const name = metadata.name || entry.name;
+          return {
+            id: entry.name,
+            name,
+            displayName: displayNameFromSkillName(name),
+            description: normalizeSkillDescription(metadata.description),
+            category: "Built-in",
+            iconKey: iconKeyForBuiltInSkill(entry.name),
+            skillMarkdown,
+          };
+        } catch (error: any) {
+          if (error?.code === "ENOENT") return null;
+          throw error;
+        }
+      }),
+  );
+
+  return items
+    .filter((item): item is SkillStoreCatalogItem => item !== null)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+async function resolveSkillStoreItem(skillId: string) {
+  const catalog = await readBuiltInSkillCatalog();
+  return catalog.find((item) => item.id === skillId);
+}
+
+function resolveManagedSkillDir(skillId: string) {
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(skillId)) throw new Error("Invalid skill id");
+  const root = path.resolve(skillStoreRoot());
+  const target = path.resolve(root, skillId);
+  if (target !== root && target.startsWith(`${root}${path.sep}`)) return { root, target };
+  throw new Error("Invalid skill install path");
+}
+
+async function readSkillStoreFile(skillId: string) {
+  const { target } = resolveManagedSkillDir(skillId);
+  const filePath = path.join(target, "SKILL.md");
+  try {
+    return { filePath, content: await fs.readFile(filePath, "utf8") };
+  } catch (error: any) {
+    if (error?.code === "ENOENT") return { filePath, content: null };
+    throw error;
+  }
+}
+
+async function readManagedMarker(skillId: string) {
+  const { target } = resolveManagedSkillDir(skillId);
+  try {
+    return await fs.readFile(path.join(target, SHOB_SKILL_STORE_MARKER_FILE), "utf8");
+  } catch (error: any) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function isLegacyDummySkill(skillId: string, content: string | null) {
+  return Boolean(content?.includes(`${SHOB_SKILL_STORE_MARKER}:${skillId}`) && content.includes(LEGACY_DUMMY_SKILL_TEXT));
+}
+
+function parseSkillStoreMarker(marker: string | null) {
+  if (!marker) return null;
+  try {
+    return JSON.parse(marker) as { source?: string };
+  } catch {
+    return null;
+  }
+}
+
+async function readSkillInstallState(skillId: string) {
+  const { filePath, content } = await readSkillStoreFile(skillId);
+  const marker = await readManagedMarker(skillId);
+  const markerData = parseSkillStoreMarker(marker);
+  const legacyDummy = isLegacyDummySkill(skillId, content);
+  return {
+    filePath,
+    content,
+    installed: content !== null && !legacyDummy,
+    managed: markerData?.source === SHOB_SKILL_STORE_SOURCE || legacyDummy,
+    deprecatedManaged: Boolean(markerData?.source && markerData.source !== SHOB_SKILL_STORE_SOURCE),
+    legacyDummy,
+  };
+}
+
+async function cleanupDeprecatedStoreSkills(activeSkillIds = new Set<string>()) {
+  let entries: fsSync.Dirent[];
+  try {
+    entries = await fs.readdir(skillStoreRoot(), { withFileTypes: true });
+  } catch (error: any) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (!/^[a-z0-9][a-z0-9._-]*$/i.test(entry.name)) continue;
+    const { target } = resolveManagedSkillDir(entry.name);
+    const state = await readSkillInstallState(entry.name);
+    if (state.legacyDummy || state.deprecatedManaged || (state.managed && !activeSkillIds.has(entry.name))) {
+      await fs.rm(target, { recursive: true, force: true });
+    }
+  }
+}
+
+async function listSkillStore() {
+  const catalog = await readBuiltInSkillCatalog();
+  await cleanupDeprecatedStoreSkills(new Set(catalog.map((item) => item.id)));
+  return Promise.all(
+    catalog.map(async (item) => {
+      const state = await readSkillInstallState(item.id);
+      return {
+        ...item,
+        name: item.id,
+        installed: state.installed,
+        managed: state.managed && state.installed,
+        location: state.installed ? state.filePath : null,
+      };
+    }),
+  );
+}
+
+async function installSkill(skillId: string) {
+  const item = await resolveSkillStoreItem(skillId);
+  if (!item) throw new Error(`Unknown skill: ${skillId}`);
+
+  const { target } = resolveManagedSkillDir(item.id);
+  const state = await readSkillInstallState(item.id);
+  if (state.content && !state.managed) {
+    return {
+      ...item,
+      name: item.id,
+      installed: true,
+      managed: false,
+      location: state.filePath,
+    };
+  }
+
+  await fs.rm(target, { recursive: true, force: true });
+  await fs.mkdir(target, { recursive: true });
+  try {
+    await fs.writeFile(path.join(target, "SKILL.md"), item.skillMarkdown, "utf8");
+    await fs.writeFile(
+      path.join(target, SHOB_SKILL_STORE_MARKER_FILE),
+      JSON.stringify(
+        {
+          source: SHOB_SKILL_STORE_SOURCE,
+          skillId: item.id,
+          installedAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+  } catch (error) {
+    await fs.rm(target, { recursive: true, force: true });
+    throw error;
+  }
+
+  return {
+    ...item,
+    name: item.id,
+    installed: true,
+    managed: true,
+    location: path.join(target, "SKILL.md"),
+  };
+}
+
+async function uninstallSkill(skillId: string) {
+  const item = await resolveSkillStoreItem(skillId);
+  if (!item) throw new Error(`Unknown skill: ${skillId}`);
+
+  const { root, target } = resolveManagedSkillDir(item.id);
+  const state = await readSkillInstallState(item.id);
+  if (!state.content) return { ok: true };
+  if (!state.managed) {
+    throw new Error("This skill was not installed by Shob Skill Store.");
+  }
+  const resolvedTarget = path.resolve(target);
+  if (resolvedTarget === root || !resolvedTarget.startsWith(`${root}${path.sep}`)) {
+    throw new Error("Refusing to remove a path outside the skill store.");
+  }
+  await fs.rm(resolvedTarget, { recursive: true, force: true });
+  return { ok: true };
+}
+
 function assertProjectDirectory(targetPath: string) {
   if (!targetPath || !fsSync.existsSync(targetPath)) throw new Error("Project path does not exist");
   const stats = fsSync.statSync(targetPath);
@@ -818,6 +1115,9 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
     return `data:${getImageMimeType(imagePath)};base64,${bytes.toString("base64")}`;
   },
   get_available_shells: async () => detectShells(),
+  list_skill_store: async () => listSkillStore(),
+  install_skill: async ({ skillId }) => installSkill(String(skillId || "")),
+  uninstall_skill: async ({ skillId }) => uninstallSkill(String(skillId || "")),
   get_terminal_host_info: async () => ({
     os: normalizeOs(),
     windowsBuildNumber: await detectWindowsBuildNumber(),

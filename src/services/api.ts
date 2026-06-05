@@ -22,6 +22,12 @@ export const api = {
   loadSessionOutput: (sessionId: string) => invokeNative('load_session_output', { sessionId }),
   
   getAvailableShells: () => invokeNative('get_available_shells'),
+
+  listSkillStore: () => invokeNative('list_skill_store'),
+
+  installSkill: (skillId: string) => invokeNative('install_skill', { skillId }),
+
+  uninstallSkill: (skillId: string) => invokeNative('uninstall_skill', { skillId }),
   
   probeCliTools: (items: { id: string; commands: string[] }[]) =>
     invokeNative('probe_cli_tools', { items }) as Promise<CliProbeResult[]>,

@@ -397,6 +397,15 @@ function createGlobalSync() {
       })
   }
 
+  const refreshSkills = async () => {
+    await Promise.all(
+      Object.entries(children.children).map(async ([directory, [, setStore]]) => {
+        const result = await sdkFor(directory).command.list()
+        setStore("command", result.data ?? [])
+      }),
+    )
+  }
+
   return {
     data: globalStore,
     set,
@@ -410,6 +419,7 @@ function createGlobalSync() {
     peek: children.peek,
     bootstrap,
     updateConfig,
+    refreshSkills,
     project: projectApi,
     todo: {
       set: setSessionTodo,

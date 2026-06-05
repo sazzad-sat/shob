@@ -41,6 +41,18 @@ export interface ElectronGitFileState {
   deletions: number
 }
 
+export interface ElectronSkillStoreItem {
+  id: string
+  name: string
+  displayName: string
+  description: string
+  category: string
+  iconKey: string
+  installed: boolean
+  managed: boolean
+  location: string | null
+}
+
 export interface ElectronOpenDialogOptions {
   directory?: boolean
   multiple?: boolean
@@ -143,6 +155,9 @@ export interface NativeCommandMap {
   load_session_output: { args: { sessionId: string }; result: string }
   read_image_data_url: { args: { path: string }; result: string }
   get_available_shells: { args: undefined; result: string[] }
+  list_skill_store: { args: undefined; result: ElectronSkillStoreItem[] }
+  install_skill: { args: { skillId: string }; result: ElectronSkillStoreItem }
+  uninstall_skill: { args: { skillId: string }; result: { ok: true } }
   get_terminal_host_info: { args: undefined; result: TerminalHostInfo }
   probe_cli_tools: { args: { items: { id: string; commands: string[] }[] }; result: CliProbeResult[] }
   set_project_watch: { args: { path: string | null }; result: void }

@@ -52,7 +52,8 @@
     ],
     "extraResources": [
       "dist-server/**",
-      "electron/icons/**"
+      "electron/icons/**",
+      "skills/**"
     ],
     "directories": {
       "buildResources": "electron/icons",

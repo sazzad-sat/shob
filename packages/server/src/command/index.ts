@@ -229,13 +229,18 @@ const PROMPT_REMOVE_SKILL = [
 
       const state = yield* InstanceState.make<State>((ctx) => init(ctx))
 
+      const refresh = Effect.fn("Command.refresh")(function* () {
+        yield* InstanceState.invalidate(state)
+        return yield* InstanceState.get(state)
+      })
+
       const get = Effect.fn("Command.get")(function* (name: string) {
-        const s = yield* InstanceState.get(state)
+        const s = yield* refresh()
         return s.commands[name]
       })
 
       const list = Effect.fn("Command.list")(function* () {
-        const s = yield* InstanceState.get(state)
+        const s = yield* refresh()
         return Object.values(s.commands)
       })
 

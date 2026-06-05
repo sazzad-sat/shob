@@ -1,14 +1,15 @@
 import { createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
-import { Boxes, SlidersHorizontal, Box, CircleHelp } from "lucide-solid"
+import { Blocks, Boxes, SlidersHorizontal, Box, CircleHelp } from "lucide-solid"
 import { SettingsProviders } from "./shob-settings/settings-providers"
 import { SettingsModels } from "./shob-settings/settings-models"
 import { SettingsAbout } from "./settings-about"
+import { SettingsPlugins } from "./settings-plugins"
 import { useStore } from "../store"
 import { applyAppTheme, getThemeById, SHOB_THEME_LIST, resolveThemeMode, type ShobTheme } from "../theme"
 import { Combobox, ComboboxContent, ComboboxControl, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-type SettingsSection = "general" | "providers" | "models" | "about"
+type SettingsSection = "general" | "plugins" | "providers" | "models" | "about"
 
 const SETTINGS_SECTIONS = [
   {
@@ -24,6 +25,13 @@ const SETTINGS_SECTIONS = [
     description: "Connected accounts and API providers",
     icon: Boxes,
     keywords: ["provider", "api", "account", "connect", "key"],
+  },
+  {
+    id: "plugins",
+    label: "Plugins",
+    description: "Install skills and workflows",
+    icon: Blocks,
+    keywords: ["plugin", "plugins", "skill", "skills", "store", "marketplace"],
   },
   {
     id: "models",
@@ -319,6 +327,10 @@ export function SettingsPage() {
 
           <Show when={section() === "providers"}>
             <SettingsProviders />
+          </Show>
+
+          <Show when={section() === "plugins"}>
+            <SettingsPlugins />
           </Show>
 
           <Show when={section() === "models"}>
