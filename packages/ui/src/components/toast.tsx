@@ -38,10 +38,10 @@ function ToastRoot(props: ToastRootComponentProps) {
   )
 }
 
-function ToastIcon(props: { name: IconProps["name"] }) {
+function ToastIcon(props: { name?: IconProps["name"]; children?: JSX.Element }) {
   return (
     <div data-slot="toast-icon">
-      <Icon name={props.name} />
+      {props.children ?? (props.name ? <Icon name={props.name} /> : null)}
     </div>
   )
 }
@@ -109,6 +109,7 @@ export interface ToastOptions {
   title?: string
   description?: string
   icon?: IconProps["name"]
+  leading?: JSX.Element
   variant?: ToastVariant
   duration?: number
   persistent?: boolean
@@ -124,8 +125,8 @@ export function showToast(options: ToastOptions | string) {
       persistent={opts.persistent}
       data-variant={opts.variant ?? "default"}
     >
-      <Show when={opts.icon}>
-        <Toast.Icon name={opts.icon!} />
+      <Show when={opts.leading ?? opts.icon}>
+        <Toast.Icon name={opts.icon}>{opts.leading}</Toast.Icon>
       </Show>
       <Toast.Content>
         <Show when={opts.title}>

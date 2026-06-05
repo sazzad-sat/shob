@@ -5,12 +5,11 @@ import { MainView } from './components/MainView'
 import { useStore } from './store'
 import { applyAppTheme, getThemeById, resolveThemeMode, type ResolvedThemeMode } from './theme'
 import { ErrorPage } from './pages/error'
-import { showToast } from '@opencode-ai/ui/toast'
-import { useSettings } from './context/settings'
+import { Toast, showToast } from '@opencode-ai/ui/toast'
+import { Ico } from './components/Ico'
 
 function App() {
   const { loadProjects, loadCliTools, loadAvailableShells } = useStore()
-  const settings = useSettings()
   const themeId = useStore((s) => s.themeId)
   const colorScheme = useStore((s) => s.colorScheme)
   const [isBooting, setIsBooting] = createSignal(true)
@@ -18,9 +17,15 @@ function App() {
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
   )
 
+  const updateToastLogo = () => (
+    <Ico
+      alt=""
+      class="size-9 rounded-lg border border-border-weak-base bg-surface-base object-cover shadow-sm"
+    />
+  )
+
   onMount(() => {
     let unlistenAvailable: (() => void) | null = null
-    let unlistenProgress: (() => void) | null = null
     let unlistenDownloaded: (() => void) | null = null
     let unlistenError: (() => void) | null = null
 
@@ -30,11 +35,11 @@ function App() {
       try {
         unlistenAvailable = await nativeApi.listen<{ version: string }>("update:available", (event) => {
           showToast({
-            title: "Update Available",
-            description: `Shob ${event.payload.version} is downloading in the background.`,
+            title: "Update downloading",
+            description: `Shob ${event.payload.version} is downloading in the background. You can keep working.`,
             variant: "default",
-            duration: 15000,
-            icon: "download",
+            duration: 8000,
+            leading: updateToastLogo(),
             actions: [
               {
                 label: "Dismiss",
@@ -44,26 +49,16 @@ function App() {
           })
         })
 
-        unlistenProgress = await nativeApi.listen<{ percent: number }>("update:progress", (event) => {
-          // Show quick alert of progress
-          showToast({
-            title: "Downloading Update",
-            description: `Shob update is downloading: ${event.payload.percent.toFixed(0)}%`,
-            variant: "default",
-            duration: 4000,
-          })
-        })
-
         unlistenDownloaded = await nativeApi.listen<{ version: string }>("update:downloaded", (event) => {
           showToast({
-            title: "Update Ready",
-            description: `Shob version ${event.payload.version} has been successfully downloaded!`,
+            title: "Update ready to install",
+            description: `Shob ${event.payload.version} has finished downloading. Restart now to complete the update.`,
             variant: "success",
             persistent: true,
-            icon: "check",
+            leading: updateToastLogo(),
             actions: [
               {
-                label: "Restart & Install",
+                label: "Restart & install",
                 onClick: () => {
                   void nativeApi.invoke("install_update")
                 },
@@ -88,7 +83,6 @@ function App() {
 
     onCleanup(() => {
       unlistenAvailable?.()
-      unlistenProgress?.()
       unlistenDownloaded?.()
       unlistenError?.()
     })
@@ -98,7 +92,7 @@ function App() {
     let timeoutId: number | null = null
 
     const runStartupUpdateCheck = () => {
-      if (!window.shob || !settings.updates.startup()) return
+      if (!window.shob) return
       void nativeApi.invoke("check_for_updates", { manual: false }).catch((error) => {
         console.warn("Startup update check failed:", error)
       })
@@ -200,6 +194,7 @@ function App() {
 
   return (
     <>
+      <Toast.Region />
       <div class="flex h-full min-h-0 flex-col overflow-hidden">
         <ErrorBoundary fallback={(error) => <ErrorPage error={error} />}>
           <TitleBar />

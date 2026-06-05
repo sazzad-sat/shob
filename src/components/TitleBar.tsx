@@ -31,9 +31,6 @@ export function TitleBar() {
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
   const [isFullscreen, setIsFullscreen] = createSignal(false)
   const [isMaximized, setIsMaximized] = createSignal(false)
-  const [updateState, setUpdateState] = createSignal<"idle" | "checking" | "available" | "downloading" | "downloaded" | "error" | "dev">("idle")
-  const [updateVersion, setUpdateVersion] = createSignal<string | null>(null)
-  const [downloadPercent, setDownloadPercent] = createSignal(0)
 
   const mac = () => platform() === "macos"
   const windows = () => platform() === "windows"
@@ -59,53 +56,6 @@ export function TitleBar() {
   })
 
   onMount(() => {
-    const unlisteners: Array<() => void> = []
-
-    void nativeApi
-      .invoke("get_update_status")
-      .then((state) => {
-        setUpdateState(state.status)
-        setUpdateVersion(state.version ?? null)
-      })
-      .catch(() => undefined)
-
-    const listen = async () => {
-      unlisteners.push(
-        await nativeApi.listen<null>("update:checking", () => {
-          setUpdateState("checking")
-        }),
-        await nativeApi.listen<{ version: string }>("update:available", (event) => {
-          setUpdateState("downloading")
-          setUpdateVersion(event.payload.version)
-          setDownloadPercent(0)
-        }),
-        await nativeApi.listen<{ percent: number }>("update:progress", (event) => {
-          setUpdateState("downloading")
-          setDownloadPercent(event.payload.percent)
-        }),
-        await nativeApi.listen<{ version: string }>("update:downloaded", (event) => {
-          setUpdateState("downloaded")
-          setUpdateVersion(event.payload.version)
-          setDownloadPercent(100)
-        }),
-        await nativeApi.listen<null>("update:not-available", () => {
-          setUpdateState("idle")
-          setUpdateVersion(null)
-          setDownloadPercent(0)
-        }),
-        await nativeApi.listen<string>("update:error", () => {
-          setUpdateState("error")
-        }),
-      )
-    }
-
-    void listen().catch(() => undefined)
-    onCleanup(() => {
-      for (const unlisten of unlisteners) unlisten()
-    })
-  })
-
-  onMount(() => {
     const handleSidebarState = (event: Event) => {
       const detail = (event as CustomEvent<{ isSidebarVisible: boolean }>).detail
       if (detail) setIsSidebarVisible(Boolean(detail.isSidebarVisible))
@@ -122,11 +72,6 @@ export function TitleBar() {
         if (typeof maximized === "boolean") setIsMaximized(maximized)
       })
       .catch(() => undefined)
-  }
-
-  const installUpdate = (e: MouseEvent) => {
-    e.stopPropagation()
-    void nativeApi.invoke("install_update").catch(() => undefined)
   }
 
   const minimizeWindow = (e: MouseEvent) => {
@@ -186,30 +131,6 @@ export function TitleBar() {
               aria-label="Start a new session"
             >
               <Icon size="small" name="new-session" />
-            </Button>
-          </Show>
-          <Show when={updateState() === "downloaded"}>
-            <Button
-              variant="ghost"
-              class="titlebar-icon titlebar-update-ready"
-              style={{ "-webkit-app-region": "no-drag" }}
-              onClick={installUpdate}
-              title={`Install Shob ${updateVersion() ?? "update"} and restart`}
-              aria-label="Install downloaded update"
-            >
-              <Icon size="small" name="download" />
-            </Button>
-          </Show>
-          <Show when={updateState() === "downloading"}>
-            <Button
-              variant="ghost"
-              class="titlebar-icon titlebar-update-downloading"
-              style={{ "-webkit-app-region": "no-drag" }}
-              disabled
-              title={`Downloading Shob ${updateVersion() ?? "update"} ${downloadPercent().toFixed(0)}%`}
-              aria-label="Update downloading"
-            >
-              <Icon size="small" name="download" />
             </Button>
           </Show>
           <div id="shob-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" style={{ "-webkit-app-region": "no-drag" }} />
