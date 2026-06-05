@@ -1372,7 +1372,12 @@ b {
   --terminal-agent-text: var(--text-strong);
   --terminal-agent-muted: var(--text-weak);
   --terminal-agent-dim: var(--text-weaker);
-  container: agent-view / size;
+  position: relative !important;
+  display: flex !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   background: var(--terminal-agent-bg) !important;
   color: var(--terminal-agent-text);
   font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif;
@@ -1513,6 +1518,10 @@ b {
 
 .agent-terminal-buffer {
   padding: 20px 0 20px !important;
+}
+
+.agent-terminal-view[data-docked-composer="true"] .agent-terminal-buffer {
+  padding-bottom: calc(var(--agent-composer-height, 132px) + 32px) !important;
 }
 
 .agent-terminal-buffer-empty {
@@ -2029,11 +2038,26 @@ b {
   display: flex;
   width: 100%;
   min-width: 0;
-  max-height: 100%;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
+  overflow: visible;
+}
+
+.agent-terminal-view[data-docked-composer="true"] .agent-terminal-composer-region {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 50;
+  max-height: min(52dvh, 360px);
   overflow: hidden;
+  padding-top: 8px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--terminal-agent-bg) 0%, transparent) 0%,
+    var(--terminal-agent-bg) 18%,
+    var(--terminal-agent-bg) 100%
+  );
 }
 
 .agent-terminal-composer-docks,
@@ -2697,7 +2721,7 @@ b {
   }
 }
 
-@container agent-view (max-height: 560px) {
+@media (max-height: 620px) {
   .agent-terminal-buffer-empty {
     align-items: flex-start !important;
     justify-content: flex-start !important;
@@ -2742,7 +2766,7 @@ b {
   }
 }
 
-@container agent-view (max-height: 440px) {
+@media (max-height: 500px) {
   .agent-terminal-new-session-heading {
     display: none;
   }

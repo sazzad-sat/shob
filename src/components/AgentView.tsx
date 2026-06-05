@@ -442,6 +442,7 @@ function AgentViewInner(props: AgentViewProps) {
   let contentRef: HTMLDivElement | undefined
   let composerRegionRef: HTMLDivElement | undefined
   let composerRegionHeight = 0
+  const [composerHeight, setComposerHeight] = createSignal(132)
   let rafId: number | undefined
   let cachedScrollHeight = 0
   let cachedClientHeight = 0
@@ -846,6 +847,7 @@ function AgentViewInner(props: AgentViewProps) {
         : false
 
       composerRegionHeight = next
+      setComposerHeight(next || 132)
 
       if (stick) autoScroll.forceScrollToBottom()
       if (el) scheduleJumpStateUpdate({ measure: true })
@@ -911,6 +913,7 @@ function AgentViewInner(props: AgentViewProps) {
   const setComposerRegionRef = (el: HTMLDivElement | undefined) => {
     composerRegionRef = el
     composerRegionHeight = 0
+    setComposerHeight(132)
     if (el) queueMicrotask(() => scheduleJumpStateUpdate({ measure: true }))
   }
 
@@ -1102,7 +1105,11 @@ function AgentViewInner(props: AgentViewProps) {
           </div>
         </Show>
 
-        <div class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground">
+        <div
+          class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground"
+          data-docked-composer={showDockedComposer() ? "true" : "false"}
+          style={{ "--agent-composer-height": `${composerHeight()}px` }}
+        >
           <div class="relative min-h-0 flex-1 overflow-hidden">
             <div
               class="pointer-events-none absolute bottom-6 left-1/2 z-[60] -translate-x-1/2 transition-all duration-200 ease-out"
