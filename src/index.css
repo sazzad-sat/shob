@@ -3392,4 +3392,16 @@ b {
   background: #262626;
 }
 
+/* ═══════════════════════════════════════════════════
+   PREVENT THEME SWITCH BLINKING
+   ═══════════════════════════════════════════════════ */
+.no-transitions,
+.no-transitions * {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  -ms-transition: none !important;
+  transition: none !important;
+}
+
 
