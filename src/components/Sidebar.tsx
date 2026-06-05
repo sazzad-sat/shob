@@ -339,6 +339,7 @@ function FolderSection(props: {
   const [renameProjectOpen, setRenameProjectOpen] = createSignal(false)
   const [renameProjectValue, setRenameProjectValue] = createSignal(props.project.name)
   const [renameProjectSaving, setRenameProjectSaving] = createSignal(false)
+  const [confirmDeleteSessionId, setConfirmDeleteSessionId] = createSignal<string | null>(null)
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
   const shobSessions = createMemo(() => projectStore().session)
   const sortable = createSortable(props.project.id)
@@ -433,6 +434,17 @@ function FolderSection(props: {
     setEditingSessionId(null)
   }
 
+  const handleRequestDeleteSession = (event: MouseEvent, sessionId: string) => {
+    event.stopPropagation()
+    setConfirmDeleteSessionId(sessionId)
+  }
+
+  const handleConfirmDeleteSession = (event: MouseEvent, sessionId: string) => {
+    event.stopPropagation()
+    setConfirmDeleteSessionId(null)
+    props.onDeleteSession(props.project.id, sessionId)
+  }
+
   const handleOpenInExplorer = () => {
     nativeApi.invoke("reveal_in_finder", { path: props.project.path }).catch(() => undefined)
   }
@@ -487,6 +499,14 @@ function FolderSection(props: {
     showAllSessions() ? rootSessions() : rootSessions().slice(0, PROJECT_SESSION_PREVIEW_LIMIT),
   )
   const hiddenRootSessionCount = createMemo(() => Math.max(0, rootSessions().length - PROJECT_SESSION_PREVIEW_LIMIT))
+
+  createEffect(() => {
+    const confirming = confirmDeleteSessionId()
+    if (confirming && !props.project.sessions.some((session) => session.id === confirming)) {
+      setConfirmDeleteSessionId(null)
+    }
+  })
+
   const renderSessionMeta = (session: Project["sessions"][number]) => (
     <Switch
       fallback={
@@ -518,7 +538,10 @@ function FolderSection(props: {
             : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
         }`}
         style={{ "padding-left": `${34 + level * 14}px` }}
-        onClick={() => props.onSelectSession(props.project.id, session.id)}
+        onClick={() => {
+          setConfirmDeleteSessionId(null)
+          props.onSelectSession(props.project.id, session.id)
+        }}
       >
         <div class="min-w-0 flex flex-1 items-center">
           <Show
@@ -530,6 +553,7 @@ function FolderSection(props: {
                 }`}
                 onDblClick={(e) => {
                   e.stopPropagation()
+                  setConfirmDeleteSessionId(null)
                   setEditingSessionId(session.id)
                   setEditSessionValue(session.name)
                 }}
@@ -568,20 +592,33 @@ function FolderSection(props: {
         </div>
 
         <div class="relative ml-3 flex h-5 min-w-7 shrink-0 items-center justify-end">
-          <button
-            type="button"
-            class="absolute right-0 z-10 rounded-[4px] p-0.5 text-text-weak opacity-0 transition-all duration-150 hover:bg-surface-raised-base-hover hover:text-text-strong group-hover/session:opacity-100"
-            title="Archive session"
-            onClick={(e) => {
-              e.stopPropagation()
-              props.onDeleteSession(props.project.id, session.id)
-            }}
+          <Show
+            when={confirmDeleteSessionId() === session.id}
+            fallback={
+              <>
+                <button
+                  type="button"
+                  class="absolute right-0 z-10 rounded-[4px] p-0.5 text-text-weak opacity-0 transition-all duration-150 hover:bg-surface-raised-base-hover hover:text-text-strong group-hover/session:opacity-100"
+                  title="Remove session"
+                  onClick={(e) => handleRequestDeleteSession(e, session.id)}
+                >
+                  <SessionDeleteIcon />
+                </button>
+                <span class="pointer-events-none flex min-w-7 items-center justify-end transition-opacity duration-150 group-hover/session:opacity-0">
+                  {renderSessionMeta(session)}
+                </span>
+              </>
+            }
           >
-            <SessionDeleteIcon />
-          </button>
-          <span class="pointer-events-none flex min-w-7 items-center justify-end transition-opacity duration-150 group-hover/session:opacity-0">
-            {renderSessionMeta(session)}
-          </span>
+            <button
+              type="button"
+              class="h-5 rounded-[5px] bg-text-diff-delete-base/15 px-2 text-[11px] font-medium leading-5 text-text-diff-delete-base transition-colors hover:bg-text-diff-delete-base/25"
+              title="Confirm remove session"
+              onClick={(e) => handleConfirmDeleteSession(e, session.id)}
+            >
+              Confirm
+            </button>
+          </Show>
         </div>
       </div>
       <For each={sessionTree(session.id)}>
