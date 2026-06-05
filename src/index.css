@@ -1520,8 +1520,12 @@ b {
   padding: 20px 0 20px !important;
 }
 
+.agent-terminal-view[data-docked-composer="true"] .agent-terminal-scroll-frame {
+  margin-bottom: calc(var(--agent-composer-height, 132px) + 8px);
+}
+
 .agent-terminal-view[data-docked-composer="true"] .agent-terminal-buffer {
-  padding-bottom: calc(var(--agent-composer-height, 132px) + 32px) !important;
+  padding-bottom: clamp(24px, 4dvh, 48px) !important;
 }
 
 .agent-terminal-buffer-empty {
@@ -1531,6 +1535,10 @@ b {
   align-items: center !important;
   justify-content: safe center !important;
   padding: clamp(8px, 4dvh, 56px) 0 clamp(12px, 3dvh, 24px) !important;
+}
+
+.agent-terminal-view[data-docked-composer="true"] .agent-terminal-buffer-empty {
+  padding-bottom: clamp(24px, 5dvh, 56px) !important;
 }
 
 .agent-terminal-buffer > .agent-terminal-turn,
@@ -2044,11 +2052,13 @@ b {
   overflow: visible;
 }
 
-.agent-terminal-view[data-docked-composer="true"] .agent-terminal-composer-region {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  z-index: 50;
+.agent-terminal-composer-region[data-agent-docked="true"] {
+  position: fixed;
+  left: var(--agent-composer-left, 0px);
+  bottom: var(--agent-composer-bottom, 0px);
+  z-index: 90;
+  width: max(240px, var(--agent-composer-width, 100vw));
+  max-width: 100vw;
   max-height: min(52dvh, 360px);
   overflow: hidden;
   padding-top: 8px;

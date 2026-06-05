@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show } from "solid-js"
+import { Portal } from "solid-js/web"
 import { PromptInput } from "../shob-ported/prompt-input"
 import { sendFollowupDraft, type FollowupDraft } from "@/shob-ported/prompt-input/submit"
 import { MockSessionProviders } from "../shob-ported/mock-session-layout"
@@ -440,10 +441,18 @@ function AgentViewInner(props: AgentViewProps) {
   const [queuedFollowups, setQueuedFollowups] = createSignal<QueuedFollowup[]>([])
   let scrollRef: HTMLDivElement | undefined
   let contentRef: HTMLDivElement | undefined
+  let viewRef: HTMLDivElement | undefined
   let composerRegionRef: HTMLDivElement | undefined
   let composerRegionHeight = 0
   const [composerHeight, setComposerHeight] = createSignal(132)
+  const [composerFrame, setComposerFrame] = createSignal({
+    left: "0px",
+    width: "100%",
+    bottom: "0px",
+  })
   let rafId: number | undefined
+  let composerFrameRaf: number | undefined
+  let composerStickScrollRaf: number | undefined
   let cachedScrollHeight = 0
   let cachedClientHeight = 0
   let userScrollPending = false
@@ -544,7 +553,7 @@ function AgentViewInner(props: AgentViewProps) {
   )
   const sessionContentLoading = createMemo(() => Boolean(activeSessionId() && messageState() === undefined))
   const isNewSession = createMemo(() => !sessionContentLoading() && messages().length === 0)
-  const showDockedComposer = createMemo(() => !sessionContentLoading() && !isNewSession())
+  const showDockedComposer = createMemo(() => !sessionContentLoading())
   const newSessionTitle = createMemo(() => {
     const key = sessionID()
     const index = key ? newSessionTitleIndexes()[key] ?? 0 : 0
@@ -849,10 +858,74 @@ function AgentViewInner(props: AgentViewProps) {
       composerRegionHeight = next
       setComposerHeight(next || 132)
 
-      if (stick) autoScroll.forceScrollToBottom()
+      if (stick) scheduleComposerStickScroll()
       if (el) scheduleJumpStateUpdate({ measure: true })
     },
   )
+
+  const measureComposerFrame = () => {
+    const el = viewRef
+    if (!el) return
+
+    const rect = el.getBoundingClientRect()
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+    let left = Math.max(0, Math.min(rect.left, viewportWidth))
+    let right = Math.max(left, Math.min(rect.right, viewportWidth))
+    const bottom = Math.max(0, viewportHeight - Math.min(rect.bottom, viewportHeight))
+
+    if (right - left < 240) {
+      left = 0
+      right = viewportWidth
+    }
+
+    setComposerFrame({
+      left: `${Math.round(left)}px`,
+      width: `${Math.round(right - left)}px`,
+      bottom: `${Math.round(bottom)}px`,
+    })
+  }
+
+  const scheduleComposerFrame = () => {
+    if (composerFrameRaf !== undefined) return
+    composerFrameRaf = requestAnimationFrame(() => {
+      composerFrameRaf = undefined
+      measureComposerFrame()
+    })
+  }
+
+  const scheduleComposerStickScroll = () => {
+    if (composerStickScrollRaf !== undefined) cancelAnimationFrame(composerStickScrollRaf)
+    composerStickScrollRaf = requestAnimationFrame(() => {
+      composerStickScrollRaf = undefined
+      autoScroll.forceScrollToBottom()
+      scheduleJumpStateUpdate({ measure: true })
+    })
+  }
+
+  createResizeObserver(
+    () => viewRef,
+    () => {
+      scheduleComposerFrame()
+    },
+  )
+
+  createEffect(() => {
+    showDockedComposer()
+    scheduleComposerFrame()
+  })
+
+  onMount(() => {
+    scheduleComposerFrame()
+    window.addEventListener("resize", scheduleComposerFrame)
+    window.visualViewport?.addEventListener("resize", scheduleComposerFrame)
+    window.visualViewport?.addEventListener("scroll", scheduleComposerFrame)
+    onCleanup(() => {
+      window.removeEventListener("resize", scheduleComposerFrame)
+      window.visualViewport?.removeEventListener("resize", scheduleComposerFrame)
+      window.visualViewport?.removeEventListener("scroll", scheduleComposerFrame)
+    })
+  })
 
   createEffect(() => {
     const sessionID = activeSessionId()
@@ -896,7 +969,14 @@ function AgentViewInner(props: AgentViewProps) {
 
   onCleanup(() => {
     if (rafId !== undefined) cancelAnimationFrame(rafId)
+    if (composerFrameRaf !== undefined) cancelAnimationFrame(composerFrameRaf)
+    if (composerStickScrollRaf !== undefined) cancelAnimationFrame(composerStickScrollRaf)
   })
+
+  const setViewRef = (el: HTMLDivElement | undefined) => {
+    viewRef = el
+    if (el) queueMicrotask(scheduleComposerFrame)
+  }
 
   const setScrollRef = (el: HTMLDivElement | undefined) => {
     scrollRef = el
@@ -1106,11 +1186,17 @@ function AgentViewInner(props: AgentViewProps) {
         </Show>
 
         <div
+          ref={setViewRef}
           class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground"
           data-docked-composer={showDockedComposer() ? "true" : "false"}
-          style={{ "--agent-composer-height": `${composerHeight()}px` }}
+          style={{
+            "--agent-composer-bottom": composerFrame().bottom,
+            "--agent-composer-height": `${composerHeight()}px`,
+            "--agent-composer-left": composerFrame().left,
+            "--agent-composer-width": composerFrame().width,
+          }}
         >
-          <div class="relative min-h-0 flex-1 overflow-hidden">
+          <div class="agent-terminal-scroll-frame relative min-h-0 flex-1 overflow-hidden">
             <div
               class="pointer-events-none absolute bottom-6 left-1/2 z-[60] -translate-x-1/2 transition-all duration-200 ease-out"
               classList={{
@@ -1342,9 +1428,6 @@ function AgentViewInner(props: AgentViewProps) {
                         <div class="agent-terminal-new-session-heading">
                           <h1>{newSessionTitle()}</h1>
                         </div>
-                        <div class="relative z-10 w-full text-left">
-                          <PromptInput onSubmit={resumeScroll} />
-                        </div>
                       </div>
                     </div>
                   </Show>
@@ -1354,77 +1437,89 @@ function AgentViewInner(props: AgentViewProps) {
           </div>
 
           <Show when={showDockedComposer()}>
-            <div ref={setComposerRegionRef} class="agent-terminal-composer-region">
-              <Show when={composerDockVisible()}>
-                <div class="agent-terminal-composer-docks">
-                  <Show when={activeQueuedFollowups().length > 0}>
-                    <div class="agent-terminal-followup-queue" aria-live="polite">
-                      <div class="agent-terminal-followup-queue-header">
-                        <span>Queued follow-ups</span>
-                        <span>{activeQueuedFollowups().length}</span>
-                      </div>
-                      <For each={activeQueuedFollowups()}>
-                        {(item) => (
-                          <div class="agent-terminal-followup-queue-item" data-state={item.state}>
-                            <div class="agent-terminal-followup-queue-copy">
-                              <span>{followupPreview(item)}</span>
-                              <Show when={item.error}>
-                                <small>{item.error}</small>
-                              </Show>
+            <Portal>
+              <div
+                ref={setComposerRegionRef}
+                class="agent-terminal-composer-region"
+                data-agent-docked="true"
+                style={{
+                  "--agent-composer-bottom": composerFrame().bottom,
+                  "--agent-composer-height": `${composerHeight()}px`,
+                  "--agent-composer-left": composerFrame().left,
+                  "--agent-composer-width": composerFrame().width,
+                }}
+              >
+                <Show when={composerDockVisible()}>
+                  <div class="agent-terminal-composer-docks">
+                    <Show when={activeQueuedFollowups().length > 0}>
+                      <div class="agent-terminal-followup-queue" aria-live="polite">
+                        <div class="agent-terminal-followup-queue-header">
+                          <span>Queued follow-ups</span>
+                          <span>{activeQueuedFollowups().length}</span>
+                        </div>
+                        <For each={activeQueuedFollowups()}>
+                          {(item) => (
+                            <div class="agent-terminal-followup-queue-item" data-state={item.state}>
+                              <div class="agent-terminal-followup-queue-copy">
+                                <span>{followupPreview(item)}</span>
+                                <Show when={item.error}>
+                                  <small>{item.error}</small>
+                                </Show>
+                              </div>
+                              <span class="agent-terminal-followup-queue-state">
+                                <Show when={item.state === "sending"} fallback={item.state === "failed" ? "Failed" : "Queued"}>
+                                  Sending
+                                </Show>
+                              </span>
+                              <button
+                                type="button"
+                                disabled={item.state === "sending"}
+                                class="agent-terminal-followup-queue-remove"
+                                onClick={() => removeQueuedFollowup(item.queueID)}
+                                aria-label="Remove queued follow-up"
+                              >
+                                <X size={13} />
+                              </button>
                             </div>
-                            <span class="agent-terminal-followup-queue-state">
-                              <Show when={item.state === "sending"} fallback={item.state === "failed" ? "Failed" : "Queued"}>
-                                Sending
-                              </Show>
-                            </span>
-                            <button
-                              type="button"
-                              disabled={item.state === "sending"}
-                              class="agent-terminal-followup-queue-remove"
-                              onClick={() => removeQueuedFollowup(item.queueID)}
-                              aria-label="Remove queued follow-up"
-                            >
-                              <X size={13} />
-                            </button>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-                  <Show when={composerState.questionRequest()} keyed>
-                    {(request) => (
-                      <div class="pb-2">
-                        <SessionQuestionDock request={request} onSubmit={() => undefined} />
+                          )}
+                        </For>
                       </div>
-                    )}
-                  </Show>
-                  <Show when={composerState.permissionRequest()} keyed>
-                    {(request) => (
+                    </Show>
+                    <Show when={composerState.questionRequest()} keyed>
+                      {(request) => (
+                        <div class="pb-2">
+                          <SessionQuestionDock request={request} onSubmit={() => undefined} />
+                        </div>
+                      )}
+                    </Show>
+                    <Show when={composerState.permissionRequest()} keyed>
+                      {(request) => (
+                        <div class="pb-2">
+                          <SessionPermissionDock
+                            request={request}
+                            responding={composerState.permissionResponding()}
+                            onDecide={composerState.decide}
+                          />
+                        </div>
+                      )}
+                    </Show>
+                    <Show when={composerState.dock() && composerState.todos().length > 0}>
                       <div class="pb-2">
-                        <SessionPermissionDock
-                          request={request}
-                          responding={composerState.permissionResponding()}
-                          onDecide={composerState.decide}
+                        <SessionTodoDock
+                          todos={composerState.todos()}
+                          collapsed={todoCollapsed()}
+                          onToggle={() => setTodoCollapsed((v) => !v)}
+                          collapseLabel={language.t("session.todo.collapse")}
+                          expandLabel={language.t("session.todo.expand")}
                         />
                       </div>
-                    )}
-                  </Show>
-                  <Show when={composerState.dock() && composerState.todos().length > 0}>
-                    <div class="pb-2">
-                      <SessionTodoDock
-                        todos={composerState.todos()}
-                        collapsed={todoCollapsed()}
-                        onToggle={() => setTodoCollapsed((v) => !v)}
-                        collapseLabel={language.t("session.todo.collapse")}
-                        expandLabel={language.t("session.todo.expand")}
-                      />
-                    </div>
-                  </Show>
-                  <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
-                </div>
-              </Show>
-              <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
-            </div>
+                    </Show>
+                    <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
+                  </div>
+                </Show>
+                <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
+              </div>
+            </Portal>
           </Show>
         </div>
         </>
