@@ -60,7 +60,6 @@ import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { PromptPasteAttachments } from "./prompt-input/paste-attachments"
-import { PastePreviewDialog } from "./prompt-input/paste-preview-dialog"
 import { useQueries } from "@tanstack/solid-query"
 import { useQueryOptions, pathKey } from "./mock-session-layout"
 import { formatServerError } from "@/utils/server-errors"
@@ -365,6 +364,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       .join("")
     return text.trim().length === 0 && imageAttachments().length === 0 && commentCount() === 0
   })
+  const visibleEditorBlank = createMemo(() => {
+    const text = prompt
+      .current()
+      .filter((part) => part.type !== "image" && part.type !== "paste")
+      .map((part) => ("content" in part ? part.content : ""))
+      .join("")
+    return text.trim().length === 0
+  })
   const promptPlainText = (parts: Prompt) => parts.map((part) => ("content" in part ? part.content : "")).join("")
   const promptText = createMemo(() => promptPlainText(prompt.current()))
   const [improvingPrompt, setImprovingPrompt] = createSignal(false)
@@ -639,8 +646,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   createEffect(() => {
-    params.sessionId
-    if (params.sessionId) return
+    const sessionID = params.sessionId
+    if (sessionID) return
     if (!suggest()) return
     const interval = setInterval(() => {
       setStore("placeholder", (prev) => (prev + 1) % EXAMPLES.length)
@@ -1184,6 +1191,27 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     queueScroll()
   }
 
+  const showPasteInTextField = (paste: PastePart) => {
+    const rawParts = parseFromDOM().filter((part) => part.type !== "text" || part.content.length > 0)
+    const images = imageAttachments()
+    const remainingPastes = pasteAttachments().filter((part) => part.id !== paste.id)
+    const rawText = promptPlainText(rawParts)
+    const prefix = rawText.length > 0 && !rawText.endsWith("\n") ? "\n" : ""
+    const content = `${prefix}${paste.content}`
+    const start = promptLength(rawParts)
+    const textPart = { type: "text" as const, content, start, end: start + content.length }
+    const next = [...rawParts, textPart, ...images, ...remainingPastes]
+    const cursor = promptLength(rawParts) + content.length
+
+    prompt.set(next, cursor)
+    resetHistoryNavigation()
+    requestAnimationFrame(() => {
+      editorRef.focus()
+      setCursorPosition(editorRef, cursor)
+      queueScroll()
+    })
+  }
+
   const addPart = (part: ContentPart) => {
     if (part.type === "image") return false
 
@@ -1642,23 +1670,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         />
         <PromptPasteAttachments
           pastes={pasteAttachments()}
-          onOpen={(paste) =>
-            dialog.show(() => (
-              <PastePreviewDialog
-                content={paste.content}
-                filename={`Pasted Text (${(paste.charCount / 1024).toFixed(1)} KB)`}
-              />
-            ))
-          }
+          onShowInTextField={showPasteInTextField}
           onRemove={removePaste}
         />
         <div
-          class="agent-terminal-prompt-line relative flex items-start justify-between gap-3 p-4"
+          class="agent-terminal-prompt-line relative flex items-start gap-3 p-4"
           onMouseDown={(e) => {
             if (improvingPrompt()) return
             const target = e.target
             if (!(target instanceof HTMLElement)) return
-            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-submit"], [data-action="prompt-improve"]')) {
+            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-improve"]')) {
               return
             }
             editorRef?.focus()
@@ -1701,14 +1722,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 onKeyDown={handleKeyDown}
                 classList={{
                   "select-text": true,
-                  "w-full text-[15px] leading-relaxed text-foreground focus:outline-none whitespace-pre-wrap font-mono! caret-primary": true,
+                  "w-full text-[15px] leading-relaxed text-foreground focus:outline-none whitespace-pre-wrap caret-primary": true,
                   "[&_[data-type=file]]:text-syntax-property": true,
                   "[&_[data-type=agent]]:text-syntax-type": true,
                 }}
               />
               <div
-                class="absolute top-0 inset-x-0 text-[15px] leading-relaxed text-muted-foreground/40 pointer-events-none whitespace-nowrap truncate font-mono!"
-                style={{ display: prompt.dirty() ? "none" : undefined }}
+                class="absolute top-0 inset-x-0 text-[15px] leading-relaxed text-muted-foreground/40 pointer-events-none whitespace-nowrap truncate"
+                style={{ display: visibleEditorBlank() ? undefined : "none" }}
               >
                 {placeholder()}
               </div>
@@ -1723,42 +1744,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </div>
               </Show>
             </div>
-          </div>
-
-          <div class="flex items-center gap-2 shrink-0 pt-0.5 pointer-events-auto">
-            <Show when={!blank()}>
-              <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-card/30 border border-border/15 text-[10px] font-mono text-muted-foreground select-none animate-fade-in backdrop-blur-sm">
-                <span>{promptLength(prompt.current().filter((p) => p.type !== "image"))} ch</span>
-                <button
-                  type="button"
-                  disabled={improvingPrompt()}
-                  onClick={() => {
-                    if (improvingPrompt()) return
-                    clearEditor()
-                    prompt.set(DEFAULT_PROMPT, 0)
-                    resetHistoryNavigation(true)
-                    requestAnimationFrame(() => editorRef?.focus())
-                  }}
-                  class="size-3.5 flex items-center justify-center rounded-full hover:bg-accent/40 text-muted-foreground hover:text-foreground transition-colors cursor-pointer outline-none"
-                  aria-label="Clear text"
-                >
-                  <Icon name="close-small" class="size-2.5" />
-                </button>
-              </div>
-            </Show>
-
-            <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
-              <IconButton
-                data-action="prompt-submit"
-                type="submit"
-                disabled={improvingPrompt() || (!working() && blank())}
-                tabIndex={store.mode === "normal" ? undefined : -1}
-                icon={stopping() ? "stop" : "arrow-up"}
-                variant="primary"
-                class="size-9 rounded-lg! flex items-center justify-center transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
-                aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
-              />
-            </Tooltip>
           </div>
         </div>
 
@@ -1926,6 +1911,38 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 }}
               />
             </Show>
+            <Show when={!blank()}>
+              <div class="agent-terminal-prompt-count flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-card/30 border border-border/15 text-[10px] font-mono text-muted-foreground select-none animate-fade-in backdrop-blur-sm">
+                <span>{promptLength(prompt.current().filter((p) => p.type !== "image"))} ch</span>
+                <button
+                  type="button"
+                  disabled={improvingPrompt()}
+                  onClick={() => {
+                    if (improvingPrompt()) return
+                    clearEditor()
+                    prompt.set(DEFAULT_PROMPT, 0)
+                    resetHistoryNavigation(true)
+                    requestAnimationFrame(() => editorRef?.focus())
+                  }}
+                  class="size-3.5 flex items-center justify-center rounded-full hover:bg-accent/40 text-muted-foreground hover:text-foreground transition-colors cursor-pointer outline-none"
+                  aria-label="Clear text"
+                >
+                  <Icon name="close-small" class="size-2.5" />
+                </button>
+              </div>
+            </Show>
+            <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
+              <IconButton
+                data-action="prompt-submit"
+                type="submit"
+                disabled={improvingPrompt() || (!working() && blank())}
+                tabIndex={store.mode === "normal" ? undefined : -1}
+                icon={stopping() ? "stop" : "arrow-up"}
+                variant="primary"
+                class="size-9 rounded-lg! flex items-center justify-center transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
+              />
+            </Tooltip>
           </div>
         </div>
       </DockShellForm>

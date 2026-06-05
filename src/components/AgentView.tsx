@@ -593,6 +593,7 @@ function AgentViewInner(props: AgentViewProps) {
     const sessionID = activeSessionId()
     return sessionID ? currentProject()?.sessions.find((session) => session.id === sessionID) ?? null : null
   })
+  const currentBranchName = createMemo(() => sync.data.vcs?.branch?.trim() || "")
   const title = createMemo(() => currentLocalSession()?.name || sessionTitle(info()?.title) || "New session")
   const statusInfo = createMemo<SessionStatus>(() => {
     const sessionID = activeSessionId()
@@ -1410,6 +1411,12 @@ function AgentViewInner(props: AgentViewProps) {
                       </DropdownMenu>
                     </div>
                     <div class="ml-auto flex shrink-0 items-center gap-2">
+                      <Show when={currentBranchName()}>
+                        <div class="agent-header-branch" title={`Current branch: ${currentBranchName()}`} aria-label={`Current branch: ${currentBranchName()}`}>
+                          <Icon name="branch" size="small" />
+                          <span>{currentBranchName()}</span>
+                        </div>
+                      </Show>
                       <AgentHeaderPanelControls projectPath={props.projectPath ?? currentProject()?.path} />
                     </div>
                   </div>

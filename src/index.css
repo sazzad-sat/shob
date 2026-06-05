@@ -1526,6 +1526,36 @@ b {
   background: color-mix(in srgb, var(--surface-raised-base-hover) 70%, transparent);
 }
 
+.agent-header-branch {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(30vw, 220px);
+  height: 26px;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--terminal-agent-border-subtle, var(--border-weaker-base));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--terminal-agent-panel, var(--surface-raised-base)) 52%, transparent);
+  color: var(--terminal-agent-dim, var(--text-weak));
+  font-family: var(--font-family-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: var(--agent-font-regular, 400);
+  line-height: 1;
+}
+
+.agent-header-branch [data-component="icon"] {
+  flex: 0 0 auto;
+  color: var(--terminal-agent-weaker, var(--text-weaker));
+}
+
+.agent-header-branch span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-terminal-buffer {
   padding: 20px 0 20px !important;
 }
@@ -2848,12 +2878,17 @@ b {
 }
 
 .agent-terminal-prompt-line {
-  align-items: flex-start !important;
+  align-items: stretch !important;
   min-height: clamp(52px, 9dvh, 72px);
   padding: 12px 14px !important;
 }
 
+.agent-terminal-input-wrap {
+  width: 100%;
+}
+
 .agent-terminal-input-scroll {
+  flex: 1 1 auto;
   min-width: 0;
   max-height: min(240px, 30dvh) !important;
 }
@@ -2861,7 +2896,7 @@ b {
 .agent-terminal-toolbar {
   min-width: 0;
   min-height: clamp(38px, 6dvh, 48px) !important;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   row-gap: 6px;
   padding-top: clamp(6px, 1.2dvh, 10px) !important;
   padding-bottom: clamp(6px, 1.2dvh, 10px) !important;
@@ -2875,15 +2910,21 @@ b {
 
 .agent-terminal-toolbar-secondary {
   margin-left: auto;
+  min-width: 0;
 }
 
 .agent-terminal-prompt [data-component="prompt-input"] {
   min-height: clamp(30px, 5.5dvh, 44px) !important;
   max-height: min(220px, 28dvh) !important;
   overflow-y: auto !important;
+  background: transparent !important;
   color: var(--foreground) !important;
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
   font-size: 14px !important;
+  font-weight: var(--agent-font-regular, var(--font-weight-regular, 400)) !important;
   line-height: 1.5 !important;
+  letter-spacing: 0 !important;
+  overflow-wrap: anywhere !important;
   scrollbar-width: thin;
 }
 
@@ -2903,6 +2944,7 @@ b {
 
 .agent-terminal-prompt [data-component="prompt-input"] + div {
   color: var(--muted-foreground) !important;
+  font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif !important;
   font-size: 14px !important;
   line-height: 1.5 !important;
 }
@@ -2979,6 +3021,10 @@ b {
   opacity: 0.45 !important;
 }
 
+.agent-terminal-prompt-count {
+  flex: 0 0 auto;
+}
+
 @container (max-width: 520px) {
   .agent-terminal-prompt-line {
     gap: 8px !important;
@@ -2992,6 +3038,7 @@ b {
 
   .agent-terminal-toolbar {
     min-height: auto !important;
+    flex-wrap: wrap;
     padding: 8px 10px !important;
   }
 
