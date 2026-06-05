@@ -3,6 +3,7 @@ import {
   parseJwtClaims,
   extractAccountIdFromClaims,
   extractAccountId,
+  filterCodexOAuthModels,
   type IdTokenClaims,
 } from "../../src/plugin/codex"
 
@@ -13,6 +14,30 @@ function createTestJwt(payload: object): string {
 }
 
 describe("plugin.codex", () => {
+  describe("filterCodexOAuthModels", () => {
+    test("keeps current Codex OAuth models and removes deprecated models", () => {
+      const provider = {
+        models: {
+          "gpt-5.5": { api: { id: "gpt-5.5" } },
+          "gpt-5.4": { api: { id: "gpt-5.4" } },
+          "gpt-5.4-mini": { api: { id: "gpt-5.4-mini" } },
+          "gpt-5.3-codex-spark": { api: { id: "gpt-5.3-codex-spark" } },
+          "gpt-5.2": { api: { id: "gpt-5.2" } },
+          "gpt-5.3-codex": { api: { id: "gpt-5.3-codex" } },
+        },
+      }
+
+      filterCodexOAuthModels(provider)
+
+      expect(Object.keys(provider.models).sort()).toEqual([
+        "gpt-5.3-codex-spark",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.5",
+      ])
+    })
+  })
+
   describe("parseJwtClaims", () => {
     test("parses valid JWT with claims", () => {
       const payload = { email: "test@example.com", chatgpt_account_id: "acc-123" }

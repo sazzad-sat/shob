@@ -15,6 +15,18 @@ const ISSUER = "https://auth.openai.com"
 const CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses"
 const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
+const CODEX_OAUTH_ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"])
+
+type CodexOAuthProvider = {
+  models: Record<string, { api: { id?: string } }>
+}
+
+export function filterCodexOAuthModels(provider: CodexOAuthProvider) {
+  for (const [modelId, model] of Object.entries(provider.models)) {
+    if (CODEX_OAUTH_ALLOWED_MODELS.has(model.api.id ?? modelId)) continue
+    delete provider.models[modelId]
+  }
+}
 
 interface PkceCodes {
   verifier: string
@@ -366,21 +378,7 @@ export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
         if (auth.type !== "oauth") return {}
 
         // Filter models to only allowed Codex models for OAuth
-        const allowedModels = new Set([
-          "gpt-5.1-codex",
-          "gpt-5.1-codex-max",
-          "gpt-5.1-codex-mini",
-          "gpt-5.2",
-          "gpt-5.2-codex",
-          "gpt-5.3-codex",
-          "gpt-5.4",
-          "gpt-5.4-mini",
-        ])
-        for (const [modelId, model] of Object.entries(provider.models)) {
-          if (modelId.includes("codex")) continue
-          if (allowedModels.has(model.api.id)) continue
-          delete provider.models[modelId]
-        }
+        filterCodexOAuthModels(provider)
 
         // Zero out costs for Codex (included with ChatGPT subscription)
         for (const model of Object.values(provider.models)) {
