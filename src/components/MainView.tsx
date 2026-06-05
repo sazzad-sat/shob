@@ -24,10 +24,7 @@ import { ScrollView } from '@opencode-ai/ui/scroll-view'
 import { SessionSidePanel } from '@/pages/session/session-side-panel'
 import { sortShobSessionsById } from '@/utils/shob-session'
 
-const MIN_AGENT_CONTENT_WIDTH = 420
-const MIN_EMPTY_WORKSPACE_WIDTH = 300
-const MIN_REVIEW_PANEL_WIDTH = 360
-const MAX_REVIEW_PANEL_WIDTH = 1080
+const DEFAULT_SESSION_PANEL_WIDTH = 600
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -190,7 +187,7 @@ export function MainView() {
   const [activeTabId, setActiveTabId] = createSignal<string>("review")
   const [terminalTabs, setTerminalTabs] = createSignal<Array<{ id: string; session: Session }>>([])
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
-  const [reviewWidth, setReviewWidth] = createSignal(840)
+  const [sessionPanelWidth, setSessionPanelWidth] = createSignal(DEFAULT_SESSION_PANEL_WIDTH)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
   const [gitKinds, setGitKinds] = createSignal<ReadonlyMap<string, DiffKind>>(new Map())
   const [gitStats, setGitStats] = createSignal<ReadonlyMap<string, DiffStats>>(new Map())
@@ -203,21 +200,25 @@ export function MainView() {
   const [reviewSnap, setReviewSnap] = createSignal(false)
   const projectSessions = createMemo(() => currentProject()?.sessions ?? [])
   let workspaceSplitRef: HTMLDivElement | undefined
-  let reviewResizeBounds: { rightEdge: number; min: number; max: number } | undefined
+  let reviewResizeBounds: { leftEdge: number; min: number; max: number } | undefined
   let reviewResizeFrame: number | undefined
-  let pendingReviewWidth: number | undefined
+  let pendingSessionPanelWidth: number | undefined
   let reviewSnapFrame: number | undefined
   let sidePanelWarmToken = 0
 
   const projectPath = createMemo(() => currentProject()?.path ?? '')
   const sidePanelOpen = createMemo(() => isReviewVisible() || isFileTreeVisible() || !!contextTabSessionId())
-  const minMainContentWidth = createMemo(() =>
-    projectSessions().length > 0 ? MIN_AGENT_CONTENT_WIDTH : MIN_EMPTY_WORKSPACE_WIDTH,
+  const sidePanelMainOpen = createMemo(() =>
+    isReviewVisible() || !!contextTabSessionId() || reviewFiles().length > 0 || terminalTabs().length > 0,
   )
-  const sidePanelWidth = createMemo(() =>
-    sidePanelOpen()
-      ? `min(${reviewWidth()}px, max(0px, calc(100% - ${minMainContentWidth()}px)))`
-      : "0px",
+  const sessionPanelStyleWidth = createMemo(() => {
+    if (projectSessions().length === 0) return "0px"
+    if (!sidePanelOpen()) return "100%"
+    if (sidePanelMainOpen()) return `min(${sessionPanelWidth()}px, 100%)`
+    return "auto"
+  })
+  const sidePanelStyleWidth = createMemo(() =>
+    sidePanelOpen() ? (sidePanelMainOpen() ? "auto" : "fit-content") : "0px",
   )
 
   const fileCtx = createFileContext({
@@ -572,27 +573,27 @@ export function MainView() {
 
   const computeReviewResizeBounds = () => {
     const rect = workspaceSplitRect()
-    const rightEdge = rect?.right ?? window.innerWidth
     const leftEdge = rect?.left ?? 0
+    const rightEdge = rect?.right ?? window.innerWidth
     const available = Math.max(0, rightEdge - leftEdge)
-    const maxReviewWidth = Math.max(0, available - minMainContentWidth())
-    const max = Math.min(MAX_REVIEW_PANEL_WIDTH, maxReviewWidth)
+    const min = Math.min(450, available)
+    const max = Math.max(min, available * 0.72)
     return {
-      rightEdge,
-      min: Math.min(MIN_REVIEW_PANEL_WIDTH, max),
+      leftEdge,
+      min,
       max,
     }
   }
 
   const commitReviewWidth = () => {
     reviewResizeFrame = undefined
-    if (pendingReviewWidth === undefined) return
-    setReviewWidth(pendingReviewWidth)
-    pendingReviewWidth = undefined
+    if (pendingSessionPanelWidth === undefined) return
+    setSessionPanelWidth(pendingSessionPanelWidth)
+    pendingSessionPanelWidth = undefined
   }
 
   const scheduleReviewWidth = (width: number) => {
-    pendingReviewWidth = width
+    pendingSessionPanelWidth = width
     if (reviewResizeFrame !== undefined) return
     reviewResizeFrame = requestAnimationFrame(commitReviewWidth)
   }
@@ -609,7 +610,7 @@ export function MainView() {
 
   const resizeReviewPanel = (clientX: number) => {
     const bounds = reviewResizeBounds ?? computeReviewResizeBounds()
-    const next = bounds.rightEdge - clientX
+    const next = clientX - bounds.leftEdge
     scheduleReviewWidth(clampPanelWidth(next, bounds.min, bounds.max))
   }
 
@@ -630,7 +631,17 @@ export function MainView() {
             <div class="flex flex-col min-h-0 flex-1 overflow-hidden">
               <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
                 <div ref={workspaceSplitRef} class="flex h-full w-full min-h-0 min-w-0">
-                  <div class="min-h-0 min-w-0 flex-1 overflow-hidden" style={{ display: projectSessions().length > 0 ? 'flex' : 'none' }}>
+                  <div
+                    class="min-h-0 min-w-0 overflow-hidden"
+                    classList={{
+                      "flex-1": !sidePanelOpen() || !sidePanelMainOpen(),
+                      "shrink-0": sidePanelOpen() && sidePanelMainOpen(),
+                    }}
+                    style={{
+                      display: projectSessions().length > 0 ? 'flex' : 'none',
+                      width: sessionPanelStyleWidth(),
+                    }}
+                  >
                     <TerminalPanel onNewSession={handleCreateSession} />
                   </div>
 
@@ -651,6 +662,7 @@ export function MainView() {
                     <div
                       class="relative min-h-0 shrink-0 overflow-hidden"
                       classList={{
+                        "flex-1": sidePanelOpen() && sidePanelMainOpen(),
                         "border-l": sidePanelOpen(),
                         "border-border/60": sidePanelOpen(),
                         "pointer-events-none": !sidePanelOpen(),
@@ -660,9 +672,9 @@ export function MainView() {
                         "will-change-[width]": !reviewResizeActive() && !reviewSnap(),
                         "motion-reduce:transition-none": !reviewResizeActive() && !reviewSnap(),
                       }}
-                      style={{ width: sidePanelWidth() }}
+                      style={{ width: sidePanelStyleWidth() }}
                     >
-                      <Show when={sidePanelOpen()}>
+                      <Show when={sidePanelOpen() && sidePanelMainOpen()}>
                         <ResizeHandle
                           edge="start"
                           onResize={resizeReviewPanel}

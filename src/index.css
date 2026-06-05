@@ -1430,14 +1430,13 @@ b {
 }
 
 .agent-terminal-scroll-empty {
-  display: flex !important;
+  display: block !important;
   width: 100% !important;
-  align-items: center !important;
-  justify-content: center !important;
 }
 
 .agent-terminal-scroll-empty > div {
   width: 100% !important;
+  min-height: 100% !important;
 }
 
 .agent-terminal-title {
@@ -1493,8 +1492,8 @@ b {
   width: 100% !important;
   min-height: 100% !important;
   align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
+  justify-content: safe center !important;
+  padding: clamp(16px, 7vh, 56px) 0 24px !important;
 }
 
 .agent-terminal-buffer > .agent-terminal-turn,
@@ -2001,6 +2000,7 @@ b {
 .agent-terminal-composer-region {
   display: flex;
   width: 100%;
+  min-width: 0;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
@@ -2369,6 +2369,7 @@ b {
 }
 
 .agent-terminal-prompt-shell {
+  min-width: 0;
   border: 1px solid color-mix(in srgb, var(--border) 38%, transparent) !important;
   border-radius: 14px !important;
   background: transparent !important;
@@ -2376,6 +2377,11 @@ b {
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+.agent-terminal-prompt {
+  min-width: 0;
+  container-type: inline-size;
 }
 
 .agent-terminal-prompt-shell:focus-within {
@@ -2395,6 +2401,22 @@ b {
   align-items: flex-start !important;
   min-height: 72px;
   padding: 12px 14px !important;
+}
+
+.agent-terminal-toolbar {
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.agent-terminal-toolbar-primary {
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.agent-terminal-toolbar-secondary {
+  margin-left: auto;
 }
 
 .agent-terminal-prompt [data-component="prompt-input"] {
@@ -2499,6 +2521,34 @@ b {
   opacity: 0.45 !important;
 }
 
+@container (max-width: 520px) {
+  .agent-terminal-prompt-line {
+    gap: 8px !important;
+    min-height: 60px;
+    padding: 10px 11px !important;
+  }
+
+  .agent-terminal-caret {
+    display: none;
+  }
+
+  .agent-terminal-toolbar {
+    min-height: auto !important;
+    padding: 8px 10px !important;
+  }
+
+  .agent-terminal-toolbar-primary,
+  .agent-terminal-toolbar-secondary {
+    gap: 6px !important;
+  }
+
+  .agent-terminal-toolbar [data-action="prompt-model"],
+  .agent-terminal-toolbar [data-action="prompt-agent"],
+  .agent-terminal-toolbar [data-action="prompt-model-variant"] {
+    max-width: min(100%, 168px) !important;
+  }
+}
+
 @media (min-width: 768px) {
   .agent-terminal-turn [data-slot="session-turn-message-container"],
   .agent-terminal-assistant [data-slot="session-turn-message-container"] {
@@ -2567,6 +2617,41 @@ b {
   .agent-terminal-prompt-line {
     min-height: 64px;
     padding: 10px 12px !important;
+  }
+}
+
+@media (max-height: 720px) {
+  .agent-terminal-buffer-empty {
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    padding-top: 18px !important;
+    padding-bottom: 18px !important;
+  }
+
+  .agent-terminal-new-session {
+    gap: 14px;
+  }
+
+  .agent-terminal-new-session-heading h1 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  .agent-terminal-prompt-line {
+    min-height: 58px;
+    padding-top: 9px !important;
+    padding-bottom: 9px !important;
+  }
+
+  .agent-terminal-prompt [data-component="prompt-input"] {
+    min-height: 34px !important;
+    max-height: 150px !important;
+  }
+
+  .agent-terminal-toolbar {
+    min-height: auto !important;
+    padding-top: 7px !important;
+    padding-bottom: 7px !important;
   }
 }
 
