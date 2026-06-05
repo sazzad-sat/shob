@@ -14,6 +14,7 @@ import {
   ImageAttachmentPart,
   AgentPart,
   FileAttachmentPart,
+  PastePart,
 } from "@/context/prompt"
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
@@ -58,6 +59,8 @@ import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
+import { PromptPasteAttachments } from "./prompt-input/paste-attachments"
+import { PastePreviewDialog } from "./prompt-input/paste-preview-dialog"
 import { useQueries } from "@tanstack/solid-query"
 import { useQueryOptions, pathKey } from "./mock-session-layout"
 import { formatServerError } from "@/utils/server-errors"
@@ -317,6 +320,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   })
   const imageAttachments = createMemo(() =>
     prompt.current().filter((part): part is ImageAttachmentPart => part.type === "image"),
+  )
+  const pasteAttachments = createMemo(() =>
+    prompt.current().filter((part): part is PastePart => part.type === "paste"),
   )
 
   const [store, setStore] = createStore<{
@@ -658,7 +664,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     setComposing(false)
     requestAnimationFrame(() => {
       if (composing()) return
-      reconcile(prompt.current().filter((part) => part.type !== "image"))
+      reconcile(prompt.current().filter((part) => part.type !== "image" && part.type !== "paste"))
     })
   }
 
@@ -748,17 +754,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (!cmd) return
     closePopover()
     const images = imageAttachments()
+    const pastes = pasteAttachments()
 
     if (cmd.type === "custom") {
       const text = `/${cmd.trigger} `
       setEditorText(text)
-      prompt.set([{ type: "text", content: text, start: 0, end: text.length }, ...images], text.length)
+      prompt.set([{ type: "text", content: text, start: 0, end: text.length }, ...images, ...pastes], text.length)
       focusEditorEnd()
       return
     }
 
     clearEditor()
-    prompt.set([...DEFAULT_PROMPT, ...images], 0)
+    prompt.set([...DEFAULT_PROMPT, ...images, ...pastes], 0)
     command.trigger(cmd.id, "slash")
   }
 
@@ -811,14 +818,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
 
     if (parts.length === 0) parts.push({ type: "text", content: guardedText, start: 0, end: guardedText.length })
-    return [...parts, ...imageAttachments()]
+    return [...parts, ...imageAttachments(), ...pasteAttachments()]
   }
 
   const improvePrompt = async () => {
     if (improvingPrompt()) return
 
     const liveParts = parseFromDOM()
-    const nextPrompt = [...liveParts, ...imageAttachments()]
+    const nextPrompt = [...liveParts, ...imageAttachments(), ...pasteAttachments()]
     const liveText = promptPlainText(nextPrompt)
     const liveCursor = getCursorPosition(editorRef)
     if (!isPromptEqual(prompt.current(), nextPrompt) || prompt.cursor() !== liveCursor) {
@@ -1029,7 +1036,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       () => prompt.current(),
       (parts) => {
         if (composing()) return
-        reconcile(parts.filter((part) => part.type !== "image"))
+        reconcile(parts.filter((part) => part.type !== "image" && part.type !== "paste"))
       },
     ),
   )
@@ -1133,7 +1140,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     const hasNonText = rawParts.some((part) => part.type !== "text")
     const textContent = (editorRef.textContent ?? "").replace(/\u200B/g, "")
     const shouldReset =
-      textContent.length === 0 && rawText.replace(/\n/g, "").length === 0 && !hasNonText && images.length === 0
+      textContent.length === 0 &&
+      rawText.replace(/\n/g, "").length === 0 &&
+      !hasNonText &&
+      images.length === 0 &&
+      pasteAttachments().length === 0
 
     if (shouldReset) {
       closePopover()
@@ -1168,7 +1179,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     resetHistoryNavigation()
 
     mirror.input = true
-    prompt.set([...rawParts, ...images], cursorPosition)
+    const pastes = pasteAttachments()
+    prompt.set([...rawParts, ...images, ...pastes], cursorPosition)
     queueScroll()
   }
 
@@ -1316,7 +1328,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return true
   }
 
-  const { addAttachments, removeAttachment, handlePaste } = createPromptAttachments({
+  const { addAttachments, removeAttachment, removePaste, handlePaste } = createPromptAttachments({
     editor: () => editorRef,
     isDialogActive: () => !!dialog.active,
     setDraggingType: (type) => setStore("draggingType", type),
@@ -1627,6 +1639,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           }
           onRemove={removeAttachment}
           removeLabel={language.t("prompt.attachment.remove")}
+        />
+        <PromptPasteAttachments
+          pastes={pasteAttachments()}
+          onOpen={(paste) =>
+            dialog.show(() => (
+              <PastePreviewDialog
+                content={paste.content}
+                filename={`Pasted Text (${(paste.charCount / 1024).toFixed(1)} KB)`}
+              />
+            ))
+          }
+          onRemove={removePaste}
         />
         <div
           class="agent-terminal-prompt-line relative flex items-start justify-between gap-3 p-4"

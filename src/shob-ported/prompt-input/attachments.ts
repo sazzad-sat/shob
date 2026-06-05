@@ -149,6 +149,25 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
 
     const text = normalizePaste(plainText)
 
+    const lineCount = text.split("\n").length
+    if (text.length >= 1000 || lineCount >= 8) {
+      const id = uuid()
+      const lines = text.split("\n")
+      const preview = lines.slice(0, 3).join("\n")
+      const pastePart = {
+        type: "paste" as const,
+        id,
+        content: text,
+        preview,
+        lineCount,
+        charCount: text.length,
+      }
+      const editor = input.editor()
+      const cursor = prompt.cursor() ?? (editor ? getCursorPosition(editor) : 0)
+      prompt.set([...prompt.current(), pastePart], cursor)
+      return
+    }
+
     const put = () => {
       if (input.addPart({ type: "text", content: text, start: 0, end: 0 })) return true
       input.focusEditor()
@@ -215,10 +234,17 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
     makeEventListener(document, "drop", handleGlobalDrop)
   })
 
+  const removePaste = (id: string) => {
+    const current = prompt.current()
+    const next = current.filter((part) => part.type !== "paste" || part.id !== id)
+    prompt.set(next, prompt.cursor())
+  }
+
   return {
     addAttachment,
     addAttachments,
     removeAttachment,
+    removePaste,
     handlePaste,
   }
 }

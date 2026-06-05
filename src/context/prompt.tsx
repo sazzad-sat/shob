@@ -36,7 +36,16 @@ export interface ImageAttachmentPart {
   dataUrl: string
 }
 
-export type ContentPart = TextPart | FileAttachmentPart | AgentPart | ImageAttachmentPart
+export interface PastePart {
+  type: "paste"
+  id: string
+  content: string
+  preview: string
+  lineCount: number
+  charCount: number
+}
+
+export type ContentPart = TextPart | FileAttachmentPart | AgentPart | ImageAttachmentPart | PastePart
 export type Prompt = ContentPart[]
 
 export type FileContextItem = {
@@ -71,6 +80,8 @@ function isPartEqual(partA: ContentPart, partB: ContentPart) {
       return partB.type === "agent" && partA.name === partB.name
     case "image":
       return partB.type === "image" && partA.id === partB.id
+    case "paste":
+      return partB.type === "paste" && partA.id === partB.id && partA.content === partB.content
   }
 }
 
@@ -91,6 +102,7 @@ function clonePart(part: ContentPart): ContentPart {
   if (part.type === "text") return { ...part }
   if (part.type === "image") return { ...part }
   if (part.type === "agent") return { ...part }
+  if (part.type === "paste") return { ...part }
   return {
     ...part,
     selection: cloneSelection(part.selection),
