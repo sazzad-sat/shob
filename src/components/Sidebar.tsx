@@ -188,10 +188,10 @@ const PinnedSessionRow = (props: {
   return (
     <button
       type="button"
-      class={`group/pinned grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[5px] px-3 text-left transition-colors ${
+      class={`group/pinned grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[5px] px-3 text-left transition-colors border ${
         props.activeSessionId === props.hit.session.id
-          ? "bg-surface-raised-base text-text-strong"
-          : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
+          ? "bg-surface-raised-strong text-text-strong border-border/70 shadow-sm"
+          : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong border-transparent"
       }`}
       title={`${props.hit.session.name} · ${props.hit.project.name}`}
       onClick={() => props.onSelect(props.hit.project.id, props.hit.session.id)}
@@ -532,10 +532,10 @@ function FolderSection(props: {
   const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
     <>
       <div
-        class={`group/session relative flex h-8 cursor-pointer items-center justify-between rounded-[5px] pr-3 transition-colors ${
+        class={`group/session relative flex h-8 cursor-pointer items-center justify-between rounded-[5px] pr-3 transition-colors border ${
           props.activeSessionId === session.id
-            ? "bg-surface-raised-base text-text-strong"
-            : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong"
+            ? "bg-surface-raised-strong text-text-strong border-border/70 shadow-sm"
+            : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong border-transparent"
         }`}
         style={{ "padding-left": `${34 + level * 14}px` }}
         onClick={() => {
@@ -758,8 +758,10 @@ function FolderSection(props: {
       </Show>
 
       <div
-        class={`group/project flex h-8 items-center justify-between rounded-[5px] pr-1 transition-colors hover:bg-surface-raised-base-hover ${
-          props.currentProjectId === props.project.id ? "text-text-strong" : "text-text-base"
+        class={`group/project flex h-8 items-center justify-between rounded-[5px] pr-1 transition-colors ${
+          props.currentProjectId === props.project.id
+            ? "bg-surface-raised-base/65 text-text-strong"
+            : "text-text-base hover:bg-surface-raised-base-hover"
         }`}
         title={props.isOpen ? "Collapse project" : "Expand project"}
       >
@@ -771,10 +773,18 @@ function FolderSection(props: {
           onPointerDown={handleProjectTitlePointerDown}
           onClick={handleToggleProjectOpen}
         >
-          <span class="text-text-weak transition-colors group-hover/project:text-text-strong">
+          <span class={`transition-colors ${
+            props.currentProjectId === props.project.id
+              ? "text-primary"
+              : "text-text-weak group-hover/project:text-text-strong"
+          }`}>
             <ProjectFolderIcon />
           </span>
-          <span class="shob-sidebar-main-label truncate text-[13px] font-normal leading-4 text-text-base transition-colors group-hover/project:text-text-strong">
+          <span class={`shob-sidebar-main-label truncate text-[13px] leading-4 transition-colors ${
+            props.currentProjectId === props.project.id
+              ? "font-semibold text-text-strong"
+              : "font-normal text-text-base group-hover/project:text-text-strong"
+          }`}>
             {props.project.name}
           </span>
           <Show when={props.project.pinned}>
