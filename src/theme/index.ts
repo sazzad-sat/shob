@@ -88,6 +88,8 @@ export const applyAppTheme = (theme: ShobTheme, mode: ResolvedThemeMode): Record
       root.dataset.colorScheme === mode
 
     if (!isAlreadyApplied) {
+      root.classList.add('no-transitions')
+
       Object.entries(tokens).forEach(([key, value]) => {
         if (lastAppliedThemeTokens?.[key] !== value) {
           root.style.setProperty(key, value)
@@ -99,6 +101,16 @@ export const applyAppTheme = (theme: ShobTheme, mode: ResolvedThemeMode): Record
       root.classList.toggle('dark', mode === 'dark')
       lastAppliedThemeKey = themeKey
       lastAppliedThemeTokens = tokens
+
+      // Force layout reflow to apply styles immediately
+      const _ = root.offsetHeight
+
+      // Remove the disabling class to re-enable transitions for normal interactions
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          root.classList.remove('no-transitions')
+        })
+      })
     }
   }
 

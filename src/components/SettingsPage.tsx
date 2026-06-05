@@ -219,10 +219,10 @@ export function SettingsPage() {
                           type="button"
                           onClick={() => setColorScheme(item.id)}
                           aria-pressed={colorScheme() === item.id}
-                          class={`rounded-md px-2 text-[12px] font-medium leading-none outline-none transition-colors ${
+                          class={`flex items-center justify-center rounded-md px-2 text-[12px] font-medium leading-none outline-none transition-colors border ${
                             colorScheme() === item.id
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
+                              ? "bg-background text-foreground shadow-sm border-border"
+                              : "text-muted-foreground hover:text-foreground border-transparent"
                           }`}
                         >
                           {item.label}
