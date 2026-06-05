@@ -630,9 +630,9 @@ export function MainView() {
           <LayoutProvider>
             <div class="flex flex-col min-h-0 flex-1 overflow-hidden">
               <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
-                <div ref={workspaceSplitRef} class="flex h-full w-full min-h-0 min-w-0">
+                <div ref={workspaceSplitRef} class="shob-workspace-split flex h-full w-full min-h-0 min-w-0">
                   <div
-                    class="min-h-0 min-w-0 overflow-hidden"
+                    class="shob-workspace-agent min-h-0 min-w-0 overflow-hidden"
                     classList={{
                       "flex-1": !sidePanelOpen() || !sidePanelMainOpen(),
                       "shrink-0": sidePanelOpen() && sidePanelMainOpen(),
@@ -660,7 +660,7 @@ export function MainView() {
 
                   <Show when={sidePanelMounted()}>
                     <div
-                      class="relative min-h-0 shrink-0 overflow-hidden"
+                      class="shob-workspace-side-panel relative min-h-0 shrink-0 overflow-hidden"
                       classList={{
                         "flex-1": sidePanelOpen() && sidePanelMainOpen(),
                         "border-l": sidePanelOpen(),

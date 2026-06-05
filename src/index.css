@@ -1372,9 +1372,37 @@ b {
   --terminal-agent-text: var(--text-strong);
   --terminal-agent-muted: var(--text-weak);
   --terminal-agent-dim: var(--text-weaker);
+  container: agent-view / size;
   background: var(--terminal-agent-bg) !important;
   color: var(--terminal-agent-text);
   font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.shob-workspace-split {
+  container: shob-workspace / inline-size;
+}
+
+.shob-workspace-agent,
+.shob-workspace-side-panel {
+  min-width: 0;
+}
+
+@container shob-workspace (max-width: 860px) {
+  .shob-workspace-agent {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 0 100% !important;
+  }
+
+  .shob-workspace-side-panel {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    flex: 0 0 0 !important;
+    border-left-width: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+  }
 }
 
 .agent-terminal-scroll {
@@ -1493,7 +1521,7 @@ b {
   min-height: 100% !important;
   align-items: center !important;
   justify-content: safe center !important;
-  padding: clamp(16px, 7vh, 56px) 0 24px !important;
+  padding: clamp(8px, 4dvh, 56px) 0 clamp(12px, 3dvh, 24px) !important;
 }
 
 .agent-terminal-buffer > .agent-terminal-turn,
@@ -1954,7 +1982,7 @@ b {
 }
 
 .agent-terminal-empty {
-  width: min(100% - 40px, 1000px) !important;
+  width: min(calc(100% - clamp(16px, 5cqw, 40px)), 1000px) !important;
   max-width: 1000px !important;
   flex: 0 0 auto !important;
   min-height: 0 !important;
@@ -1972,7 +2000,7 @@ b {
 .agent-terminal-new-session {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: clamp(10px, 3dvh, 22px);
 }
 
 .agent-terminal-new-session-heading {
@@ -1987,7 +2015,7 @@ b {
   max-width: min(760px, 100%);
   overflow-wrap: anywhere;
   color: var(--text-strong);
-  font-size: 34px;
+  font-size: clamp(20px, 4.5dvh, 34px);
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1.16;
@@ -2001,9 +2029,11 @@ b {
   display: flex;
   width: 100%;
   min-width: 0;
+  max-height: 100%;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
+  overflow: hidden;
 }
 
 .agent-terminal-composer-docks,
@@ -2018,6 +2048,10 @@ b {
 
 .agent-terminal-composer-docks {
   margin-bottom: 8px;
+  max-height: min(220px, 32dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .agent-terminal-view > .agent-terminal-prompt,
@@ -2399,14 +2433,22 @@ b {
 
 .agent-terminal-prompt-line {
   align-items: flex-start !important;
-  min-height: 72px;
+  min-height: clamp(52px, 9dvh, 72px);
   padding: 12px 14px !important;
+}
+
+.agent-terminal-input-scroll {
+  min-width: 0;
+  max-height: min(240px, 30dvh) !important;
 }
 
 .agent-terminal-toolbar {
   min-width: 0;
+  min-height: clamp(38px, 6dvh, 48px) !important;
   flex-wrap: wrap;
   row-gap: 6px;
+  padding-top: clamp(6px, 1.2dvh, 10px) !important;
+  padding-bottom: clamp(6px, 1.2dvh, 10px) !important;
 }
 
 .agent-terminal-toolbar-primary {
@@ -2420,8 +2462,8 @@ b {
 }
 
 .agent-terminal-prompt [data-component="prompt-input"] {
-  min-height: 44px !important;
-  max-height: 220px !important;
+  min-height: clamp(30px, 5.5dvh, 44px) !important;
+  max-height: min(220px, 28dvh) !important;
   overflow-y: auto !important;
   color: var(--foreground) !important;
   font-size: 14px !important;
@@ -2652,6 +2694,85 @@ b {
     min-height: auto !important;
     padding-top: 7px !important;
     padding-bottom: 7px !important;
+  }
+}
+
+@container agent-view (max-height: 560px) {
+  .agent-terminal-buffer-empty {
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    padding-top: clamp(8px, 2dvh, 14px) !important;
+    padding-bottom: clamp(10px, 2dvh, 16px) !important;
+  }
+
+  .agent-terminal-new-session {
+    gap: 10px;
+  }
+
+  .agent-terminal-new-session-heading {
+    padding-inline: 4px;
+  }
+
+  .agent-terminal-new-session-heading h1 {
+    font-size: clamp(18px, 3.8dvh, 24px);
+    line-height: 1.16;
+  }
+
+  .agent-terminal-prompt-line {
+    min-height: 52px;
+    padding: 8px 10px !important;
+  }
+
+  .agent-terminal-prompt [data-component="prompt-input"] {
+    min-height: 30px !important;
+    max-height: min(120px, 24dvh) !important;
+  }
+
+  .agent-terminal-input-scroll {
+    max-height: min(132px, 26dvh) !important;
+  }
+
+  .agent-terminal-toolbar {
+    min-height: 38px !important;
+    padding: 6px 10px !important;
+  }
+
+  .agent-terminal-composer-docks {
+    max-height: min(160px, 28dvh);
+  }
+}
+
+@container agent-view (max-height: 440px) {
+  .agent-terminal-new-session-heading {
+    display: none;
+  }
+
+  .agent-terminal-new-session {
+    gap: 8px;
+  }
+
+  .agent-terminal-buffer-empty {
+    padding-top: 8px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .agent-terminal-prompt-line {
+    min-height: 48px;
+    padding: 7px 9px !important;
+  }
+
+  .agent-terminal-prompt [data-component="prompt-input"] {
+    min-height: 28px !important;
+    max-height: min(96px, 22dvh) !important;
+  }
+
+  .agent-terminal-toolbar {
+    min-height: 34px !important;
+    padding: 5px 9px !important;
+  }
+
+  .agent-terminal-composer-docks {
+    max-height: min(120px, 24dvh);
   }
 }
 
