@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useProviders } from "@/hooks/use-providers"
 import { getSessionContextMetrics, type Context as SessionContextMetricsContext } from "@/components/session/session-context-metrics"
+import { AGENT_REVIEW_OPEN_EVENT, createAgentTurnDiffSummary } from "@/components/agent-turn-diff-summary"
 
 
 interface AgentViewProps {
@@ -61,8 +62,8 @@ const openWithOptions: Array<{
   { id: "vscode", label: "VS Code", icon: "vscode" },
   { id: "explorer", label: "File Explorer", icon: "file-explorer" },
   { id: "terminal", label: "Terminal", icon: "terminal" },
-  { id: "git-bash", label: "Git Bash", badge: "GB", badgeClass: "bg-[#12351e] text-[#74d680]" },
-  { id: "wsl", label: "WSL", badge: "WSL", badgeClass: "bg-[#102b46] text-[#7bc7ff]" },
+  { id: "git-bash", label: "Git Bash", badge: "GB", badgeClass: "bg-surface-success-weak text-text-on-success-base" },
+  { id: "wsl", label: "WSL", badge: "WSL", badgeClass: "bg-surface-info-weak text-text-on-info-base" },
 ]
 
 const unknownNativeCommand = (error: unknown) => String(error instanceof Error ? error.message : error).includes("Unknown IPC command")
@@ -79,6 +80,11 @@ const formatCompactNumber = (value: number | null | undefined) => {
   if (value === undefined || value === null) return "\u2014"
   return value.toLocaleString()
 }
+
+const formatDiffStat = (value: number) => value.toLocaleString()
+
+const messageSummaryDiffs = (message: ChatMessage) =>
+  (message as { summary?: { diffs?: unknown } }).summary?.diffs
 
 const messageTextAsMarkdown = (message: ChatMessage, parts: Part[]) => {
   const text = parts
@@ -126,7 +132,7 @@ function AgentTurnError(props: { error: EventSessionError["properties"]["error"]
     <Card variant="error" class="premium-error-card">
       <div class="flex items-start gap-3 w-full">
         {/* Simple crisp error warning icon */}
-        <div class="flex-shrink-0 mt-0.5 text-[var(--card-accent,var(--icon-critical-base,var(--destructive,#ed4831)))] animate-pulse-slow">
+        <div class="flex-shrink-0 mt-0.5 text-[var(--card-accent,var(--icon-critical-base,var(--destructive)))] animate-pulse-slow">
           <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
@@ -209,6 +215,80 @@ function AutoCompactStrip(props: { context: SessionContextMetricsContext | undef
   )
 }
 
+function AgentTurnDiffSummaryCard(props: { message: ChatMessage }) {
+  const summary = createMemo(() => createAgentTurnDiffSummary(messageSummaryDiffs(props.message)))
+  const [expanded, setExpanded] = createSignal(false)
+  const rows = createMemo(() => (expanded() ? summary().files : summary().visible))
+  const fileLabel = createMemo(() => (summary().count === 1 ? "file" : "files"))
+
+  const openReview = () => {
+    window.dispatchEvent(
+      new CustomEvent(AGENT_REVIEW_OPEN_EVENT, {
+        detail: { sessionID: props.message.sessionID },
+      }),
+    )
+  }
+
+  return (
+    <Show when={summary().count > 0}>
+      <div class="agent-turn-diff-card" data-component="agent-turn-diff-summary">
+        <div class="agent-turn-diff-card-header">
+          <div class="agent-turn-diff-heading">
+            <span class="agent-turn-diff-title">
+              Edited {summary().count} {fileLabel()}
+            </span>
+            <span class="agent-turn-diff-total">
+              <Show when={summary().additions > 0}>
+                <span data-kind="add">+{formatDiffStat(summary().additions)}</span>
+              </Show>
+              <Show when={summary().deletions > 0}>
+                <span data-kind="delete">-{formatDiffStat(summary().deletions)}</span>
+              </Show>
+            </span>
+          </div>
+          <div class="agent-turn-diff-actions">
+            <button type="button" class="agent-turn-diff-review" onClick={openReview}>
+              Review
+            </button>
+          </div>
+        </div>
+        <div class="agent-turn-diff-files">
+          <For each={rows()}>
+            {(diff) => (
+              <div class="agent-turn-diff-file-row">
+                <span class="agent-turn-diff-file-path" title={diff.file}>{diff.file}</span>
+                <span class="agent-turn-diff-file-stats">
+                  <Show when={diff.additions > 0}>
+                    <span data-kind="add">+{formatDiffStat(diff.additions)}</span>
+                  </Show>
+                  <Show when={diff.deletions > 0}>
+                    <span data-kind="delete">-{formatDiffStat(diff.deletions)}</span>
+                  </Show>
+                </span>
+              </div>
+            )}
+          </For>
+          <Show when={summary().overflow > 0 || expanded()}>
+            <button
+              type="button"
+              class="agent-turn-diff-more"
+              data-expanded={expanded() ? "true" : "false"}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              <span>
+                <Show when={expanded()} fallback={`Show ${summary().overflow} more ${fileLabel()}`}>
+                  Show fewer {fileLabel()}
+                </Show>
+              </span>
+              <ChevronDown size={14} />
+            </button>
+          </Show>
+        </div>
+      </div>
+    </Show>
+  )
+}
+
 function OpenWithOptionIcon(props: { option: (typeof openWithOptions)[number] }) {
   if (props.option.icon) {
     return <AppIcon id={props.option.icon} class="size-5 shrink-0 rounded-[4px]" />
@@ -216,7 +296,7 @@ function OpenWithOptionIcon(props: { option: (typeof openWithOptions)[number] })
 
   return (
     <span
-      class={`flex size-5 shrink-0 items-center justify-center rounded-[5px] text-[8px] font-bold leading-none ring-1 ring-white/10 ${props.option.badgeClass ?? "bg-surface-raised-base text-text-base"}`}
+      class={`flex size-5 shrink-0 items-center justify-center rounded-[5px] text-[8px] font-medium leading-none ring-1 ring-border-weaker-base ${props.option.badgeClass ?? "bg-surface-raised-base text-text-base"}`}
     >
       {props.option.badge}
     </span>
@@ -1126,7 +1206,7 @@ function AgentViewInner(props: AgentViewProps) {
         <>
         <Show when={renameOpen()}>
           <div
-            class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+            class="fixed inset-0 z-[1000] flex items-center justify-center bg-[color-mix(in_srgb,var(--background)_72%,transparent)] px-4 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="rename-chat-title"
@@ -1255,8 +1335,7 @@ function AgentViewInner(props: AgentViewProps) {
                 <div
                   class="flex h-6 w-8 items-center justify-center rounded-[6px] border border-border-weaker-base bg-[color-mix(in_srgb,var(--surface-raised-stronger-non-alpha)_80%,transparent)] backdrop-blur-[0.75px] transition-colors group-hover:border-[var(--border-weak-base)]"
                   style={{
-                    "box-shadow":
-                      "0 51px 60px 0 rgba(0,0,0,0.10), 0 15px 18px 0 rgba(0,0,0,0.12), 0 6.386px 7.513px 0 rgba(0,0,0,0.12), 0 2.31px 2.717px 0 rgba(0,0,0,0.20)",
+                    "box-shadow": "var(--shadow-md)",
                   }}
                 >
                   <Icon name="arrow-down-to-line" size="small" />
@@ -1375,13 +1454,16 @@ function AgentViewInner(props: AgentViewProps) {
                       const showThinking = createMemo(
                         () => working() && latestTurn() && assistantVisible() === 0 && !turnError() && statusInfo().type !== "retry",
                       )
+                      const showDiffSummary = createMemo(
+                        () => createAgentTurnDiffSummary(messageSummaryDiffs(message)).count > 0 && (!latestTurn() || !working()),
+                      )
 
                       return (
                         <div
                           id={`message-${message.id}`}
                           data-message-id={message.id}
                           data-timeline-row="UserMessage"
-                          class="agent-terminal-turn min-w-0 w-full max-w-full md:mx-auto md:max-w-200 2xl:max-w-[1000px]"
+                          class="agent-terminal-turn min-w-0 w-full max-w-full md:mx-auto md:max-w-[736px] 2xl:max-w-[736px]"
                           classList={{ "pt-6": index() > 0 }}
                         >
                           <div data-component="session-turn" class="relative min-w-0 w-full">
@@ -1427,6 +1509,12 @@ function AgentViewInner(props: AgentViewProps) {
                             </div>
                           </Show>
 
+                          <Show when={showDiffSummary()}>
+                            <div class="agent-terminal-diff-summary min-w-0 w-full max-w-full pt-3">
+                              <AgentTurnDiffSummaryCard message={message} />
+                            </div>
+                          </Show>
+
                           <Show when={showThinking()}>
                             <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3">
                               <div data-component="session-turn" class="relative min-w-0 w-full">
@@ -1445,7 +1533,7 @@ function AgentViewInner(props: AgentViewProps) {
 
                   <For each={orphanMessages()}>
                     {(message) => (
-                      <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-200 2xl:max-w-[1000px]">
+                      <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-[736px] 2xl:max-w-[736px]">
                         <div data-component="session-turn" class="relative min-w-0 w-full">
                           <div data-slot="session-turn-message-container" class="w-full">
                             <div data-slot="session-turn-assistant-content">
