@@ -24,6 +24,10 @@ import { ScrollView } from '@opencode-ai/ui/scroll-view'
 import { SessionSidePanel } from '@/pages/session/session-side-panel'
 import { sortShobSessionsById } from '@/utils/shob-session'
 
+const MIN_AGENT_CONTENT_WIDTH = 420
+const MIN_EMPTY_WORKSPACE_WIDTH = 300
+const MIN_REVIEW_PANEL_WIDTH = 360
+const MAX_REVIEW_PANEL_WIDTH = 1080
 
 const folderNameFromPath = (path: string) => {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -207,6 +211,14 @@ export function MainView() {
 
   const projectPath = createMemo(() => currentProject()?.path ?? '')
   const sidePanelOpen = createMemo(() => isReviewVisible() || isFileTreeVisible() || !!contextTabSessionId())
+  const minMainContentWidth = createMemo(() =>
+    projectSessions().length > 0 ? MIN_AGENT_CONTENT_WIDTH : MIN_EMPTY_WORKSPACE_WIDTH,
+  )
+  const sidePanelWidth = createMemo(() =>
+    sidePanelOpen()
+      ? `min(${reviewWidth()}px, max(0px, calc(100% - ${minMainContentWidth()}px)))`
+      : "0px",
+  )
 
   const fileCtx = createFileContext({
     projectPath,
@@ -563,12 +575,12 @@ export function MainView() {
     const rightEdge = rect?.right ?? window.innerWidth
     const leftEdge = rect?.left ?? 0
     const available = Math.max(0, rightEdge - leftEdge)
-    const minMainContent = projectSessions().length > 0 ? 420 : 300
-    const maxReviewWidth = Math.max(360, available - minMainContent)
+    const maxReviewWidth = Math.max(0, available - minMainContentWidth())
+    const max = Math.min(MAX_REVIEW_PANEL_WIDTH, maxReviewWidth)
     return {
       rightEdge,
-      min: 360,
-      max: Math.min(1080, maxReviewWidth),
+      min: Math.min(MIN_REVIEW_PANEL_WIDTH, max),
+      max,
     }
   }
 
@@ -648,7 +660,7 @@ export function MainView() {
                         "will-change-[width]": !reviewResizeActive() && !reviewSnap(),
                         "motion-reduce:transition-none": !reviewResizeActive() && !reviewSnap(),
                       }}
-                      style={{ width: sidePanelOpen() ? `${reviewWidth()}px` : "0px" }}
+                      style={{ width: sidePanelWidth() }}
                     >
                       <Show when={sidePanelOpen()}>
                         <ResizeHandle
