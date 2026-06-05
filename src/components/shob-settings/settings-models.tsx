@@ -1,15 +1,27 @@
-import { useFilteredList } from "@opencode-ai/ui/hooks"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Switch } from "@opencode-ai/ui/switch"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { TextField } from "@opencode-ai/ui/text-field"
-import { type Component, For, Show, createMemo } from "solid-js"
+import { type Component, For, Show, createEffect, createMemo, createSignal } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
-import { popularProviders } from "@/hooks/use-providers"
+import { popularProviders, useProviders } from "@/hooks/use-providers"
 
 type ModelItem = ReturnType<ReturnType<typeof useModels>["list"]>[number]
+type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
+
+const providerName = (item: { id: string; name: string }) => (item.id === "xai" ? "xAI (Grok)" : item.name)
+
+const providerRank = (id: string) => {
+  const rank = popularProviders.indexOf(id)
+  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank
+}
+
+const matches = (query: string, values: Array<string | undefined>) => {
+  if (!query) return true
+  return values.some((value) => value?.toLowerCase().includes(query))
+}
 
 const LoadingState: Component<{ label: string }> = (props) => (
   <div class="flex flex-col items-center justify-center py-12 text-center">
@@ -39,58 +51,84 @@ const ModelRow: Component<{ item: ModelItem; onToggle: (checked: boolean) => voi
   </div>
 )
 
-const ProviderGroup: Component<{
-  group: { category: string; items: ModelItem[] }
-  onToggle: (item: ModelItem, checked: boolean) => void
-  isVisible: (item: ModelItem) => boolean
-}> = (props) => (
-  <div class="rounded-xl border border-border-weak-base bg-surface-panel p-5">
-    <div class="flex items-center gap-2 mb-4">
-      <ProviderIcon id={props.group.category} class="size-5 shrink-0 icon-strong-base" />
-      <span class="text-13-semibold text-text-strong">{props.group.items[0].provider.name}</span>
-    </div>
-    <div class="flex flex-col">
-      <For each={props.group.items}>
-        {(item) => (
-          <ModelRow
-            item={item}
-            visible={props.isVisible(item)}
-            onToggle={(checked) => props.onToggle(item, checked)}
-          />
-        )}
-      </For>
-    </div>
-  </div>
+const ProviderRow: Component<{ item: ProviderItem; onSelect: () => void; openLabel: string }> = (props) => (
+  <button
+    type="button"
+    class="group grid min-h-[64px] min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-3 rounded-xl border border-border-weak-base bg-surface-panel px-4 py-3 text-left transition-colors hover:border-border-strong-base hover:bg-surface-raised-base-hover"
+    onClick={props.onSelect}
+  >
+    <ProviderIcon id={props.item.id} class="size-5 shrink-0 icon-strong-base" />
+    <span class="min-w-0">
+      <span class="block truncate text-14-medium text-text-strong">{providerName(props.item)}</span>
+      <span class="block truncate text-12-regular text-text-weak">{props.item.id}</span>
+    </span>
+    <span class="flex shrink-0 items-center gap-2 text-12-medium text-text-weak group-hover:text-text-strong">
+      <span class="hidden sm:inline">{props.openLabel}</span>
+      <Icon name="chevron-right" class="text-icon-weak group-hover:text-icon-strong-base" />
+    </span>
+  </button>
 )
 
 export const SettingsModels: Component = () => {
   const language = useLanguage()
   const models = useModels()
+  const providers = useProviders()
+  const [filter, setFilter] = createSignal("")
+  const [selectedProviderID, setSelectedProviderID] = createSignal<string>()
 
-  const list = useFilteredList<ModelItem>({
-    items: (_filter) => models.list(),
-    key: (x) => `${x.provider.id}:${x.id}`,
-    filterKeys: ["provider.name", "name", "id"],
-    sortBy: (a, b) => a.name.localeCompare(b.name),
-    groupBy: (x) => x.provider.id,
-    sortGroupsBy: (a, b) => {
-      const aIndex = popularProviders.indexOf(a.category)
-      const bIndex = popularProviders.indexOf(b.category)
-      const aPopular = aIndex >= 0
-      const bPopular = bIndex >= 0
+  const query = createMemo(() => filter().trim().toLowerCase())
 
-      if (aPopular && !bPopular) return -1
-      if (!aPopular && bPopular) return 1
-      if (aPopular && bPopular) return aIndex - bIndex
+  const providerList = createMemo(() => {
+    const items = providers.connected().slice()
+    items.sort((a, b) => {
+      const rank = providerRank(a.id) - providerRank(b.id)
+      if (rank !== 0) return rank
+      return providerName(a).localeCompare(providerName(b))
+    })
+    return items
+  })
 
-      return a.items[0].provider.name.localeCompare(b.items[0].provider.name)
-    },
+  const filteredProviders = createMemo(() => {
+    const needle = query()
+    return providerList().filter((provider) => matches(needle, [providerName(provider), provider.name, provider.id]))
+  })
+
+  const selectedProvider = createMemo(() => providerList().find((provider) => provider.id === selectedProviderID()))
+
+  createEffect(() => {
+    if (selectedProviderID() && !selectedProvider()) setSelectedProviderID(undefined)
+  })
+
+  const selectedProviderModels = createMemo(() => {
+    const provider = selectedProvider()
+    if (!provider) return []
+    return models
+      .list()
+      .filter((model) => model.provider.id === provider.id)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  })
+
+  const filteredModels = createMemo(() => {
+    const needle = query()
+    return selectedProviderModels().filter((model) =>
+      matches(needle, [model.name, model.id, model.provider.name, model.provider.id]),
+    )
   })
 
   const isVisible = (item: ModelItem) => models.visible({ providerID: item.provider.id, modelID: item.id })
 
   const handleToggle = (item: ModelItem, checked: boolean) => {
     models.setVisibility({ providerID: item.provider.id, modelID: item.id }, checked)
+  }
+
+  const clearFilter = () => setFilter("")
+  const selectProvider = (providerID: string) => {
+    setSelectedProviderID(providerID)
+    clearFilter()
+  }
+  const backToProviders = () => {
+    setSelectedProviderID(undefined)
+    clearFilter()
   }
 
   return (
@@ -102,46 +140,99 @@ export const SettingsModels: Component = () => {
           <TextField
             variant="ghost"
             type="text"
-            value={list.filter()}
-            onChange={list.onInput}
-            placeholder={language.t("dialog.model.search.placeholder")}
+            value={filter()}
+            onChange={setFilter}
+            placeholder={
+              selectedProvider()
+                ? language.t("dialog.model.search.placeholder")
+                : language.t("dialog.provider.search.placeholder")
+            }
             spellcheck={false}
             autocorrect="off"
             autocomplete="off"
             autocapitalize="off"
             class="flex-1"
           />
-          <Show when={list.filter()}>
-            <IconButton icon="circle-x" variant="ghost" onClick={list.clear} />
+          <Show when={filter()}>
+            <IconButton icon="circle-x" variant="ghost" onClick={clearFilter} />
           </Show>
         </div>
 
         {/* Content */}
-        <div class="flex flex-col gap-4">
-          <Show
-            when={!list.grouped.loading}
-            fallback={
-              <div class="rounded-xl border border-border-weak-base bg-surface-panel p-8">
-                <LoadingState label={`${language.t("common.loading")}${language.t("common.loading.ellipsis")}`} />
+        <Show
+          when={selectedProvider()}
+          fallback={
+            <div class="flex flex-col gap-3">
+              <Show
+                when={filteredProviders().length > 0}
+                fallback={
+                  <div class="rounded-xl border border-border-weak-base bg-surface-panel p-8">
+                    <EmptyState
+                      message={
+                        providerList().length === 0
+                          ? language.t("settings.providers.connected.empty")
+                          : language.t("dialog.provider.empty")
+                      }
+                      filter={filter()}
+                    />
+                  </div>
+                }
+              >
+                <For each={filteredProviders()}>
+                  {(provider) => (
+                    <ProviderRow
+                      item={provider}
+                      openLabel={language.t("common.open")}
+                      onSelect={() => selectProvider(provider.id)}
+                    />
+                  )}
+                </For>
+              </Show>
+            </div>
+          }
+        >
+          {(provider) => (
+            <div class="flex flex-col gap-4">
+              <div class="flex items-center gap-2">
+                <IconButton
+                  icon="arrow-left"
+                  variant="ghost"
+                  class="-ml-2 h-7 w-7"
+                  onClick={backToProviders}
+                  aria-label={language.t("common.goBack")}
+                />
+                <ProviderIcon id={provider().id} class="size-5 shrink-0 icon-strong-base" />
+                <span class="min-w-0 truncate text-14-medium text-text-strong">{providerName(provider())}</span>
               </div>
-            }
-          >
-            <Show
-              when={list.flat().length > 0}
-              fallback={
-                <div class="rounded-xl border border-border-weak-base bg-surface-panel p-8">
-                  <EmptyState message={language.t("dialog.model.empty")} filter={list.filter()} />
-                </div>
-              }
-            >
-              <For each={list.grouped.latest}>
-                {(group) => (
-                  <ProviderGroup group={group} onToggle={handleToggle} isVisible={isVisible} />
-                )}
-              </For>
-            </Show>
-          </Show>
-        </div>
+
+              <div class="rounded-xl border border-border-weak-base bg-surface-panel p-5">
+                <Show
+                  when={models.ready()}
+                  fallback={
+                    <LoadingState label={`${language.t("common.loading")}${language.t("common.loading.ellipsis")}`} />
+                  }
+                >
+                  <Show
+                    when={filteredModels().length > 0}
+                    fallback={<EmptyState message={language.t("dialog.model.empty")} filter={filter()} />}
+                  >
+                    <div class="flex flex-col">
+                      <For each={filteredModels()}>
+                        {(item) => (
+                          <ModelRow
+                            item={item}
+                            visible={isVisible(item)}
+                            onToggle={(checked) => handleToggle(item, checked)}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </Show>
+              </div>
+            </div>
+          )}
+        </Show>
       </div>
     </div>
   )
