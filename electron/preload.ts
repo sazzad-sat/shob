@@ -36,6 +36,8 @@ const allowedCommands = new Set([
   "show_open_dialog",
   "open_external",
   "get_app_info",
+  "storage_set",
+  "storage_remove",
   "check_for_updates",
   "install_update",
   "download_update",
@@ -102,6 +104,14 @@ contextBridge.exposeInMainWorld("shob", {
   },
   listen(channel: string, callback: (message: unknown) => void) {
     return Promise.resolve(subscribe(eventSubscriptions, channel, callback));
+  },
+  storage: {
+    getItem: (storage: string | undefined, key: string) =>
+      ipcRenderer.sendSync("shob:storage-get", storage ?? null, key) as string | null,
+    setItem: (storage: string | undefined, key: string, value: string) =>
+      ipcRenderer.invoke("shob:invoke", "storage_set", { storage: storage ?? null, key, value }),
+    removeItem: (storage: string | undefined, key: string) =>
+      ipcRenderer.invoke("shob:invoke", "storage_remove", { storage: storage ?? null, key }),
   },
   window: {
     minimize: () => ipcRenderer.invoke("shob:invoke", "minimize_window", {}),

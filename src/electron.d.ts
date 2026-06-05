@@ -92,6 +92,11 @@ export interface ShobNativeApi {
     channel: string,
     callback: (event: { payload: T }) => void,
   ): Promise<() => void>
+  storage: {
+    getItem(storage: string | undefined, key: string): string | null
+    setItem(storage: string | undefined, key: string, value: string): Promise<void>
+    removeItem(storage: string | undefined, key: string): Promise<void>
+  }
   window: {
     minimize(): Promise<void>
     toggleMaximize(): Promise<boolean>
@@ -125,6 +130,8 @@ export interface NativeCommandMap {
     args: undefined
     result: { name: string; version: string; packaged: boolean; platform: "windows" | "macos" | "linux" | string }
   }
+  storage_set: { args: { storage?: string | null; key: string; value: string }; result: void }
+  storage_remove: { args: { storage?: string | null; key: string }; result: void }
   check_for_updates: {
     args: { manual?: boolean } | undefined
     result: { status: "dev" | "success" | "error"; updateAvailable?: boolean; version?: string; downloaded?: boolean }

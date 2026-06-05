@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron";
 import pkg from "electron-updater";
 const { autoUpdater } = pkg;
+import Store from "electron-store";
 import path from "node:path";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
@@ -55,7 +56,11 @@ const PTY_REPLAY_BUFFER_LIMIT = 2 * 1024 * 1024;
 const PTY_OUTPUT_FLUSH_DELAY_MS = 500;
 const TITLEBAR_HEIGHT = 40;
 
+app.setName("shob");
 applyWindowsAppIdentity();
+
+const DEFAULT_STORAGE_NAME = "default.dat";
+const storageStores = new Map<string, Store<Record<string, string>>>();
 
 function titlebarTone() {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
@@ -78,9 +83,58 @@ function userDataPath(...parts: string[]) {
   return path.join(app.getPath("userData"), ...parts);
 }
 
+function configureSessionDataPath() {
+  const sessionDataPath = userDataPath("chromium");
+  fsSync.mkdirSync(sessionDataPath, { recursive: true });
+  app.setPath("sessionData", sessionDataPath);
+}
+
+configureSessionDataPath();
+
 async function ensureDataDirs() {
   await fs.mkdir(userDataPath("sessions"), { recursive: true });
+  await fs.mkdir(userDataPath("storage"), { recursive: true });
   initSessionDatabase();
+}
+
+function normalizeStorageName(name: unknown) {
+  const value = typeof name === "string" && name.trim() ? name.trim() : DEFAULT_STORAGE_NAME;
+  if (!/^[a-zA-Z0-9._-]+$/.test(value)) throw new Error("Invalid storage name");
+  return value;
+}
+
+function normalizeStorageKey(key: unknown) {
+  if (typeof key !== "string" || !key) throw new Error("Invalid storage key");
+  if (key === "__proto__" || key === "constructor" || key === "prototype") throw new Error("Invalid storage key");
+  return key;
+}
+
+function persistentStore(name: unknown) {
+  const storageName = normalizeStorageName(name);
+  let store = storageStores.get(storageName);
+  if (!store) {
+    store = new Store<Record<string, string>>({
+      name: storageName,
+      cwd: "storage",
+      accessPropertiesByDotNotation: false,
+    });
+    storageStores.set(storageName, store);
+  }
+  return store;
+}
+
+function storageGet(name: unknown, key: unknown) {
+  const value = persistentStore(name).get(normalizeStorageKey(key));
+  return typeof value === "string" ? value : null;
+}
+
+function storageSet(name: unknown, key: unknown, value: unknown) {
+  if (typeof value !== "string") throw new Error("Invalid storage value");
+  persistentStore(name).set(normalizeStorageKey(key), value);
+}
+
+function storageRemove(name: unknown, key: unknown) {
+  persistentStore(name).delete(normalizeStorageKey(key));
 }
 
 async function ensureServerStarted() {
@@ -1019,6 +1073,12 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
     packaged: app.isPackaged,
     platform: normalizeOs(),
   }),
+  storage_set: async ({ storage, key, value }) => {
+    storageSet(storage, key, value);
+  },
+  storage_remove: async ({ storage, key }) => {
+    storageRemove(storage, key);
+  },
   get_update_status: async () => ({
     status: !app.isPackaged
       ? "dev"
@@ -1229,6 +1289,15 @@ function registerIpc() {
     return handler(payload);
   });
 
+  ipcMain.on("shob:storage-get", (event, storage, key) => {
+    try {
+      event.returnValue = storageGet(storage, key);
+    } catch (error) {
+      console.warn("[shob] failed to read storage:", error);
+      event.returnValue = null;
+    }
+  });
+
   ipcMain.on("shob:get-opencode-server-url", (event) => {
     event.returnValue = serverInstance?.url ?? null;
   });
@@ -1375,7 +1444,6 @@ async function createWindow() {
   }
 }
 
-app.setName("shob");
 app.whenReady().then(async () => {
   applyMacDockIcon();
   registerIpc();
