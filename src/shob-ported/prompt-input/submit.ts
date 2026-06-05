@@ -223,7 +223,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   }
 
   const abort = async () => {
-    const sessionID = params.id
+    const sessionID = input.info()?.id || params.id
     if (!sessionID) return Promise.resolve()
 
     globalSync.todo.set(sessionID, [])
