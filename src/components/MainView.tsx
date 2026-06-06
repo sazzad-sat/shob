@@ -22,7 +22,7 @@ import { FileComponentProvider } from '@opencode-ai/ui/context'
 import { File as ShobFile } from '@opencode-ai/ui/file'
 import { ScrollView } from '@opencode-ai/ui/scroll-view'
 import { SessionSidePanel } from '@/pages/session/session-side-panel'
-import { sortShobSessionsById } from '@/utils/shob-session'
+import { findReusableEmptyRootShobSession, sortShobSessionsById } from '@/utils/shob-session'
 import { AGENT_REVIEW_OPEN_EVENT } from '@/components/agent-turn-diff-summary'
 
 const DEFAULT_SESSION_PANEL_WIDTH = 600
@@ -550,10 +550,22 @@ export function MainView() {
     if (!cpid) return
     const project = projects().find((item) => item.id === cpid)
     if (!project) return
+    const [projectStore, setProjectStore] = globalSync.child(project.path)
+    const reusable = findReusableEmptyRootShobSession(projectStore.session, projectStore.message, appStore.activeSessionId)
+    if (reusable) {
+      setProjectStore("message", reusable.id, (messages) => messages ?? [])
+      if (!projectStore.session_status[reusable.id]) {
+        setProjectStore("session_status", reusable.id, { type: "idle" } as SessionStatus)
+      }
+      await appStore.syncShobSessions(cpid, projectStore.session)
+      if (currentProjectId() !== cpid) appStore.setCurrentProject(cpid)
+      appStore.setActiveSession(reusable.id)
+      return
+    }
+
     const client = globalSDK.createClient({ directory: project.path, throwOnError: true })
     const created = await client.session.create().then((response) => response.data)
     if (!created) return
-    const [projectStore, setProjectStore] = globalSync.child(project.path)
     const hadSession = projectStore.session.some((session) => session.id === created.id)
     const mergedSessions = [created, ...projectStore.session.filter((session) => session.id !== created.id)]
     setProjectStore("session", (sessions) =>
@@ -568,7 +580,7 @@ export function MainView() {
     if (!hadSession && !created.parentID) {
       setProjectStore("sessionTotal", (total) => total + 1)
     }
-    void appStore.syncShobSessions(cpid, mergedSessions)
+    await appStore.syncShobSessions(cpid, mergedSessions)
     if (currentProjectId() !== cpid) appStore.setCurrentProject(cpid)
     appStore.setActiveSession(created.id)
     void globalSync.project.loadSessions(project.path)
