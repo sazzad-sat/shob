@@ -56,6 +56,12 @@ import { patchFiles } from "./apply-patch-file"
 import { animate } from "motion"
 import { useLocation } from "@solidjs/router"
 import { attached, inline, kind } from "./message-file"
+import {
+  groupAssistantDisplayParts,
+  sameAssistantPartGroups,
+  type AssistantPartGroup as PartGroup,
+  type AssistantPartRef as PartRef,
+} from "./message-part-order"
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
@@ -480,91 +486,6 @@ function same<T>(a: readonly T[] | undefined, b: readonly T[] | undefined) {
   return a.every((x, i) => x === b[i])
 }
 
-type PartRef = {
-  messageID: string
-  partID: string
-}
-
-type PartGroup =
-  | {
-      key: string
-      type: "part"
-      ref: PartRef
-    }
-  | {
-      key: string
-      type: "context"
-      refs: PartRef[]
-    }
-
-function sameRef(a: PartRef, b: PartRef) {
-  return a.messageID === b.messageID && a.partID === b.partID
-}
-
-function sameGroup(a: PartGroup, b: PartGroup) {
-  if (a === b) return true
-  if (a.key !== b.key) return false
-  if (a.type !== b.type) return false
-  if (a.type === "part") {
-    if (b.type !== "part") return false
-    return sameRef(a.ref, b.ref)
-  }
-  if (b.type !== "context") return false
-  if (a.refs.length !== b.refs.length) return false
-  return a.refs.every((ref, i) => sameRef(ref, b.refs[i]!))
-}
-
-function sameGroups(a: readonly PartGroup[] | undefined, b: readonly PartGroup[] | undefined) {
-  if (a === b) return true
-  if (!a || !b) return false
-  if (a.length !== b.length) return false
-  return a.every((item, i) => sameGroup(item, b[i]!))
-}
-
-function groupParts(parts: { messageID: string; part: PartType }[]) {
-  const result: PartGroup[] = []
-  let start = -1
-
-  const flush = (end: number) => {
-    if (start < 0) return
-    const first = parts[start]
-    const last = parts[end]
-    if (!first || !last) {
-      start = -1
-      return
-    }
-    result.push({
-      key: `context:${first.part.id}`,
-      type: "context",
-      refs: parts.slice(start, end + 1).map((item) => ({
-        messageID: item.messageID,
-        partID: item.part.id,
-      })),
-    })
-    start = -1
-  }
-
-  parts.forEach((item, index) => {
-    if (isContextGroupTool(item.part)) {
-      if (start < 0) start = index
-      return
-    }
-
-    flush(index - 1)
-    result.push({
-      key: `part:${item.messageID}:${item.part.id}`,
-      type: "part",
-      ref: {
-        messageID: item.messageID,
-        partID: item.part.id,
-      },
-    })
-  })
-
-  flush(parts.length - 1)
-  return result
-}
-
 function index<T extends { id: string }>(items: readonly T[]) {
   return new Map(items.map((item) => [item.id, item] as const))
 }
@@ -924,7 +845,7 @@ export function AssistantParts(props: {
 
   const grouped = createMemo(
     () =>
-      groupParts(
+      groupAssistantDisplayParts(
         props.messages.flatMap((message) =>
           list(data.store.part?.[message.id], emptyParts)
             .filter((part) => renderable(part, props.showReasoningSummaries ?? true))
@@ -933,9 +854,10 @@ export function AssistantParts(props: {
               part,
             })),
         ),
+        isContextGroupTool,
       ),
     [] as PartGroup[],
-    { equals: sameGroups },
+    { equals: sameAssistantPartGroups },
   )
 
   return (
@@ -965,37 +887,39 @@ export function AssistantParts(props: {
                         return statsOf(toolsList())
                       })
                       return (
-                        <ContextTools
-                          running={() => stats().running}
-                          generating={() => !!props.working && index === grouped().length - 1}
-                          span={() => stats().span}
-                          count={toolsList().length}
-                          tools={toolsList()}
-                        >
-                          <div data-component="context-tool-batch">
-                            <For each={refs()}>
-                              {(ref) => {
-                                const message = createMemo(() => msgs().get(ref.messageID))
-                                const item = createMemo(() => part().get(ref.messageID)?.get(ref.partID))
-                                return (
-                                  <Show when={message() && item() && isContextGroupTool(item()!)}>
-                                    <Part
-                                      part={item()!}
-                                      message={message()!}
-                                      showAssistantCopyPartID={props.showAssistantCopyPartID}
-                                      turnDurationMs={props.turnDurationMs}
-                                      defaultOpen={partDefaultOpen(
-                                        item()!,
-                                        props.shellToolDefaultOpen,
-                                        props.editToolDefaultOpen,
-                                      )}
-                                    />
-                                  </Show>
-                                )
-                              }}
-                            </For>
-                          </div>
-                        </ContextTools>
+                        <Show when={toolsList().length > 0}>
+                          <ContextTools
+                            running={() => stats().running}
+                            generating={() => !!props.working && index === grouped().length - 1}
+                            span={() => stats().span}
+                            count={toolsList().length}
+                            tools={toolsList()}
+                          >
+                            <div data-component="context-tool-batch">
+                              <For each={refs()}>
+                                {(ref) => {
+                                  const message = createMemo(() => msgs().get(ref.messageID))
+                                  const item = createMemo(() => part().get(ref.messageID)?.get(ref.partID))
+                                  return (
+                                    <Show when={message() && item() && isContextGroupTool(item()!)}>
+                                      <Part
+                                        part={item()!}
+                                        message={message()!}
+                                        showAssistantCopyPartID={props.showAssistantCopyPartID}
+                                        turnDurationMs={props.turnDurationMs}
+                                        defaultOpen={partDefaultOpen(
+                                          item()!,
+                                          props.shellToolDefaultOpen,
+                                          props.editToolDefaultOpen,
+                                        )}
+                                      />
+                                    </Show>
+                                  )
+                                }}
+                              </For>
+                            </div>
+                          </ContextTools>
+                        </Show>
                       )
                     })()}
                   </Show>
@@ -1037,8 +961,8 @@ export function AssistantParts(props: {
   )
 }
 
-function isContextGroupTool(part: PartType): part is (ToolPart | ReasoningPart) {
-  return (part.type === "tool" && CONTEXT_GROUP_TOOLS.has(part.tool)) || part.type === "reasoning"
+function isContextGroupTool(part: PartType): part is ToolPart {
+  return part.type === "tool" && CONTEXT_GROUP_TOOLS.has(part.tool)
 }
 
 function ExaOutput(props: { output?: string }) {
@@ -1102,16 +1026,17 @@ export function AssistantMessageDisplay(props: {
   const part = createMemo(() => index(props.parts))
   const grouped = createMemo(
     () =>
-      groupParts(
+      groupAssistantDisplayParts(
         props.parts
           .filter((part) => renderable(part, props.showReasoningSummaries ?? true))
           .map((part) => ({
             messageID: props.message.id,
             part,
           })),
+        isContextGroupTool,
       ),
     [] as PartGroup[],
-    { equals: sameGroups },
+    { equals: sameAssistantPartGroups },
   )
 
   return (
@@ -1141,30 +1066,34 @@ export function AssistantMessageDisplay(props: {
                         return statsOf(toolsList())
                       })
                       return (
-                        <ContextTools
-                          running={() => stats().running}
-                          generating={() => typeof props.message.time.completed !== "number" && index === grouped().length - 1}
-                          span={() => stats().span}
-                          count={toolsList().length}
-                          tools={toolsList()}
-                        >
-                          <div data-component="context-tool-batch">
-                            <For each={refs()}>
-                              {(ref) => {
-                                const item = createMemo(() => part().get(ref.partID))
-                                return (
-                                  <Show when={item() && isContextGroupTool(item()!)}>
-                                    <Part
-                                      part={item()!}
-                                      message={props.message}
-                                      showAssistantCopyPartID={props.showAssistantCopyPartID}
-                                    />
-                                  </Show>
-                                )
-                              }}
-                            </For>
-                          </div>
-                        </ContextTools>
+                        <Show when={toolsList().length > 0}>
+                          <ContextTools
+                            running={() => stats().running}
+                            generating={() =>
+                              typeof props.message.time.completed !== "number" && index === grouped().length - 1
+                            }
+                            span={() => stats().span}
+                            count={toolsList().length}
+                            tools={toolsList()}
+                          >
+                            <div data-component="context-tool-batch">
+                              <For each={refs()}>
+                                {(ref) => {
+                                  const item = createMemo(() => part().get(ref.partID))
+                                  return (
+                                    <Show when={item() && isContextGroupTool(item()!)}>
+                                      <Part
+                                        part={item()!}
+                                        message={props.message}
+                                        showAssistantCopyPartID={props.showAssistantCopyPartID}
+                                      />
+                                    </Show>
+                                  )
+                                }}
+                              </For>
+                            </div>
+                          </ContextTools>
+                        </Show>
                       )
                     })()}
                   </Show>
