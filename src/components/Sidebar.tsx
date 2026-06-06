@@ -63,9 +63,14 @@ type SidebarSearchResult =
 
 const latestSessionTime = (session: Project["sessions"][number]) => session.lastActiveAt ?? session.createdAt ?? 0
 const PROJECT_SESSION_PREVIEW_LIMIT = 5
+const DEFAULT_SIDEBAR_WIDTH = 314
+const MIN_SIDEBAR_WIDTH = 240
+const MAX_SIDEBAR_WIDTH = 460
 
 const areSameProjectOrder = (left: string[], right: string[]) =>
   left.length === right.length && left.every((projectId, index) => projectId === right[index])
+
+const clampSidebarWidth = (width: number) => Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, width))
 
 const SidebarSectionTitle = (props: { children: string }) => (
   <div class="shob-sidebar-section-label px-3 pb-2 pt-4 text-[13px] font-normal leading-4 text-text-weaker">
@@ -1026,12 +1031,14 @@ export function Sidebar(props: {
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
-  const [sidebarWidth, setSidebarWidth] = createSignal(264)
+  const [sidebarWidth, setSidebarWidth] = createSignal(DEFAULT_SIDEBAR_WIDTH)
   const [pendingDeleteSessionIDs, setPendingDeleteSessionIDs] = createSignal<Set<string>>(new Set())
   const [searchOpen, setSearchOpen] = createSignal(false)
   const [searchQuery, setSearchQuery] = createSignal("")
   const [sidebarNow, setSidebarNow] = createSignal(Date.now())
   const [projectOpenById, setProjectOpenById] = createSignal<Record<string, boolean>>({})
+  let sidebarResizeFrame: number | undefined
+  let pendingSidebarWidth: number | undefined
 
   const allSessionHits = createMemo<SidebarSessionHit[]>(() =>
     projects().flatMap((project) => project.sessions.map((session) => ({ project, session }))),
@@ -1094,6 +1101,40 @@ export function Sidebar(props: {
     return [...projectMatches, ...sessionMatches].slice(0, 80)
   })
 
+  const commitSidebarWidth = () => {
+    sidebarResizeFrame = undefined
+    if (pendingSidebarWidth === undefined) return
+    setSidebarWidth(pendingSidebarWidth)
+    pendingSidebarWidth = undefined
+  }
+
+  const beginSidebarResize = () => {
+    pendingSidebarWidth = undefined
+    if (sidebarResizeFrame === undefined) return
+    cancelAnimationFrame(sidebarResizeFrame)
+    sidebarResizeFrame = undefined
+  }
+
+  const scheduleSidebarWidth = (width: number) => {
+    pendingSidebarWidth = width
+    if (sidebarResizeFrame !== undefined) return
+    sidebarResizeFrame = requestAnimationFrame(commitSidebarWidth)
+  }
+
+  const resizeSidebar = (clientX: number) => {
+    scheduleSidebarWidth(clampSidebarWidth(clientX))
+  }
+
+  const endSidebarResize = () => {
+    if (sidebarResizeFrame !== undefined) {
+      cancelAnimationFrame(sidebarResizeFrame)
+      sidebarResizeFrame = undefined
+    }
+    if (pendingSidebarWidth === undefined) return
+    setSidebarWidth(pendingSidebarWidth)
+    pendingSidebarWidth = undefined
+  }
+
   createEffect(() => {
     window.dispatchEvent(
       new CustomEvent("gg-sidebar-state", {
@@ -1113,6 +1154,10 @@ export function Sidebar(props: {
       window.removeEventListener("gg-toggle-sidebar", handleSidebarToggleRequest)
       window.clearInterval(nowInterval)
     })
+  })
+
+  onCleanup(() => {
+    if (sidebarResizeFrame !== undefined) cancelAnimationFrame(sidebarResizeFrame)
   })
 
   const handleAddProject = async () => {
@@ -1277,7 +1322,9 @@ export function Sidebar(props: {
         />
         <ResizeHandle
           edge="end"
-          onResize={(clientX) => setSidebarWidth(Math.max(240, Math.min(460, clientX)))}
+          onResize={resizeSidebar}
+          onResizeStart={beginSidebarResize}
+          onResizeEnd={endSidebarResize}
         />
         <div class="shob-sidebar relative flex h-full max-h-full flex-col bg-background-stronger text-text-base select-none">
           <div class="sticky top-0 z-20 shrink-0 bg-background-stronger/95 px-1.5 pb-3 pt-2 backdrop-blur">
