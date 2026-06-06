@@ -10,7 +10,7 @@ import { useGlobalSync } from "@/context/global-sync"
 import { DialogConnectProvider } from "./dialog-connect-provider"
 import { DialogSelectProvider } from "./dialog-select-provider"
 import { DialogCustomProvider } from "./dialog-custom-provider"
-import { DialogOpenAICompatible } from "./dialog-openai-compatible"
+import { DialogOpenAICompatible, OPENCLAUDE_OPENAI_COMPATIBLE_PRESET } from "./dialog-openai-compatible"
 import { iconNames } from "../../../packages/ui/src/components/provider-icons/types"
 
 type ProviderSource = "env" | "api" | "config" | "custom"
@@ -34,7 +34,8 @@ const Section: Component<{ title: string; children: JSX.Element; action?: JSX.El
 
 const providerName = (item: { id: string; name: string }) => (item.id === "xai" ? "xAI (Grok)" : item.name)
 
-const hasProviderIcon = (id: string) => id === "antigravity" || iconNames.includes(id as (typeof iconNames)[number])
+const hasProviderIcon = (id: string) =>
+  id === "antigravity" || id === "openclaude" || iconNames.includes(id as (typeof iconNames)[number])
 
 const initials = (value: string) => {
   const parts = value.split(/[^a-z0-9]+/i).filter(Boolean)
@@ -283,6 +284,24 @@ export const SettingsProviders: Component = () => {
                 />
               )}
             </For>
+
+            <div data-component="openclaude-compatible-section">
+              <SimpleTopActionCard
+                iconId="openclaude"
+                title={OPENCLAUDE_OPENAI_COMPATIBLE_PRESET.name}
+                tag={language.t("settings.providers.tag.custom")}
+                connectLabel={language.t("common.connect")}
+                onConnect={() =>
+                  dialog.show(() => (
+                    <DialogOpenAICompatible
+                      defaults={OPENCLAUDE_OPENAI_COMPATIBLE_PRESET}
+                      iconID="openclaude"
+                      apiKeyOnly
+                    />
+                  ))
+                }
+              />
+            </div>
 
             <div data-component="openai-compatible-section">
               <SimpleTopActionCard

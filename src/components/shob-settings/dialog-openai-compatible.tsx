@@ -11,6 +11,7 @@ import { createStore, produce } from "solid-js/store"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
+import { useServer } from "@/context/server"
 
 interface FetchedModel {
   id: string
@@ -35,16 +36,31 @@ interface FormState {
 const PROVIDER_ID = /^[a-z0-9][a-z0-9-_]*$/
 const OPENAI_COMPATIBLE = "@ai-sdk/openai-compatible"
 
-export function DialogOpenAICompatible() {
+export const OPENCLAUDE_OPENAI_COMPATIBLE_PRESET = {
+  providerID: "openclaude",
+  name: "OpenClaude Gateway",
+  baseURL: "https://opengateway.gitlawb.com/v1",
+} as const
+
+type Props = {
+  defaults?: Partial<Pick<FormState, "providerID" | "name" | "baseURL">>
+  iconID?: string
+  apiKeyOnly?: boolean
+}
+
+const normalizeBaseURL = (value: string) => value.trim().replace(/\/+$/, "")
+
+export function DialogOpenAICompatible(props: Props = {}) {
   const dialog = useDialog()
   const globalSync = useGlobalSync()
   const globalSDK = useGlobalSDK()
   const language = useLanguage()
+  const server = useServer()
 
   const [form, setForm] = createStore<FormState>({
-    providerID: "",
-    name: "",
-    baseURL: "",
+    providerID: props.defaults?.providerID ?? "",
+    name: props.defaults?.name ?? "",
+    baseURL: props.defaults?.baseURL ?? "",
     apiKey: "",
     err: {},
   })
@@ -52,11 +68,16 @@ export function DialogOpenAICompatible() {
   const [models, setModels] = createSignal<FetchedModel[]>([])
   const [isFetching, setIsFetching] = createSignal(false)
   const [hasFetched, setHasFetched] = createSignal(false)
+  const apiKeyOnly = () => props.apiKeyOnly === true
 
   const setField = (key: "providerID" | "name" | "baseURL" | "apiKey", value: string) => {
     batch(() => {
       setForm(key, value)
       setForm("err", key, undefined)
+      if (key === "baseURL" || key === "apiKey") {
+        setModels([])
+        setHasFetched(false)
+      }
     })
   }
 
@@ -90,6 +111,42 @@ export function DialogOpenAICompatible() {
     return !idError && !nameError && !urlError && !keyError
   }
 
+  const requestModels = async () => {
+    const currentServer = server.current
+    if (!currentServer) throw new Error("No server available")
+
+    const auth = currentServer.http.password
+      ? {
+          Authorization: `Basic ${btoa(`${currentServer.http.username ?? "opencode"}:${currentServer.http.password}`)}`,
+        }
+      : {}
+    const response = await fetch(`${currentServer.http.url}/provider/openai-compatible/models`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...auth,
+      },
+      body: JSON.stringify({
+        baseURL: normalizeBaseURL(form.baseURL),
+        apiKey: form.apiKey.trim(),
+      }),
+    })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      if (response.status === 404 && !data.error) {
+        throw new Error("Local model fetch route was not found. Restart Shob and try again.")
+      }
+      throw new Error(data.error || `Failed to fetch models: ${response.status} ${response.statusText}`)
+    }
+
+    return data.data.map((m: any) => ({
+      id: m.id,
+      name: m.name || m.id,
+      selected: true,
+    })) as FetchedModel[]
+  }
+
   const fetchModels = async () => {
     if (!validateForm()) return
 
@@ -97,33 +154,9 @@ export function DialogOpenAICompatible() {
     setForm("err", "fetch", undefined)
 
     try {
-      const baseURL = form.baseURL.trim().replace(/\/$/, "")
-      const response = await fetch(`${baseURL}/v1/models`, {
-        headers: {
-          "Authorization": `Bearer ${form.apiKey.trim()}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      
-      if (!data.data || !Array.isArray(data.data)) {
-        throw new Error("Invalid response format from API")
-      }
-
-      const fetchedModels: FetchedModel[] = data.data.map((m: any) => ({
-        id: m.id,
-        name: m.name || m.id,
-        selected: true,
-      }))
-
+      const fetchedModels = await requestModels()
       setModels(fetchedModels)
       setHasFetched(true)
-
       showToast({
         variant: "success",
         icon: "circle-check",
@@ -170,13 +203,13 @@ export function DialogOpenAICompatible() {
   }
 
   const saveMutation = useMutation(() => ({
-    mutationFn: async () => {
+    mutationFn: async (modelOverride?: FetchedModel[]) => {
       const providerID = form.providerID.trim()
       const name = form.name.trim()
-      const baseURL = form.baseURL.trim()
+      const baseURL = normalizeBaseURL(form.baseURL)
       const apiKey = form.apiKey.trim()
 
-      const selectedModels = models().filter((m) => m.selected)
+      const selectedModels = (modelOverride ?? models()).filter((m) => m.selected)
       if (selectedModels.length === 0) {
         throw new Error(language.t("provider.openaiCompatible.error.noModelsSelected"))
       }
@@ -200,6 +233,7 @@ export function DialogOpenAICompatible() {
         provider: {
           [providerID]: {
             npm: OPENAI_COMPATIBLE,
+            api: baseURL,
             name,
             options: {
               baseURL,
@@ -230,6 +264,28 @@ export function DialogOpenAICompatible() {
   const save = (e: SubmitEvent) => {
     e.preventDefault()
     if (saveMutation.isPending || isFetching()) return
+    if (apiKeyOnly()) {
+      if (!validateForm()) return
+      setIsFetching(true)
+      setForm("err", "fetch", undefined)
+      requestModels()
+        .then((fetchedModels) => {
+          setModels(fetchedModels)
+          setHasFetched(true)
+          saveMutation.mutate(fetchedModels)
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err)
+          setForm("err", "fetch", message)
+          showToast({
+            variant: "error",
+            title: language.t("provider.openaiCompatible.fetch.error.title"),
+            description: message,
+          })
+        })
+        .finally(() => setIsFetching(false))
+      return
+    }
     if (!hasFetched()) {
       showToast({
         variant: "error",
@@ -238,7 +294,7 @@ export function DialogOpenAICompatible() {
       })
       return
     }
-    saveMutation.mutate()
+    saveMutation.mutate(undefined)
   }
 
   return (
@@ -256,45 +312,50 @@ export function DialogOpenAICompatible() {
     >
       <div class="flex flex-col gap-6 px-2.5 pb-3 overflow-y-auto max-h-[60vh]">
         <div class="px-2.5 flex gap-4 items-center">
-          <ProviderIcon id="openai" class="size-5 shrink-0 icon-strong-base" />
+          <ProviderIcon id={props.iconID ?? "openai"} class="size-5 shrink-0 icon-strong-base" />
           <div class="text-16-medium text-text-strong">
-            {language.t("provider.openaiCompatible.title")}
+            {props.defaults?.name ?? language.t("provider.openaiCompatible.title")}
           </div>
         </div>
 
         <form onSubmit={save} class="px-2.5 pb-6 flex flex-col gap-6">
-          <p class="text-14-regular text-text-base">
-            {language.t("provider.openaiCompatible.description")}
-          </p>
+          <Show when={!apiKeyOnly()}>
+            <p class="text-14-regular text-text-base">
+              {language.t("provider.openaiCompatible.description")}
+            </p>
+          </Show>
 
           <div class="flex flex-col gap-4">
+            <Show when={!apiKeyOnly()}>
+              <TextField
+                autofocus
+                label={language.t("provider.custom.field.providerID.label")}
+                placeholder={language.t("provider.custom.field.providerID.placeholder")}
+                description={language.t("provider.custom.field.providerID.description")}
+                value={form.providerID}
+                onChange={(v) => setField("providerID", v)}
+                validationState={form.err.providerID ? "invalid" : undefined}
+                error={form.err.providerID}
+              />
+              <TextField
+                label={language.t("provider.custom.field.name.label")}
+                placeholder={language.t("provider.custom.field.name.placeholder")}
+                value={form.name}
+                onChange={(v) => setField("name", v)}
+                validationState={form.err.name ? "invalid" : undefined}
+                error={form.err.name}
+              />
+              <TextField
+                label={language.t("provider.custom.field.baseURL.label")}
+                placeholder={language.t("provider.custom.field.baseURL.placeholder")}
+                value={form.baseURL}
+                onChange={(v) => setField("baseURL", v)}
+                validationState={form.err.baseURL ? "invalid" : undefined}
+                error={form.err.baseURL}
+              />
+            </Show>
             <TextField
-              autofocus
-              label={language.t("provider.custom.field.providerID.label")}
-              placeholder={language.t("provider.custom.field.providerID.placeholder")}
-              description={language.t("provider.custom.field.providerID.description")}
-              value={form.providerID}
-              onChange={(v) => setField("providerID", v)}
-              validationState={form.err.providerID ? "invalid" : undefined}
-              error={form.err.providerID}
-            />
-            <TextField
-              label={language.t("provider.custom.field.name.label")}
-              placeholder={language.t("provider.custom.field.name.placeholder")}
-              value={form.name}
-              onChange={(v) => setField("name", v)}
-              validationState={form.err.name ? "invalid" : undefined}
-              error={form.err.name}
-            />
-            <TextField
-              label={language.t("provider.custom.field.baseURL.label")}
-              placeholder={language.t("provider.custom.field.baseURL.placeholder")}
-              value={form.baseURL}
-              onChange={(v) => setField("baseURL", v)}
-              validationState={form.err.baseURL ? "invalid" : undefined}
-              error={form.err.baseURL}
-            />
-            <TextField
+              autofocus={apiKeyOnly()}
               label={language.t("provider.custom.field.apiKey.label")}
               placeholder={language.t("provider.custom.field.apiKey.placeholder")}
               description={language.t("provider.custom.field.apiKey.description")}
@@ -309,19 +370,21 @@ export function DialogOpenAICompatible() {
             <div class="text-14-regular text-text-error">{form.err.fetch}</div>
           </Show>
 
-          <Button
-            type="button"
-            size="large"
-            variant="secondary"
-            disabled={isFetching() || saveMutation.isPending}
-            onClick={fetchModels}
-          >
-            {isFetching()
-              ? language.t("provider.openaiCompatible.fetching")
-              : language.t("provider.openaiCompatible.fetchModels")}
-          </Button>
+          <Show when={!apiKeyOnly()}>
+            <Button
+              type="button"
+              size="large"
+              variant="secondary"
+              disabled={isFetching() || saveMutation.isPending}
+              onClick={fetchModels}
+            >
+              {isFetching()
+                ? language.t("provider.openaiCompatible.fetching")
+                : language.t("provider.openaiCompatible.fetchModels")}
+            </Button>
+          </Show>
 
-          <Show when={hasFetched() && models().length > 0}>
+          <Show when={!apiKeyOnly() && hasFetched() && models().length > 0}>
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between">
                 <label class="text-12-medium text-text-weak">
@@ -363,11 +426,15 @@ export function DialogOpenAICompatible() {
             type="submit"
             size="large"
             variant="primary"
-            disabled={saveMutation.isPending || isFetching() || !hasFetched()}
+            disabled={saveMutation.isPending || isFetching() || (!apiKeyOnly() && !hasFetched())}
           >
             {saveMutation.isPending
               ? language.t("common.saving")
-              : language.t("common.submit")}
+              : isFetching()
+                ? language.t("provider.openaiCompatible.fetching")
+                : apiKeyOnly()
+                  ? language.t("common.connect")
+                  : language.t("common.submit")}
           </Button>
         </form>
       </div>

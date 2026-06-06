@@ -11,6 +11,7 @@ import { Provider } from "../../src/provider/provider"
 import { ProviderID, ModelID } from "../../src/provider/schema"
 import { Filesystem } from "../../src/util/filesystem"
 import { Env } from "../../src/env"
+import { Auth } from "../../src/auth"
 
 function paid(providers: Awaited<ReturnType<typeof Provider.list>>) {
   const item = providers[ProviderID.make("opencode")]
@@ -2357,6 +2358,66 @@ test("cloudflare-ai-gateway forwards config metadata options", async () => {
         invoked_by: "test",
         project: "opencode",
       })
+    },
+  })
+})
+
+test("openclaude is not a built-in models catalog provider", async () => {
+  const providers = await ModelsDev.get()
+
+  expect(providers.openclaude).toBeUndefined()
+})
+
+test("openclaude can be configured as a custom OpenAI-compatible provider", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          disabled_providers: [],
+          provider: {
+            openclaude: {
+              name: "OpenClaude Gateway",
+              npm: "@ai-sdk/openai-compatible",
+              api: "https://opengateway.gitlawb.com/v1",
+              options: {
+                baseURL: "https://opengateway.gitlawb.com/v1",
+              },
+              models: {
+                "mimo-v2.5-pro": {
+                  name: "MiMo V2.5 Pro",
+                },
+              },
+            },
+          },
+        }),
+      )
+    },
+  })
+
+  await Instance.provide({
+    directory: tmp.path,
+    init: async () => {
+      await Auth.set("openclaude", {
+        type: "api",
+        key: "test-openclaude-key",
+      })
+    },
+    fn: async () => {
+      try {
+        const providers = await Provider.list()
+        const gateway = providers[ProviderID.make("openclaude")]
+
+        expect(gateway).toBeDefined()
+        expect(gateway.name).toBe("OpenClaude Gateway")
+        expect(gateway.key).toBe("test-openclaude-key")
+        expect(gateway.models["mimo-v2.5-pro"].api.url).toBe("https://opengateway.gitlawb.com/v1")
+        expect(gateway.options.baseURL).toBe("https://opengateway.gitlawb.com/v1")
+        expect(gateway.models["mimo-v2.5-pro"].api.npm).toBe("@ai-sdk/openai-compatible")
+      } finally {
+        await Auth.remove("openclaude")
+      }
     },
   })
 })

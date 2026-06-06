@@ -8,8 +8,10 @@ import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { DialogConnectProvider } from "./dialog-connect-provider"
 import { useLanguage } from "@/context/language"
 import { DialogCustomProvider } from "./dialog-custom-provider"
+import { DialogOpenAICompatible, OPENCLAUDE_OPENAI_COMPATIBLE_PRESET } from "./dialog-openai-compatible"
 
 const CUSTOM_ID = "_custom"
+const OPENCLAUDE_ID = "_openclaude"
 
 export const DialogSelectProvider: Component = () => {
   const dialog = useDialog()
@@ -26,6 +28,7 @@ export const DialogSelectProvider: Component = () => {
     if (id === "antigravity") return language.t("dialog.provider.google.note")
     if (id.startsWith("github-copilot")) return language.t("dialog.provider.copilot.note")
     if (id === "opencode-go") return language.t("dialog.provider.opencodeGo.tagline")
+    if (id === OPENCLAUDE_ID) return "OpenAI-compatible gateway"
   }
 
   return (
@@ -37,13 +40,19 @@ export const DialogSelectProvider: Component = () => {
         key={(x) => x?.id}
         items={() => {
           language.locale()
-          return [{ id: CUSTOM_ID, name: customLabel() }, ...providers.all()]
+          return [
+            { id: CUSTOM_ID, name: customLabel() },
+            { id: OPENCLAUDE_ID, name: OPENCLAUDE_OPENAI_COMPATIBLE_PRESET.name },
+            ...providers.all(),
+          ]
         }}
         filterKeys={["id", "name"]}
-        groupBy={(x) => (popularProviders.includes(x.id) ? popularGroup() : otherGroup())}
+        groupBy={(x) => (x.id === OPENCLAUDE_ID || popularProviders.includes(x.id) ? popularGroup() : otherGroup())}
         sortBy={(a, b) => {
           if (a.id === CUSTOM_ID) return -1
           if (b.id === CUSTOM_ID) return 1
+          if (a.id === OPENCLAUDE_ID) return -1
+          if (b.id === OPENCLAUDE_ID) return 1
           if (popularProviders.includes(a.id) && popularProviders.includes(b.id))
             return popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id)
           return a.name.localeCompare(b.name)
@@ -60,17 +69,26 @@ export const DialogSelectProvider: Component = () => {
             dialog.show(() => <DialogCustomProvider back="providers" />)
             return
           }
+          if (x.id === OPENCLAUDE_ID) {
+            dialog.show(() => (
+              <DialogOpenAICompatible defaults={OPENCLAUDE_OPENAI_COMPATIBLE_PRESET} iconID="openclaude" apiKeyOnly />
+            ))
+            return
+          }
           dialog.show(() => <DialogConnectProvider provider={x.id} />)
         }}
       >
         {(i) => (
           <div class="px-1.25 w-full flex items-center gap-x-3">
-            <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
+            <ProviderIcon data-slot="list-item-extra-icon" id={i.id === OPENCLAUDE_ID ? "openclaude" : i.id} />
             <span>{i.name}</span>
             <Show when={i.id === "opencode"}>
               <div class="text-14-regular text-text-weak">{language.t("dialog.provider.opencode.tagline")}</div>
             </Show>
             <Show when={i.id === CUSTOM_ID}>
+              <Tag>{language.t("settings.providers.tag.custom")}</Tag>
+            </Show>
+            <Show when={i.id === OPENCLAUDE_ID}>
               <Tag>{language.t("settings.providers.tag.custom")}</Tag>
             </Show>
             <Show when={note(i.id)}>{(value) => <div class="text-14-regular text-text-weak">{value()}</div>}</Show>

@@ -14,6 +14,46 @@ import { Log } from "../../util/log"
 
 const log = Log.create({ service: "server" })
 
+const OpenAICompatibleFetchedModel = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+})
+
+const GITLAWB_OPENGATEWAY_CATALOG_URL = "https://gitlawb.com/opengateway"
+
+function isGitlawbOpenGateway(baseURL: string) {
+  try {
+    const url = new URL(baseURL)
+    return ["opengateway.gitlawb.com", "opengateway.fly.dev"].includes(url.hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
+async function fetchGitlawbOpenGatewayCatalog() {
+  const response = await fetch(GITLAWB_OPENGATEWAY_CATALOG_URL, {
+    headers: {
+      Accept: "text/html",
+    },
+  })
+  const text = await response.text()
+  if (!response.ok) {
+    throw new Error(`Failed to fetch OpenGateway catalog: ${response.status} ${response.statusText}`)
+  }
+
+  const plainText = text.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, " ")
+  const ids = Array.from(
+    new Set(
+      Array.from(plainText.matchAll(/\bmodel:\s*([A-Za-z0-9][A-Za-z0-9._:/-]*)/g), (match) => match[1].trim()),
+    ),
+  )
+  if (ids.length === 0) {
+    throw new Error("OpenGateway catalog did not contain any model IDs")
+  }
+
+  return ids.map((id) => ({ id }))
+}
+
 export const ProviderRoutes = lazy(() =>
   new Hono()
     .get(
@@ -61,6 +101,104 @@ export const ProviderRoutes = lazy(() =>
           all: Object.values(providers),
           default: mapValues(providers, (item) => Provider.sort(Object.values(item.models))[0].id),
           connected: Object.keys(connected),
+        })
+      },
+    )
+    .post(
+      "/openai-compatible/models",
+      describeRoute({
+        summary: "Fetch OpenAI-compatible models",
+        description: "Fetch model IDs from an OpenAI-compatible provider's /models endpoint.",
+        operationId: "provider.openaiCompatible.models",
+        responses: {
+          200: {
+            description: "Fetched models",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    data: z.array(OpenAICompatibleFetchedModel),
+                  }),
+                ),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator(
+        "json",
+        z.object({
+          baseURL: z.string(),
+          apiKey: z.string(),
+          headers: z.record(z.string(), z.string()).optional(),
+        }),
+      ),
+      async (c) => {
+        const input = c.req.valid("json")
+        const baseURL = input.baseURL.trim().replace(/\/+$/, "")
+        if (!/^https?:\/\//.test(baseURL)) {
+          return c.json({ error: "Base URL must start with http:// or https://" }, 400)
+        }
+
+        const isOpenGateway = isGitlawbOpenGateway(baseURL)
+        if (isOpenGateway) {
+          try {
+            return c.json({ data: await fetchGitlawbOpenGatewayCatalog() })
+          } catch (error) {
+            return c.json(
+              {
+                error: error instanceof Error ? error.message : String(error),
+              },
+              400,
+            )
+          }
+        }
+
+        const response = await fetch(`${baseURL}/models`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${input.apiKey}`,
+            ...(input.headers ?? {}),
+          },
+        }).catch((error) => {
+          throw new Error(error instanceof Error ? error.message : String(error))
+        })
+
+        const text = await response.text()
+        if (!response.ok) {
+          return c.json(
+            {
+              error: `Failed to fetch models: ${response.status} ${response.statusText}`,
+              body: text,
+            },
+            400,
+          )
+        }
+
+        const data = (() => {
+          try {
+            return JSON.parse(text) as { data?: unknown }
+          } catch {
+            return undefined
+          }
+        })()
+        if (!data) {
+          return c.json({ error: "Invalid JSON response from API" }, 400)
+        }
+        if (!Array.isArray(data.data)) {
+          return c.json({ error: "Invalid response format from API" }, 400)
+        }
+
+        return c.json({
+          data: data.data
+            .filter((item): item is { id: string; name?: string } => {
+              return typeof item === "object" && item !== null && typeof (item as { id?: unknown }).id === "string"
+            })
+            .map((item) => ({
+              id: item.id,
+              name: typeof item.name === "string" ? item.name : undefined,
+            })),
         })
       },
     )
