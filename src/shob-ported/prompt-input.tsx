@@ -681,6 +681,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       .map((agent): AtOption => ({ type: "agent", name: agent.name, display: agent.name })),
   )
   const agentNames = createMemo(() => local.agent.list().map((agent) => agent.name))
+  const agentModeClass = createMemo(() => {
+    const name = local.agent.current()?.name?.toLowerCase()
+    if (name === "build") return "agent-terminal-agent-build"
+    if (name === "plan") return "agent-terminal-agent-plan"
+    return ""
+  })
 
   const handleAtSelect = (option: AtOption | undefined) => {
     if (!option) return
@@ -1685,12 +1691,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             editorRef?.focus()
           }}
         >
-          <div class="agent-terminal-input-wrap flex min-w-0 flex-1 items-start gap-3">
+          <div class="agent-terminal-input-wrap flex min-w-0 flex-1 items-start gap-3 text-left">
             <span class="agent-terminal-caret select-none font-mono text-[16px] leading-5" aria-hidden="true">
               {store.mode === "shell" ? ">" : ""}
             </span>
             <div
-              class="agent-terminal-input-scroll relative flex-1 max-h-[240px] overflow-y-auto no-scrollbar"
+              class="agent-terminal-input-scroll relative flex-1 max-h-[240px] overflow-y-auto no-scrollbar text-left"
               ref={(el) => (scrollRef = el)}
             >
               <div
@@ -1720,16 +1726,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 onCompositionEnd={handleCompositionEnd}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
+                style={{ "text-align": "left" }}
                 classList={{
                   "select-text": true,
-                  "w-full text-[15px] leading-relaxed text-foreground focus:outline-none whitespace-pre-wrap caret-primary": true,
+                  "w-full text-left text-[15px] leading-relaxed text-foreground focus:outline-none whitespace-pre-wrap caret-primary": true,
                   "[&_[data-type=file]]:text-syntax-property": true,
                   "[&_[data-type=agent]]:text-syntax-type": true,
                 }}
               />
               <div
-                class="absolute top-0 inset-x-0 text-[15px] leading-relaxed text-muted-foreground/40 pointer-events-none whitespace-nowrap truncate"
-                style={{ display: visibleEditorBlank() ? undefined : "none" }}
+                class="absolute top-0 inset-x-0 text-left text-[15px] leading-relaxed text-muted-foreground/40 pointer-events-none whitespace-nowrap truncate"
+                style={{ display: visibleEditorBlank() ? undefined : "none", "text-align": "left" }}
               >
                 {placeholder()}
               </div>
@@ -1831,18 +1838,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               >
                 <Select
                   size="normal"
+                  placement="top-start"
+                  gutter={8}
                   options={agentNames()}
                   current={local.agent.current()?.name ?? ""}
+                  groupBy={() => "Mode"}
                   disabled={improvingPrompt()}
                   onSelect={(value) => {
                     if (improvingPrompt()) return
                     local.agent.set(value)
                     restoreFocus()
                   }}
-                  class="h-8 min-w-0 px-3 flex items-center gap-2 rounded-lg border border-border/30 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 overflow-hidden"
+                  class={`h-8 min-w-0 px-3 flex items-center gap-2 rounded-lg border border-border/30 hover:bg-accent/50 text-[12px] font-mono text-foreground transition-colors duration-150 cursor-pointer outline-none shrink-0 overflow-hidden ${agentModeClass()}`}
                   valueClass="min-w-0 flex-1 truncate text-left"
                   triggerStyle={{ border: "none", background: "transparent", height: "100%", "font-family": "inherit" }}
                   triggerProps={{ "data-action": "prompt-agent" }}
+                  triggerVariant="composer"
                   variant="ghost"
                   label={(name) => <span class="min-w-0 truncate capitalize">{name}</span>}
                 />
@@ -1858,6 +1869,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               >
                 <Select
                   size="normal"
+                  placement="top-start"
+                  gutter={8}
                   options={variants()}
                   current={local.model.variant.current() ?? "default"}
                   label={variantLabel}
@@ -1872,6 +1885,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   valueClass="min-w-0 flex-1 truncate text-left"
                   triggerStyle={{ border: "none", background: "transparent", height: "100%", "font-family": "inherit" }}
                   triggerProps={{ "data-action": "prompt-model-variant" }}
+                  triggerVariant="composer"
                   variant="ghost"
                 />
               </TooltipKeybind>

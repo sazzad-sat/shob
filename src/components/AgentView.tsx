@@ -637,7 +637,8 @@ function AgentViewInner(props: AgentViewProps) {
   )
   const sessionContentLoading = createMemo(() => Boolean(activeSessionId() && messageState() === undefined))
   const isNewSession = createMemo(() => !sessionContentLoading() && messages().length === 0)
-  const showDockedComposer = createMemo(() => !sessionContentLoading())
+  const showInlineComposer = createMemo(() => isNewSession())
+  const showDockedComposer = createMemo(() => !sessionContentLoading() && !showInlineComposer())
   const newSessionTitle = createMemo(() => {
     const key = sessionID()
     const index = key ? newSessionTitleIndexes()[key] ?? 0 : 0
@@ -1311,6 +1312,7 @@ function AgentViewInner(props: AgentViewProps) {
           class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground"
           data-composer-dock-visible={composerDockVisible() ? "true" : "false"}
           data-docked-composer={showDockedComposer() ? "true" : "false"}
+          data-new-session={isNewSession() ? "true" : "false"}
           style={{
             "--agent-composer-bottom": composerFrame().bottom,
             "--agent-composer-dock-height": `${composerDockHeight()}px`,
@@ -1348,7 +1350,6 @@ function AgentViewInner(props: AgentViewProps) {
               ref={setScrollRef}
               data-slot="session-turn-content"
               class="agent-terminal-scroll agent-smart-scrollbar h-full min-w-0 overflow-x-hidden overflow-y-auto"
-              classList={{ "agent-terminal-scroll-empty": isNewSession() }}
               style={{
                 "--session-title-height": "40px",
                 "--sticky-accordion-top": "48px",
@@ -1363,11 +1364,14 @@ function AgentViewInner(props: AgentViewProps) {
               onPointerDown={handleTimelinePointerDown}
               onKeyDown={handleTimelineKeyDown}
             >
-              <div onClick={autoScroll.handleInteraction}>
+              <div class="agent-terminal-scroll-body" onClick={autoScroll.handleInteraction}>
+                <Show
+                  when={isNewSession()}
+                  fallback={
+                    <>
                 <div
                   data-session-title
                   class="agent-terminal-title sticky top-0 z-30 w-full px-3 md:px-4"
-                  style={{ display: isNewSession() ? "none" : undefined }}
                 >
                   <div class="flex w-full items-center gap-2.5">
                     <div class="agent-session-title-cluster flex min-w-0 flex-1 items-center gap-2">
@@ -1425,7 +1429,6 @@ function AgentViewInner(props: AgentViewProps) {
                 <div
                   ref={setContentRef}
                   class="agent-terminal-buffer min-h-full pb-56 pt-2"
-                  classList={{ "agent-terminal-buffer-empty": isNewSession() }}
                 >
                   <Show when={sessionContentLoading()}>
                     <div class="flex min-h-full items-center justify-center px-6 text-center">
@@ -1559,16 +1562,23 @@ function AgentViewInner(props: AgentViewProps) {
                     )}
                   </For>
 
-                  <Show when={isNewSession()}>
-                    <div class="agent-terminal-empty relative isolate flex min-h-0 flex-col items-stretch justify-center px-2 text-left overflow-visible md:mx-auto md:px-5">
-                      <div class="agent-terminal-new-session relative z-10 w-full">
-                        <div class="agent-terminal-new-session-heading">
-                          <h1>{newSessionTitle()}</h1>
-                        </div>
-                      </div>
-                    </div>
-                  </Show>
                 </div>
+                    </>
+                  }
+                >
+                  <div ref={setContentRef} class="agent-terminal-new-session-stage">
+                    <div class="agent-terminal-new-session relative z-10 w-full">
+                      <div class="agent-terminal-new-session-heading">
+                        <h1>{newSessionTitle()}</h1>
+                      </div>
+                      <Show when={showInlineComposer()}>
+                        <div class="agent-terminal-new-session-composer" data-agent-docked="false">
+                          <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
+                        </div>
+                      </Show>
+                    </div>
+                  </div>
+                </Show>
               </div>
             </div>
           </div>
