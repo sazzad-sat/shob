@@ -62,6 +62,14 @@
     }
   }
 
+  [data-slot="session-turn-thinking-elapsed"] {
+    color: var(--text-weaker);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-regular);
+    line-height: 18px;
+  }
+
   [data-component="text-reveal"].session-turn-thinking-heading {
     flex: 1 1 auto;
     min-width: 0;

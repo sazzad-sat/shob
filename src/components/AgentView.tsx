@@ -7,6 +7,7 @@ import { useSync } from "@/context/sync"
 import { useGlobalSync } from "@/context/global-sync"
 import { useNavigate, useParams } from "@solidjs/router"
 import { AssistantParts, Message } from "@opencode-ai/ui/message-part"
+import { getAssistantActivityLabel } from "@opencode-ai/ui/session-activity"
 import { DataProvider, FileComponentProvider } from "@opencode-ai/ui/context"
 import { AppIcon } from "@opencode-ai/ui/app-icon"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -82,6 +83,16 @@ const formatCompactNumber = (value: number | null | undefined) => {
 }
 
 const formatDiffStat = (value: number) => value.toLocaleString()
+
+const formatThinkingElapsed = (ms: number) => {
+  if (ms < 1000) return ""
+  const totalSeconds = ms / 1000
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`
+  const total = Math.floor(totalSeconds)
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  return `${minutes}m ${seconds}s`
+}
 
 const messageSummaryDiffs = (message: ChatMessage) =>
   (message as { summary?: { diffs?: unknown } }).summary?.diffs
@@ -601,6 +612,13 @@ function AgentViewInner(props: AgentViewProps) {
   })
   const status = createMemo(() => statusInfo().type)
   const working = createMemo(() => status() !== "idle")
+  const [thinkingNow, setThinkingNow] = createSignal(Date.now())
+  createEffect(() => {
+    if (!working()) return
+    setThinkingNow(Date.now())
+    const timer = setInterval(() => setThinkingNow(Date.now()), 100)
+    onCleanup(() => clearInterval(timer))
+  })
   const sessionEventError = createMemo(() => {
     const sessionID = activeSessionId()
     const error = sessionID ? sync.data.session_error[sessionID] : undefined
@@ -1191,13 +1209,6 @@ function AgentViewInner(props: AgentViewProps) {
     })
   }
 
-  const visibleAssistantPart = (part: Part) => {
-    if (part.type === "text") return Boolean(part.text?.trim())
-    if (part.type === "reasoning") return Boolean(part.text?.trim())
-    if (part.type === "tool") return part.tool !== "todowrite"
-    return false
-  }
-
   return (
     <DataProvider
       data={sync.data}
@@ -1440,17 +1451,6 @@ function AgentViewInner(props: AgentViewProps) {
                     {(message, index) => {
                       const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
                       const latestTurn = createMemo(() => index() === userMessages().length - 1)
-                      const assistantVisible = createMemo(() => {
-                        let visible = 0
-                        for (const msg of assistants()) {
-                          if (assistantMessageError(msg)) visible++
-                          const parts = getParts(msg.id)
-                          for (const part of parts) {
-                            if (visibleAssistantPart(part)) visible++
-                          }
-                        }
-                        return visible
-                      })
                       const assistantError = createMemo(() => {
                         for (const msg of assistants()) {
                           const error = assistantMessageError(msg)
@@ -1462,8 +1462,22 @@ function AgentViewInner(props: AgentViewProps) {
                         () => assistants().length > 0 || !!turnError() || (latestTurn() && statusInfo().type === "retry"),
                       )
                       const showThinking = createMemo(
-                        () => working() && latestTurn() && assistantVisible() === 0 && !turnError() && statusInfo().type !== "retry",
+                        () => working() && latestTurn() && !turnError() && statusInfo().type !== "retry",
                       )
+                      const thinkingLabel = createMemo(() =>
+                        getAssistantActivityLabel({
+                          messages: assistants(),
+                          getParts,
+                          t: (key, params) => language.t(key as any, params),
+                        }),
+                      )
+                      const thinkingElapsed = createMemo(() => {
+                        if (!showThinking()) return ""
+                        const firstAssistant = assistants()[0]
+                        const start = (firstAssistant && timeValue(firstAssistant, "created")) ?? timeValue(message, "created")
+                        if (start === undefined) return ""
+                        return formatThinkingElapsed(Math.max(0, thinkingNow() - start))
+                      })
                       const showDiffSummary = createMemo(
                         () => createAgentTurnDiffSummary(messageSummaryDiffs(message)).count > 0 && (!latestTurn() || !working()),
                       )
@@ -1530,7 +1544,10 @@ function AgentViewInner(props: AgentViewProps) {
                               <div data-component="session-turn" class="relative min-w-0 w-full">
                                 <div data-slot="session-turn-message-container" class="w-full">
                                   <div data-slot="session-turn-thinking" class="pl-2">
-                                    <TextShimmer text={language.t("ui.sessionTurn.status.thinking") ?? "Thinking..."} />
+                                    <TextShimmer text={thinkingLabel()} />
+                                    <Show when={thinkingElapsed()}>
+                                      <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
+                                    </Show>
                                   </div>
                                 </div>
                               </div>

@@ -10,10 +10,10 @@ import { useFileComponent } from "../context/file"
 
 import { Binary } from "@opencode-ai/util/binary"
 import { getDirectory, getFilename } from "@opencode-ai/util/path"
-import { createEffect, createMemo, createSignal, For, on, ParentProps, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, ParentProps, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
-import { AssistantParts, Message, MessageDivider, PART_MAPPING, type UserActions } from "./message-part"
+import { AssistantParts, Message, MessageDivider, type UserActions } from "./message-part"
 import { Card } from "./card"
 import { Accordion } from "./accordion"
 import { StickyAccordionHeader } from "./sticky-accordion-header"
@@ -25,6 +25,7 @@ import { TextReveal } from "./text-reveal"
 import { createAutoScroll } from "../hooks"
 import { useI18n } from "../context/i18n"
 import { normalize } from "./session-diff"
+import { extractReasoningTopic, getAssistantActivityLabel } from "./session-activity"
 
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -79,6 +80,16 @@ function unwrap(message: string) {
   return message
 }
 
+function formatThinkingElapsed(ms: number) {
+  if (ms < 1000) return ""
+  const totalSeconds = ms / 1000
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`
+  const total = Math.floor(totalSeconds)
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  return `${minutes}m ${seconds}s`
+}
+
 function same<T>(a: readonly T[], b: readonly T[]) {
   if (a === b) return true
   if (a.length !== b.length) return false
@@ -88,59 +99,6 @@ function same<T>(a: readonly T[], b: readonly T[]) {
 function list<T>(value: T[] | undefined | null, fallback: T[]) {
   if (Array.isArray(value)) return value
   return fallback
-}
-
-const hidden = new Set(["todowrite"])
-
-function partState(part: PartType, showReasoningSummaries: boolean) {
-  if (part.type === "tool") {
-    if (hidden.has(part.tool)) return
-    if (part.tool === "question" && (part.state.status === "pending" || part.state.status === "running")) return
-    return "visible" as const
-  }
-  if (part.type === "text") return part.text?.trim() ? ("visible" as const) : undefined
-  if (part.type === "reasoning") {
-    if (showReasoningSummaries && part.text?.trim()) return "visible" as const
-    return
-  }
-  if (PART_MAPPING[part.type]) return "visible" as const
-  return
-}
-
-function clean(value: string) {
-  return value
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
-    .replace(/[*_~]+/g, "")
-    .trim()
-}
-
-function heading(text: string) {
-  const markdown = text.replace(/\r\n?/g, "\n")
-
-  const html = markdown.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)
-  if (html?.[1]) {
-    const value = clean(html[1].replace(/<[^>]+>/g, " "))
-    if (value) return value
-  }
-
-  const atx = markdown.match(/^\s{0,3}#{1,6}[ \t]+(.+?)(?:[ \t]+#+[ \t]*)?$/m)
-  if (atx?.[1]) {
-    const value = clean(atx[1])
-    if (value) return value
-  }
-
-  const setext = markdown.match(/^([^\n]+)\n(?:=+|-+)\s*$/m)
-  if (setext?.[1]) {
-    const value = clean(setext[1])
-    if (value) return value
-  }
-
-  const strong = markdown.match(/^\s*(?:\*\*|__)(.+?)(?:\*\*|__)\s*$/m)
-  if (strong?.[1]) {
-    const value = clean(strong[1])
-    if (value) return value
-  }
 }
 
 export function SessionTurn(
@@ -343,30 +301,42 @@ export function SessionTurn(
     if (end < start) return undefined
     return end - start
   })
-  const assistantDerived = createMemo(() => {
-    let visible = 0
+  const thinkingLabel = createMemo(() =>
+    getAssistantActivityLabel({
+      messages: assistantMessages(),
+      getParts: (messageID) => list(data.store.part?.[messageID], emptyParts),
+      t: (key, params) => i18n.t(key as any, params),
+    }),
+  )
+  const reasoningHeading = createMemo(() => {
     let reason: string | undefined
-    const show = showReasoningSummaries()
     for (const message of assistantMessages()) {
       for (const part of list(data.store.part?.[message.id], emptyParts)) {
-        if (partState(part, show) === "visible") {
-          visible++
-        }
         if (part.type === "reasoning" && part.text) {
-          const h = heading(part.text)
+          const h = extractReasoningTopic(part.text)
           if (h) reason = h
         }
       }
     }
-    return { visible, reason }
+    return reason
   })
-  const assistantVisible = createMemo(() => assistantDerived().visible)
-  const reasoningHeading = createMemo(() => assistantDerived().reason)
   const showThinking = createMemo(() => {
     if (!working() || !!error()) return false
     if (status().type === "retry") return false
-    if (showReasoningSummaries()) return assistantVisible() === 0
     return true
+  })
+  const [thinkingNow, setThinkingNow] = createSignal(Date.now())
+  createEffect(() => {
+    if (!showThinking()) return
+    setThinkingNow(Date.now())
+    const timer = setInterval(() => setThinkingNow(Date.now()), 100)
+    onCleanup(() => clearInterval(timer))
+  })
+  const thinkingElapsed = createMemo(() => {
+    if (!showThinking()) return ""
+    const start = assistantMessages()[0]?.time.created ?? message()?.time.created
+    if (typeof start !== "number") return ""
+    return formatThinkingElapsed(Math.max(0, thinkingNow() - start))
   })
 
   const autoScroll = createAutoScroll({
@@ -414,7 +384,10 @@ export function SessionTurn(
               </Show>
               <Show when={showThinking()}>
                 <div data-slot="session-turn-thinking">
-                  <TextShimmer text={i18n.t("ui.sessionTurn.status.thinking")} />
+                  <TextShimmer text={thinkingLabel()} />
+                  <Show when={thinkingElapsed()}>
+                    <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
+                  </Show>
                   <Show when={!showReasoningSummaries()}>
                     <TextReveal
                       text={reasoningHeading()}
