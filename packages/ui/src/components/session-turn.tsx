@@ -384,7 +384,7 @@ export function SessionTurn(
               </Show>
               <Show when={showThinking()}>
                 <div data-slot="session-turn-thinking">
-                  <TextShimmer text={thinkingLabel()} />
+                  <TextShimmer text={thinkingLabel()} class="session-turn-thinking-label" />
                   <Show when={thinkingElapsed()}>
                     <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
                   </Show>

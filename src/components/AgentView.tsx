@@ -1544,7 +1544,7 @@ function AgentViewInner(props: AgentViewProps) {
                               <div data-component="session-turn" class="relative min-w-0 w-full">
                                 <div data-slot="session-turn-message-container" class="w-full">
                                   <div data-slot="session-turn-thinking" class="pl-2">
-                                    <TextShimmer text={thinkingLabel()} />
+                                    <TextShimmer text={thinkingLabel()} class="session-turn-thinking-label" />
                                     <Show when={thinkingElapsed()}>
                                       <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
                                     </Show>

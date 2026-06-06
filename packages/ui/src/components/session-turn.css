@@ -45,7 +45,7 @@
 
   [data-slot="session-turn-thinking"] {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     width: 100%;
     min-width: 0;
@@ -62,7 +62,31 @@
     }
   }
 
+  [data-component="text-shimmer"].session-turn-thinking-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  [data-component="text-shimmer"].session-turn-thinking-label [data-slot="text-shimmer-char"] {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  [data-component="text-shimmer"].session-turn-thinking-label [data-slot="text-shimmer-char-base"],
+  [data-component="text-shimmer"].session-turn-thinking-label [data-slot="text-shimmer-char-shimmer"] {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   [data-slot="session-turn-thinking-elapsed"] {
+    flex: 0 0 auto;
     color: var(--text-weaker);
     font-variant-numeric: tabular-nums;
     font-size: var(--font-size-small);
