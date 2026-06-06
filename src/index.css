@@ -3092,7 +3092,7 @@ b {
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-model-variant"]:enabled:hover,
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-model-variant"][data-expanded],
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-improve"]:enabled:hover {
-  background: color-mix(in srgb, #fff 6%, transparent) !important;
+  background: #242424 !important;
 }
 
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-model"] span,
