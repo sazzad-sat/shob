@@ -465,50 +465,15 @@ async function highlightCodeBlocks(html: string): Promise<string> {
 
 export type NativeMarkdownParser = (markdown: string) => Promise<string>
 
-export function escapeHtmlAttribute(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case "&":
-        return "&amp;"
-      case "<":
-        return "&lt;"
-      case ">":
-        return "&gt;"
-      case "\"":
-        return "&quot;"
-      case "'":
-        return "&#39;"
-      default:
-        return char
-    }
-  })
-}
-
-function safeMarkdownHref(href: string): string | undefined {
-  const normalized = href.trim().replace(/[\u0000-\u001f\u007f-\u009f\s]+/g, "")
-  const protocol = /^[A-Za-z][A-Za-z0-9+.-]*:/.exec(normalized)?.[0].toLowerCase()
-  if (protocol && !["http:", "https:", "mailto:", "tel:"].includes(protocol)) return
-  return href
-}
-
-export function renderMarkdownLink(props: { href: string; title?: string | null; text: string }): string {
-  const href = safeMarkdownHref(props.href)
-  const hrefAttr = href ? ` href="${escapeHtmlAttribute(href)}"` : ""
-  const titleAttr = props.title ? ` title="${escapeHtmlAttribute(props.title)}"` : ""
-  const externalAttrs = href ? ' target="_blank" rel="noopener noreferrer"' : ""
-  return `<a${hrefAttr}${titleAttr} class="external-link"${externalAttrs}>${props.text}</a>`
-}
-
-export function createMarkdownParser(props: { nativeParser?: NativeMarkdownParser } = {}) {
+function createMarkdownParser(props: { nativeParser?: NativeMarkdownParser } = {}) {
   const jsParser = new Marked(
     {
+      gfm: true,
+      breaks: false,
       renderer: {
         link(this: { parser: { parseInline: (tokens: Tokens.Link["tokens"]) => string } }, token: Tokens.Link) {
-          return renderMarkdownLink({
-            href: token.href,
-            title: token.title,
-            text: this.parser.parseInline(token.tokens),
-          })
+          const titleAttr = token.title ? ` title="${token.title}"` : ""
+          return `<a href="${token.href}"${titleAttr} class="external-link" target="_blank" rel="noopener noreferrer">${this.parser.parseInline(token.tokens)}</a>`
         },
       },
     },

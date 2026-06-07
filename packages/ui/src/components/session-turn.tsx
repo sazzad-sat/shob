@@ -13,7 +13,13 @@ import { getDirectory, getFilename } from "@opencode-ai/util/path"
 import { createEffect, createMemo, createSignal, For, on, onCleanup, ParentProps, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
-import { AssistantParts, Message, MessageDivider, type UserActions } from "./message-part"
+import {
+  AssistantParts,
+  Message,
+  MessageDivider,
+  visibleAssistantDisplayPartEntries,
+  type UserActions,
+} from "./message-part"
 import { Card } from "./card"
 import { Accordion } from "./accordion"
 import { StickyAccordionHeader } from "./sticky-accordion-header"
@@ -320,10 +326,19 @@ export function SessionTurn(
     }
     return reason
   })
+  const assistantVisibleContent = createMemo(
+    () =>
+      visibleAssistantDisplayPartEntries({
+        messages: assistantMessages(),
+        getParts: (messageID) => list(data.store.part?.[messageID], emptyParts),
+        showReasoningSummaries: showReasoningSummaries(),
+        live: working(),
+      }).length,
+  )
   const showThinking = createMemo(() => {
     if (!working() || !!error()) return false
     if (status().type === "retry") return false
-    return true
+    return assistantVisibleContent() === 0
   })
   const [thinkingNow, setThinkingNow] = createSignal(Date.now())
   createEffect(() => {

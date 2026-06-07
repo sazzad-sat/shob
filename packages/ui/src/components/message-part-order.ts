@@ -3,6 +3,7 @@ import type { Part } from "@opencode-ai/sdk/v2"
 export type AssistantPartEntry<TPart extends Pick<Part, "id" | "type"> = Part> = {
   messageID: string
   part: TPart
+  messageCompleted?: boolean
 }
 
 export type AssistantPartRef = {
@@ -49,35 +50,49 @@ export function sameAssistantPartGroups(
   return a.every((item, i) => sameGroup(item, b[i]!))
 }
 
-export function orderAssistantDisplayParts<T extends AssistantPartEntry>(parts: T[]) {
-  const firstText = parts.findIndex((entry) => entry.part.type === "text")
-  if (firstText === -1) return parts
+export type AssistantDisplayOrderOptions = {
+  live?: boolean
+}
 
-  const beforeText: T[] = []
-  const lateReasoning: T[] = []
-  const textAndAfter: T[] = []
+function hasEnd(value: unknown) {
+  if (!value || typeof value !== "object") return false
+  return typeof (value as { end?: unknown }).end === "number"
+}
 
-  parts.forEach((entry, index) => {
-    if (index < firstText) {
-      beforeText.push(entry)
-      return
-    }
-    if (index > firstText && entry.part.type === "reasoning") {
-      lateReasoning.push(entry)
-      return
-    }
-    textAndAfter.push(entry)
-  })
+function isActiveTool(part: Pick<Part, "type">) {
+  if (part.type !== "tool") return false
+  const status = (part as { state?: { status?: unknown } }).state?.status
+  return status === "pending" || status === "running"
+}
 
-  if (lateReasoning.length === 0) return parts
-  return [...beforeText, ...lateReasoning, ...textAndAfter]
+function isUnfinishedLivePart(entry: AssistantPartEntry) {
+  const parentLive = entry.messageCompleted !== true
+  if (!parentLive) return false
+
+  if (entry.part.type === "reasoning" || entry.part.type === "text") {
+    return !hasEnd((entry.part as { time?: unknown }).time)
+  }
+
+  return isActiveTool(entry.part)
+}
+
+export function orderAssistantDisplayParts<T extends AssistantPartEntry>(
+  parts: T[],
+  options: AssistantDisplayOrderOptions = {},
+) {
+  if (!options.live) return parts
+
+  const firstUnfinished = parts.findIndex(isUnfinishedLivePart)
+  if (firstUnfinished === -1) return parts
+  return parts.slice(0, firstUnfinished + 1)
 }
 
 export function groupAssistantDisplayParts<T extends AssistantPartEntry>(
   parts: T[],
   isContextPart: (part: T["part"]) => boolean,
+  options: AssistantDisplayOrderOptions = {},
 ): AssistantPartGroup[] {
-  const ordered = orderAssistantDisplayParts(parts)
+  const ordered = orderAssistantDisplayParts(parts, options)
   const result: AssistantPartGroup[] = []
   let start = -1
 

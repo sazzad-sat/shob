@@ -18,6 +18,7 @@ type SessionCache = {
   todo: Record<string, Todo[] | undefined>
   message: Record<string, Message[] | undefined>
   part: Record<string, Part[] | undefined>
+  part_text_accum_delta: Record<string, string | undefined>
   permission: Record<string, PermissionRequest[] | undefined>
   question: Record<string, QuestionRequest[] | undefined>
 }
@@ -29,6 +30,9 @@ export function dropSessionCaches(store: SessionCache, sessionIDs: Iterable<stri
   for (const key of Object.keys(store.part)) {
     const parts = store.part[key]
     if (!parts?.some((part) => stale.has(part?.sessionID ?? ""))) continue
+    for (const part of parts) {
+      delete store.part_text_accum_delta[part.id]
+    }
     delete store.part[key]
   }
 

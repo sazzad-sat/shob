@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, mapArray, onCleanup, onMount, Show } from "solid-js"
 import { Portal } from "solid-js/web"
 import { PromptInput } from "../shob-ported/prompt-input"
 import { sendFollowupDraft, type FollowupDraft } from "@/shob-ported/prompt-input/submit"
@@ -6,7 +6,7 @@ import { MockSessionProviders } from "../shob-ported/mock-session-layout"
 import { useSync } from "@/context/sync"
 import { useGlobalSync } from "@/context/global-sync"
 import { useNavigate, useParams } from "@solidjs/router"
-import { AssistantParts, Message } from "@opencode-ai/ui/message-part"
+import { AssistantPartGroupView, Message } from "@opencode-ai/ui/message-part"
 import { getAssistantActivityLabel } from "@opencode-ai/ui/session-activity"
 import { DataProvider, FileComponentProvider } from "@opencode-ai/ui/context"
 import { AppIcon } from "@opencode-ai/ui/app-icon"
@@ -43,7 +43,12 @@ import {
 import { useProviders } from "@/hooks/use-providers"
 import { getSessionContextMetrics, type Context as SessionContextMetricsContext } from "@/components/session/session-context-metrics"
 import { AGENT_REVIEW_OPEN_EVENT, createAgentTurnDiffSummary } from "@/components/agent-turn-diff-summary"
-
+import {
+  buildAgentTimelineOrphanRows,
+  buildAgentTimelineTurnRows,
+  reuseAgentTimelineRows,
+  type AgentTimelineRow,
+} from "@/components/agent-timeline-rows"
 
 interface AgentViewProps {
   sessionId: string
@@ -553,11 +558,6 @@ function AgentViewInner(props: AgentViewProps) {
   let scrollGestureAt = 0
   let touchY: number | undefined
   const composerState = createSessionComposerState({ closeMs: 320 })
-  const autoScroll = createAutoScroll({
-    working: () => true,
-    overflowAnchor: "dynamic",
-    onUserInteracted: () => scheduleJumpStateUpdate(),
-  })
 
   // props.sessionId is ALWAYS the authoritative source. params.id lags behind
   // because the MemoryRouter updates asynchronously. If params.id were checked
@@ -612,6 +612,11 @@ function AgentViewInner(props: AgentViewProps) {
   })
   const status = createMemo(() => statusInfo().type)
   const working = createMemo(() => status() !== "idle")
+  const autoScroll = createAutoScroll({
+    working,
+    overflowAnchor: "dynamic",
+    onUserInteracted: () => scheduleJumpStateUpdate(),
+  })
   const [thinkingNow, setThinkingNow] = createSignal(Date.now())
   createEffect(() => {
     if (!working()) return
@@ -631,7 +636,11 @@ function AgentViewInner(props: AgentViewProps) {
   })
   const [newSessionTitleIndexes, setNewSessionTitleIndexes] = createSignal<Record<string, number>>({})
   const pickNewSessionTitleIndex = () => Math.floor(Math.random() * NEW_SESSION_TITLE_KEYS.length)
-  const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
+  const userMessages = createMemo(() =>
+    messages().filter((message): message is Extract<ChatMessage, { role: "user" }> => message.role === "user"),
+  )
+  const latestUserMessageID = createMemo(() => userMessages().at(-1)?.id)
+  const messageByID = createMemo(() => new Map(messages().map((message) => [message.id, message] as const)))
   const sessionID = createMemo(() => activeSessionId() ?? "")
   const renameValueTrimmed = createMemo(() => renameValue().trim())
   const canRename = createMemo(() => {
@@ -650,8 +659,36 @@ function AgentViewInner(props: AgentViewProps) {
     }
     return grouped
   })
-  const orphanMessages = createMemo(() =>
-    messages().filter((message) => message.role !== "user" && (!("parentID" in message) || !message.parentID)),
+  const timelineTurnMemos = createMemo(
+    mapArray(userMessages, (message, index) =>
+      createMemo((previous: AgentTimelineRow[] | undefined) =>
+        reuseAgentTimelineRows(
+          previous,
+          buildAgentTimelineTurnRows({
+            userMessage: message,
+            assistantMessages: (assistantByParent().get(message.id) ?? []) as Extract<
+              ChatMessage,
+              { role: "assistant" }
+            >[],
+            getParts,
+            status: statusInfo(),
+            sessionError: message.id === latestUserMessageID() ? sessionEventError() : undefined,
+            active: working() && message.id === latestUserMessageID(),
+            previousUserMessage: index() > 0,
+            showReasoningSummaries: true,
+          }),
+        ),
+      ),
+    ),
+  )
+  const orphanRows = createMemo((previous: AgentTimelineRow[] | undefined) =>
+    reuseAgentTimelineRows(previous, buildAgentTimelineOrphanRows(messages())),
+  )
+  const timelineRows = createMemo((previous: AgentTimelineRow[] | undefined) =>
+    reuseAgentTimelineRows(
+      previous,
+      [...timelineTurnMemos().flatMap((memo) => memo()), ...orphanRows()],
+    ),
   )
   const sessionContentLoading = createMemo(() => Boolean(activeSessionId() && messageState() === undefined))
   const isNewSession = createMemo(() => !sessionContentLoading() && messages().length === 0)
@@ -1164,6 +1201,177 @@ function AgentViewInner(props: AgentViewProps) {
 
   const FilePreview = (fileProps: any) => <ShobFile {...fileProps} />
 
+  const renderTimelineRow = (row: AgentTimelineRow) => {
+    switch (row.type) {
+      case "user": {
+        const message = createMemo(() => messageByID().get(row.userMessageID))
+        return (
+          <Show when={message()}>
+            {(message) => (
+              <div
+                id={`message-${row.userMessageID}`}
+                data-message-id={row.userMessageID}
+                data-timeline-row="UserMessage"
+                class="agent-terminal-turn min-w-0 w-full max-w-full md:mx-auto md:max-w-[736px] 2xl:max-w-[736px]"
+                classList={{ "pt-6": row.previousUserMessage }}
+              >
+                <div data-component="session-turn" class="relative min-w-0 w-full">
+                  <div data-slot="session-turn-message-container" class="w-full">
+                    <div data-slot="session-turn-message-content" aria-live="off">
+                      <Message message={message()} parts={getParts(row.userMessageID)} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Show>
+        )
+      }
+      case "assistant-part": {
+        const assistants = createMemo(() => assistantByParent().get(row.userMessageID) ?? [])
+        const userMessage = createMemo(() => messageByID().get(row.userMessageID))
+        const showCopy = createMemo(() => !working() && row.userMessageID === latestUserMessageID())
+        return (
+          <Show when={userMessage()}>
+            {(message) => (
+              <div
+                data-message-id={row.userMessageID}
+                data-timeline-row="AssistantPart"
+                data-active={row.active ? "true" : undefined}
+                class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3"
+              >
+                <div data-component="session-turn" class="relative min-w-0 w-full">
+                  <div data-slot="session-turn-message-container" class="w-full">
+                    <div data-slot="session-turn-assistant-content" aria-hidden={working() && row.active}>
+                      <AssistantPartGroupView
+                        group={row.group}
+                        messages={assistants() as any}
+                        turnDurationMs={turnDurationMs(message(), assistants())}
+                        showAssistantCopyPartID={assistantCopyPartID(assistants(), showCopy())}
+                        generating={working() && row.active && row.lastAssistantPart}
+                        shellToolDefaultOpen={settings.general.shellToolPartsExpanded()}
+                        editToolDefaultOpen={settings.general.editToolPartsExpanded()}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Show>
+        )
+      }
+      case "thinking": {
+        const message = createMemo(() => messageByID().get(row.userMessageID))
+        const assistants = createMemo(() => assistantByParent().get(row.userMessageID) ?? [])
+        const thinkingLabel = createMemo(() =>
+          getAssistantActivityLabel({
+            messages: assistants(),
+            getParts,
+            t: (key, params) => language.t(key as any, params),
+          }),
+        )
+        const thinkingElapsed = createMemo(() => {
+          const user = message()
+          if (!user) return ""
+          const firstAssistant = assistants()[0]
+          const start = (firstAssistant && timeValue(firstAssistant, "created")) ?? timeValue(user, "created")
+          if (start === undefined) return ""
+          return formatThinkingElapsed(Math.max(0, thinkingNow() - start))
+        })
+        return (
+          <div
+            data-message-id={row.userMessageID}
+            data-timeline-row="Thinking"
+            data-active="true"
+            class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3"
+          >
+            <div data-component="session-turn" class="relative min-w-0 w-full">
+              <div data-slot="session-turn-message-container" class="w-full">
+                <div data-slot="session-turn-thinking" class="pl-2">
+                  <TextShimmer text={thinkingLabel()} class="session-turn-thinking-label" />
+                  <Show when={thinkingElapsed()}>
+                    <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
+                  </Show>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      case "retry":
+        return (
+          <div
+            data-message-id={row.userMessageID}
+            data-timeline-row="Retry"
+            data-active="true"
+            class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3"
+          >
+            <div data-component="session-turn" class="relative min-w-0 w-full">
+              <div data-slot="session-turn-message-container" class="w-full">
+                <SessionRetry status={statusInfo()} show={true} />
+              </div>
+            </div>
+          </div>
+        )
+      case "error":
+        return (
+          <div
+            data-message-id={row.userMessageID}
+            data-timeline-row="Error"
+            data-active="true"
+            class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3"
+          >
+            <div data-component="session-turn" class="relative min-w-0 w-full">
+              <div data-slot="session-turn-message-container" class="w-full">
+                <AgentTurnError error={row.error} />
+              </div>
+            </div>
+          </div>
+        )
+      case "diff-summary": {
+        const message = createMemo(() => messageByID().get(row.userMessageID))
+        return (
+          <Show when={message()}>
+            {(message) => (
+              <div
+                data-message-id={row.userMessageID}
+                data-timeline-row="DiffSummary"
+                class="agent-terminal-diff-summary min-w-0 w-full max-w-full pt-3"
+              >
+                <AgentTurnDiffSummaryCard message={message()} />
+              </div>
+            )}
+          </Show>
+        )
+      }
+      case "orphan-assistant": {
+        const message = createMemo(() => messageByID().get(row.messageID))
+        return (
+          <Show when={message()}>
+            {(message) => (
+              <div
+                data-message-id={row.messageID}
+                data-timeline-row="OrphanAssistant"
+                class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-[736px] 2xl:max-w-[736px]"
+              >
+                <div data-component="session-turn" class="relative min-w-0 w-full">
+                  <div data-slot="session-turn-message-container" class="w-full">
+                    <div data-slot="session-turn-assistant-content">
+                      <Message message={message()} parts={getParts(row.messageID)} showReasoningSummaries={true} />
+                    </div>
+                    <Show when={assistantMessageError(message())} keyed>
+                      {(error) => <AgentTurnError error={error} />}
+                    </Show>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Show>
+        )
+    }
+  }
+  }
+
   const syncSessionIntoProject = async (targetSessionID: string) => {
     const project = currentProject()
     if (!project) return false
@@ -1447,137 +1655,7 @@ function AgentViewInner(props: AgentViewProps) {
                     </div>
                   </Show>
 
-                  <For each={userMessages()}>
-                    {(message, index) => {
-                      const assistants = createMemo(() => assistantByParent().get(message.id) ?? [])
-                      const latestTurn = createMemo(() => index() === userMessages().length - 1)
-                      const assistantError = createMemo(() => {
-                        for (const msg of assistants()) {
-                          const error = assistantMessageError(msg)
-                          if (error) return error
-                        }
-                      })
-                      const turnError = createMemo(() => assistantError() ?? (latestTurn() ? sessionEventError() : undefined))
-                      const showAssistantBlock = createMemo(
-                        () => assistants().length > 0 || !!turnError() || (latestTurn() && statusInfo().type === "retry"),
-                      )
-                      const showThinking = createMemo(
-                        () => working() && latestTurn() && !turnError() && statusInfo().type !== "retry",
-                      )
-                      const thinkingLabel = createMemo(() =>
-                        getAssistantActivityLabel({
-                          messages: assistants(),
-                          getParts,
-                          t: (key, params) => language.t(key as any, params),
-                        }),
-                      )
-                      const thinkingElapsed = createMemo(() => {
-                        if (!showThinking()) return ""
-                        const firstAssistant = assistants()[0]
-                        const start = (firstAssistant && timeValue(firstAssistant, "created")) ?? timeValue(message, "created")
-                        if (start === undefined) return ""
-                        return formatThinkingElapsed(Math.max(0, thinkingNow() - start))
-                      })
-                      const showDiffSummary = createMemo(
-                        () => createAgentTurnDiffSummary(messageSummaryDiffs(message)).count > 0 && (!latestTurn() || !working()),
-                      )
-
-                      return (
-                        <div
-                          id={`message-${message.id}`}
-                          data-message-id={message.id}
-                          data-timeline-row="UserMessage"
-                          class="agent-terminal-turn min-w-0 w-full max-w-full md:mx-auto md:max-w-[736px] 2xl:max-w-[736px]"
-                          classList={{ "pt-6": index() > 0 }}
-                        >
-                          <div data-component="session-turn" class="relative min-w-0 w-full">
-                            <div data-slot="session-turn-message-container" class="w-full">
-                              <div data-slot="session-turn-message-content" aria-live="off">
-                                <Message message={message} parts={getParts(message.id)} />
-                              </div>
-                            </div>
-                          </div>
-
-                          <Show when={showAssistantBlock()}>
-                            <div
-                              data-message-id={message.id}
-                              data-timeline-row="AssistantPart"
-                              class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3"
-                            >
-                              <div data-component="session-turn" class="relative min-w-0 w-full">
-                                <div data-slot="session-turn-message-container" class="w-full">
-                                  <Show when={assistants().length > 0}>
-                                    <div
-                                      data-slot="session-turn-assistant-content"
-                                      aria-hidden={working() && latestTurn()}
-                                    >
-                                      <AssistantParts
-                                        messages={assistants() as any}
-                                        showReasoningSummaries={true}
-                                        working={working() && latestTurn()}
-                                        turnDurationMs={turnDurationMs(message, assistants())}
-                                        showAssistantCopyPartID={assistantCopyPartID(assistants(), !working() && latestTurn())}
-                                        shellToolDefaultOpen={settings.general.shellToolPartsExpanded()}
-                                        editToolDefaultOpen={settings.general.editToolPartsExpanded()}
-                                      />
-                                    </div>
-                                  </Show>
-                                  <Show when={latestTurn()}>
-                                    <SessionRetry status={statusInfo()} show={!turnError()} />
-                                  </Show>
-                                  <Show when={turnError()} keyed>
-                                    {(error) => <AgentTurnError error={error} />}
-                                  </Show>
-                                </div>
-                              </div>
-                            </div>
-                          </Show>
-
-                          <Show when={showDiffSummary()}>
-                            <div class="agent-terminal-diff-summary min-w-0 w-full max-w-full pt-3">
-                              <AgentTurnDiffSummaryCard message={message} />
-                            </div>
-                          </Show>
-
-                          <Show when={showThinking()}>
-                            <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3">
-                              <div data-component="session-turn" class="relative min-w-0 w-full">
-                                <div data-slot="session-turn-message-container" class="w-full">
-                                  <div data-slot="session-turn-thinking" class="pl-2">
-                                    <TextShimmer text={thinkingLabel()} class="session-turn-thinking-label" />
-                                    <Show when={thinkingElapsed()}>
-                                      <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
-                                    </Show>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </Show>
-                        </div>
-                      )
-                    }}
-                  </For>
-
-                  <For each={orphanMessages()}>
-                    {(message) => (
-                      <div class="agent-terminal-assistant min-w-0 w-full max-w-full pt-3 md:mx-auto md:max-w-[736px] 2xl:max-w-[736px]">
-                        <div data-component="session-turn" class="relative min-w-0 w-full">
-                          <div data-slot="session-turn-message-container" class="w-full">
-                            <div data-slot="session-turn-assistant-content">
-                              <Message
-                                message={message}
-                                parts={getParts(message.id)}
-                                showReasoningSummaries={true}
-                              />
-                            </div>
-                            <Show when={assistantMessageError(message)} keyed>
-                              {(error) => <AgentTurnError error={error} />}
-                            </Show>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </For>
+                  <For each={timelineRows()}>{(row) => renderTimelineRow(row)}</For>
 
                 </div>
                     </>

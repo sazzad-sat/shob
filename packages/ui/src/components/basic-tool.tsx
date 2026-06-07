@@ -37,6 +37,7 @@ export interface BasicToolProps {
   durationMs?: number
   hideDetails?: boolean
   defaultOpen?: boolean
+  autoOpenOnPending?: boolean
   forceOpen?: boolean
   defer?: boolean
   locked?: boolean
@@ -106,7 +107,7 @@ export function BasicTool(props: BasicToolProps) {
       (active) => {
         if (active) {
           if (!seen()) setState("seen", true)
-          if (!open()) setState("open", true)
+          if ((props.autoOpenOnPending ?? true) && !open()) setState("open", true)
         }
       },
       { defer: true },

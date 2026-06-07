@@ -33,10 +33,12 @@ const config = {
   SANITIZE_NAMED_PROPS: true,
   FORBID_TAGS: ["style"],
   FORBID_CONTENTS: ["style", "script"],
+  ADD_TAGS: ["svg", "path"],
+  ADD_ATTR: ["d", "viewBox", "preserveAspectRatio", "xmlns", "target"],
 }
 
 const iconPaths = {
-  copy: '<path fill-rule="evenodd" clip-rule="evenodd" d="M1 9.50006C1 10.3285 1.67157 11.0001 2.5 11.0001H4L4 10.0001H2.5C2.22386 10.0001 2 9.7762 2 9.50006L2 2.50006C2 2.22392 2.22386 2.00006 2.5 2.00006L9.5 2.00006C9.77614 2.00006 10 2.22392 10 2.50006V4.00002H5.5C4.67158 4.00002 4 4.67159 4 5.50002V12.5C4 13.3284 4.67158 14 5.5 14H12.5C13.3284 14 14 13.3284 14 12.5V5.50002C14 4.67159 13.3284 4.00002 12.5 4.00002H11V2.50006C11 1.67163 10.3284 1.00006 9.5 1.00006H2.5C1.67157 1.00006 1 1.67163 1 2.50006V9.50006ZM5 5.50002C5 5.22388 5.22386 5.00002 5.5 5.00002H12.5C12.7761 5.00002 13 5.22388 13 5.50002V12.5C13 12.7762 12.7761 13 12.5 13H5.5C5.22386 13 5 12.7762 5 12.5V5.50002Z" fill="currentColor"/>',
+  copy: '<path d="M6.2513 6.24935V2.91602H17.0846V13.7493H13.7513M13.7513 6.24935V17.0827H2.91797V6.24935H13.7513Z" stroke="currentColor" stroke-linecap="round"/>',
   check: '<path d="M5 11.9657L8.37838 14.7529L15 5.83398" stroke="currentColor" stroke-linecap="square"/>',
 }
 
@@ -65,48 +67,6 @@ type CopyLabels = {
 
 const urlPattern = /^https?:\/\/[^\s<>()`"']+$/
 
-export type MarkdownFileReferenceSegment = {
-  text: string
-  file: boolean
-}
-
-export type MarkdownFileReference = {
-  text: string
-  path: string
-}
-
-const fileReferencePattern =
-  /(^|[\s([{"'“‘])((?:(?:[A-Za-z]:[\\/])|(?:(?:\.{1,2}|[A-Za-z0-9_@+$~.-]+)[\\/]))(?:[A-Za-z0-9_@+$~.[\](){}-]+[\\/])*[A-Za-z0-9_@+$~.[\](){}-]*[A-Za-z0-9_@+$~[\](){}-]\.[A-Za-z0-9]{1,12}(?::\d+)?(?:\s+\((?:line|lines)\s+\d+(?:[-–]\d+)?\))?)/gi
-
-const inlineFilenameReferencePattern =
-  /^[A-Za-z0-9_@+$~[\](){}-][A-Za-z0-9_@+$~.[\](){}-]*\.[A-Za-z][A-Za-z0-9]{0,11}(?::\d+)?(?:\s+\((?:line|lines)\s+\d+(?:[-–]\d+)?\))?$/i
-
-export function splitMarkdownFileReferences(text: string): MarkdownFileReferenceSegment[] {
-  const segments: MarkdownFileReferenceSegment[] = []
-  let cursor = 0
-  fileReferencePattern.lastIndex = 0
-
-  for (const match of text.matchAll(fileReferencePattern)) {
-    const prefix = match[1] ?? ""
-    const reference = match[2] ?? ""
-    const start = match.index ?? 0
-    const referenceStart = start + prefix.length
-    const referenceEnd = referenceStart + reference.length
-
-    if (referenceStart > cursor) {
-      segments.push({ text: text.slice(cursor, referenceStart), file: false })
-    }
-    segments.push({ text: reference, file: true })
-    cursor = referenceEnd
-  }
-
-  if (cursor < text.length) {
-    segments.push({ text: text.slice(cursor), file: false })
-  }
-
-  return segments
-}
-
 function codeUrl(text: string) {
   const href = text.trim().replace(/[),.;!?]+$/, "")
   if (!urlPattern.test(href)) return
@@ -126,7 +86,7 @@ function createIcon(path: string, slot: string) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
   svg.setAttribute("data-slot", "icon-svg")
   svg.setAttribute("fill", "none")
-  svg.setAttribute("viewBox", slot === "copy-icon" ? "0 0 15 15" : "0 0 20 20")
+  svg.setAttribute("viewBox", "0 0 20 20")
   svg.setAttribute("aria-hidden", "true")
   svg.innerHTML = path
   icon.appendChild(svg)
@@ -144,7 +104,15 @@ function createCopyButton(labels: CopyLabels) {
   button.setAttribute("data-tooltip", labels.copy)
   button.appendChild(createIcon(iconPaths.copy, "copy-icon"))
   button.appendChild(createIcon(iconPaths.check, "check-icon"))
+  setCopyState(button, labels, false)
   return button
+}
+
+function setIconHidden(button: HTMLButtonElement, slot: "copy-icon" | "check-icon", hidden: boolean) {
+  const icon = button.querySelector(`[data-slot="${slot}"]`)
+  if (!(icon instanceof HTMLElement)) return
+  icon.hidden = hidden
+  icon.setAttribute("aria-hidden", hidden ? "true" : "false")
 }
 
 function setCopyState(button: HTMLButtonElement, labels: CopyLabels, copied: boolean) {
@@ -152,11 +120,15 @@ function setCopyState(button: HTMLButtonElement, labels: CopyLabels, copied: boo
     button.setAttribute("data-copied", "true")
     button.setAttribute("aria-label", labels.copied)
     button.setAttribute("data-tooltip", labels.copied)
+    setIconHidden(button, "copy-icon", true)
+    setIconHidden(button, "check-icon", false)
     return
   }
   button.removeAttribute("data-copied")
   button.setAttribute("aria-label", labels.copy)
   button.setAttribute("data-tooltip", labels.copy)
+  setIconHidden(button, "copy-icon", false)
+  setIconHidden(button, "check-icon", true)
 }
 
 function ensureCodeWrapper(block: HTMLPreElement, labels: CopyLabels) {
@@ -215,110 +187,12 @@ function markCodeLinks(root: HTMLDivElement) {
   }
 }
 
-function fileReferencePath(reference: string) {
-  return reference
-    .replace(/\s+\((?:line|lines)\s+\d+(?:[-–]\d+)?\)$/i, "")
-    .replace(/:\d+$/, "")
-}
-
-export function markdownInlineCodeFileReference(text: string): MarkdownFileReference | undefined {
-  const reference = text.trim()
-  if (!reference || codeUrl(reference)) return
-
-  const segments = splitMarkdownFileReferences(` ${reference}`)
-  const matchedReference = segments[1]
-  if (
-    segments.length === 2 &&
-    segments[0]?.text === " " &&
-    matchedReference?.file &&
-    matchedReference.text === reference
-  ) {
-    return { text: reference, path: fileReferencePath(reference) }
-  }
-
-  if (inlineFilenameReferencePattern.test(reference)) {
-    return { text: reference, path: fileReferencePath(reference) }
-  }
-}
-
-function markInlineCodeFileReference(code: Element) {
-  const reference = markdownInlineCodeFileReference(code.textContent ?? "")
-  if (!reference) {
-    if (code.getAttribute("data-component") === "markdown-file-reference") {
-      code.removeAttribute("data-component")
-      code.removeAttribute("data-path")
-      code.removeAttribute("title")
-    }
-    return
-  }
-
-  code.setAttribute("data-component", "markdown-file-reference")
-  code.setAttribute("data-path", reference.path)
-  code.setAttribute("title", reference.text)
-}
-
-function skipFileReferenceNode(node: Text) {
-  let parent = node.parentElement
-  while (parent) {
-    if (
-      parent.matches(
-        'a, button, code, pre, kbd, samp, textarea, [data-component="markdown-code"], [data-component="markdown-file-reference"]',
-      )
-    ) {
-      return true
-    }
-    parent = parent.parentElement
-  }
-  return false
-}
-
-function markFileReferences(root: HTMLDivElement) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => {
-      if (!(node instanceof Text)) return NodeFilter.FILTER_REJECT
-      if (!node.nodeValue?.trim()) return NodeFilter.FILTER_REJECT
-      if (skipFileReferenceNode(node)) return NodeFilter.FILTER_REJECT
-      return NodeFilter.FILTER_ACCEPT
-    },
-  })
-
-  const nodes: Text[] = []
-  while (walker.nextNode()) {
-    if (walker.currentNode instanceof Text) nodes.push(walker.currentNode)
-  }
-
-  for (const node of nodes) {
-    const segments = splitMarkdownFileReferences(node.nodeValue ?? "")
-    if (!segments.some((segment) => segment.file)) continue
-
-    const fragment = document.createDocumentFragment()
-    for (const segment of segments) {
-      if (!segment.file) {
-        fragment.appendChild(document.createTextNode(segment.text))
-        continue
-      }
-
-      const span = document.createElement("span")
-      span.setAttribute("data-component", "markdown-file-reference")
-      span.setAttribute("data-path", fileReferencePath(segment.text))
-      span.title = segment.text
-      span.textContent = segment.text
-      fragment.appendChild(span)
-    }
-    node.parentNode?.replaceChild(fragment, node)
-  }
-}
-
 function decorate(root: HTMLDivElement, labels: CopyLabels) {
   const blocks = Array.from(root.querySelectorAll("pre"))
   for (const block of blocks) {
     ensureCodeWrapper(block, labels)
   }
   markCodeLinks(root)
-  for (const code of Array.from(root.querySelectorAll(":not(pre) > code"))) {
-    markInlineCodeFileReference(code)
-  }
-  markFileReferences(root)
 }
 
 function setupCodeCopy(root: HTMLDivElement, getLabels: () => CopyLabels) {
@@ -478,7 +352,7 @@ export function Markdown(
     <div
       data-component="markdown"
       classList={{
-        ...(local.classList ?? {}),
+        ...local.classList,
         [local.class ?? ""]: !!local.class,
       }}
       ref={setRoot}
