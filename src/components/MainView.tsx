@@ -403,7 +403,9 @@ export function MainView() {
 
   createEffect(() => {
     const handleReviewToggleRequest = () => {
-      setIsReviewVisible((current) => !current)
+      const nextVisible = !isReviewVisible()
+      setIsReviewVisible(nextVisible)
+      if (!nextVisible) setIsFileTreeVisible(false)
     }
 
     window.addEventListener('gg-toggle-review', handleReviewToggleRequest)

@@ -352,11 +352,11 @@ function queueErrorMessage(error: unknown) {
 
 function AgentHeaderPanelControls(props: { projectPath?: string }) {
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
-  const [isFileTreeVisible, setIsFileTreeVisible] = createSignal(false)
   const [isTerminalPanelOpen, setIsTerminalPanelOpen] = createSignal(false)
   const [openWithMenuOpen, setOpenWithMenuOpen] = createSignal(false)
   const [openingTarget, setOpeningTarget] = createSignal<OpenWithTarget | null>(null)
-  const reviewWorkspaceOpen = createMemo(() => isReviewVisible() || isFileTreeVisible())
+  const panelButtonClass =
+    "size-8 rounded-md border-0 bg-transparent px-0 text-text-weaker shadow-none transition-colors hover:bg-surface-raised-base/45 hover:text-text-base aria-pressed:bg-surface-raised-base/55 aria-pressed:text-text-base focus-visible:ring-2 focus-visible:ring-ring/35 active:not-aria-[haspopup]:translate-y-0"
 
   const openProjectWith = (target: OpenWithTarget) => {
     const projectPath = props.projectPath?.trim()
@@ -400,32 +400,26 @@ function AgentHeaderPanelControls(props: { projectPath?: string }) {
       const detail = (event as CustomEvent<{ isReviewVisible: boolean }>).detail
       if (detail) setIsReviewVisible(Boolean(detail.isReviewVisible))
     }
-    const handleFileTreeState = (event: Event) => {
-      const detail = (event as CustomEvent<{ isFileTreeVisible: boolean }>).detail
-      if (detail) setIsFileTreeVisible(Boolean(detail.isFileTreeVisible))
-    }
     const handleTerminalPanelState = (event: Event) => {
       const detail = (event as CustomEvent<{ isOpen: boolean }>).detail
       if (detail) setIsTerminalPanelOpen(Boolean(detail.isOpen))
     }
 
     window.addEventListener("gg-review-state", handleReviewState as EventListener)
-    window.addEventListener("gg-file-tree-state", handleFileTreeState as EventListener)
     window.addEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener)
 
     onCleanup(() => {
       window.removeEventListener("gg-review-state", handleReviewState as EventListener)
-      window.removeEventListener("gg-file-tree-state", handleFileTreeState as EventListener)
       window.removeEventListener("gg-terminal-panel-state", handleTerminalPanelState as EventListener)
     })
   })
 
   return (
-    <div class="flex shrink-0 items-center gap-1">
-      <div class="flex h-8 shrink-0 overflow-hidden rounded-lg border border-border-weak-base bg-surface-raised-base/70 shadow-sm backdrop-blur">
+    <div class="flex shrink-0 items-center gap-0">
+      <div class="flex h-9 shrink-0 overflow-hidden rounded-[14px] border border-border-weaker-base bg-background-stronger/95 shadow-sm backdrop-blur">
         <button
           type="button"
-          class="group/open-with flex h-8 w-9 items-center justify-center text-text-weak outline-none transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-60"
+          class="group/open-with flex h-9 w-9 items-center justify-center text-text-weak outline-none transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-60"
           title="Open in VS Code"
           aria-label="Open project in VS Code"
           disabled={Boolean(openingTarget())}
@@ -436,21 +430,20 @@ function AgentHeaderPanelControls(props: { projectPath?: string }) {
         >
           <Show
             when={openingTarget() === "vscode"}
-            fallback={<AppIcon id="vscode" class="size-[18px] shrink-0 transition-transform group-hover/open-with:scale-105" />}
+            fallback={<AppIcon id="vscode" class="size-[26px] shrink-0 transition-transform group-hover/open-with:scale-105" />}
           >
             <span class="size-3.5 rounded-full border border-text-weaker border-t-text-strong animate-spin" />
           </Show>
         </button>
-        <div class="my-1.5 w-px bg-border-weaker-base" />
         <DropdownMenu open={openWithMenuOpen()} onOpenChange={setOpenWithMenuOpen} placement="bottom-end" gutter={7}>
           <DropdownMenuTrigger
-            class="flex h-8 w-7 shrink-0 items-center justify-center text-text-weaker outline-none transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40 data-expanded:bg-surface-raised-base-hover data-expanded:text-text-strong disabled:pointer-events-none disabled:opacity-60"
+            class="-ml-2 flex h-9 w-6 shrink-0 items-center justify-center text-text-weaker outline-none transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40 data-expanded:bg-surface-raised-base-hover data-expanded:text-text-strong disabled:pointer-events-none disabled:opacity-60"
             title="Open with"
             aria-label="Choose app to open project"
             disabled={Boolean(openingTarget())}
             onClick={(event: MouseEvent) => event.stopPropagation()}
           >
-            <ChevronDown size={13} class="shrink-0" />
+            <ChevronDown size={17} strokeWidth={2.25} class="shrink-0" />
           </DropdownMenuTrigger>
           <DropdownMenuContent class="w-[228px] rounded-xl border border-border-weak-base bg-surface-raised-base/95 p-1.5 text-[13px] shadow-2xl backdrop-blur">
             <For each={openWithOptions}>
@@ -477,33 +470,23 @@ function AgentHeaderPanelControls(props: { projectPath?: string }) {
       </div>
       <Button
         variant="ghost"
-        class="size-8 rounded-lg border border-transparent px-0 text-text-weak hover:border-border-weaker-base hover:bg-surface-raised-base/70 hover:text-text-strong aria-pressed:border-border-weak-base aria-pressed:bg-surface-raised-base aria-pressed:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40"
+        class={panelButtonClass}
         onClick={() => window.dispatchEvent(new Event("gg-toggle-terminal-panel"))}
         title={isTerminalPanelOpen() ? "Hide terminal panel" : "Show terminal panel"}
         aria-label="Toggle terminal panel"
         aria-pressed={isTerminalPanelOpen()}
       >
-        <Icon name={isTerminalPanelOpen() ? "terminal-active" : "terminal"} size="small" />
+        <Icon name="panel-bottom" size="normal" />
       </Button>
       <Button
         variant="ghost"
-        class="size-8 rounded-lg border border-transparent px-0 text-text-weak hover:border-border-weaker-base hover:bg-surface-raised-base/70 hover:text-text-strong aria-pressed:border-border-weak-base aria-pressed:bg-surface-raised-base aria-pressed:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40"
-        onClick={() => window.dispatchEvent(new Event("gg-toggle-file-tree"))}
-        title={isFileTreeVisible() ? "Hide file tree" : "Show file tree"}
-        aria-label="Toggle file tree"
-        aria-pressed={isFileTreeVisible()}
+        class={panelButtonClass}
+        onClick={() => window.dispatchEvent(new Event("gg-toggle-review"))}
+        title={isReviewVisible() ? "Hide review panel" : "Show review panel"}
+        aria-label="Toggle review panel"
+        aria-pressed={isReviewVisible()}
       >
-        <Icon name={isFileTreeVisible() ? "file-tree-active" : "file-tree"} size="small" />
-      </Button>
-      <Button
-        variant="ghost"
-        class="size-8 rounded-lg border border-transparent px-0 text-text-weak hover:border-border-weaker-base hover:bg-surface-raised-base/70 hover:text-text-strong aria-pressed:border-border-weak-base aria-pressed:bg-surface-raised-base aria-pressed:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40"
-        onClick={() => window.dispatchEvent(new Event("gg-toggle-review-workspace"))}
-        title={reviewWorkspaceOpen() ? "Hide file tree and review panel" : "Show file tree and review panel"}
-        aria-label="Toggle review workspace"
-        aria-pressed={reviewWorkspaceOpen()}
-      >
-        <Icon name={reviewWorkspaceOpen() ? "review-active" : "review"} size="small" />
+        <Icon name="panel-right" size="normal" />
       </Button>
     </div>
   )

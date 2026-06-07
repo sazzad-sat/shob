@@ -25,6 +25,8 @@ const icons = {
   terminal: `<path d="M6.5 8L8.64286 10L6.5 12M10.9286 12H13.5M2 18H18V2H2V18Z" stroke="currentColor" stroke-linecap="square"/>`,
   "terminal-active": `<path d="M2 18H18V2H2V18Z" fill="currentColor" fill-opacity="0.1"/>
 <path d="M6.5 8L8.64286 10L6.5 12M10.9286 12H13.5M2 18H18V2H2V18Z" stroke="currentColor" stroke-linecap="square"/>`,
+  "panel-right": `<g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" transform="translate(3 3)"><path d="m2.5.5h10c1.1045695 0 2 .8954305 2 2v10c0 1.1045695-.8954305 2-2 2h-10c-1.1045695 0-2-.8954305-2-2v-10c0-1.1045695.8954305-2 2-2z"/><path d="m12.5 11.5v-8"/></g>`,
+  "panel-bottom": `<g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" transform="translate(3 3)"><path d="m2.5.5h10c1.1045695 0 2 .8954305 2 2v10c0 1.1045695-.8954305 2-2 2h-10c-1.1045695 0-2-.8954305-2-2v-10c0-1.1045695.8954305-2 2-2z"/><path d="m3.5 12.5h8"/></g>`,
   review: `<path d="M7 14.5H13M7 7.99512H10.0049M10.0049 7.99512H13M10.0049 7.99512V5M10.0049 7.99512V11M18 18V2L2 2L2 18H18Z" stroke="currentColor"/>`,
   "review-active": `<path d="M18 18V2L2 2L2 18H18Z" fill="currentColor" fill-opacity="0.1"/>
 <path d="M7 14.5H13M7 7.99512H10.0049M10.0049 7.99512H13M10.0049 7.99512V5M10.0049 7.99512V11M18 18V2L2 2L2 18H18Z" stroke="currentColor"/>`,
@@ -119,9 +121,11 @@ export function Icon(props: IconProps) {
       ? "0 0 16 16"
       : local.name === "new-session" || local.name === "new-session-active"
         ? "0 0 24 24"
-        : local.name === "copy"
-          ? "0 0 15 15"
-          : "0 0 20 20"
+        : local.name === "panel-right" || local.name === "panel-bottom"
+          ? "0 0 21 21"
+          : local.name === "copy"
+            ? "0 0 15 15"
+            : "0 0 20 20"
   return (
     <div data-component="icon" data-size={local.size || "normal"}>
       <svg

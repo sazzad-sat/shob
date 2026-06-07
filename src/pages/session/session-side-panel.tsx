@@ -240,7 +240,19 @@ export function SessionSidePanel(props: SidePanelProps) {
                         </Tabs.Trigger>
                       )}
                     </For>
-                    <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center pr-3">
+                    <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center gap-1 pr-3">
+                      <Tooltip value={props.fileTreeOpen() ? "Hide file tree" : "Show file tree"} placement="bottom">
+                        <IconButton
+                          icon={props.fileTreeOpen() ? "file-tree-active" : "file-tree"}
+                          variant="ghost"
+                          iconSize="small"
+                          class="!rounded-md"
+                          aria-label="Toggle file tree"
+                          aria-pressed={props.fileTreeOpen()}
+                          data-selected={props.fileTreeOpen() ? "" : undefined}
+                          onClick={() => window.dispatchEvent(new Event("gg-toggle-file-tree"))}
+                        />
+                      </Tooltip>
                       <Tooltip value={language.t("session.tab.add")} placement="bottom">
                         <IconButton
                           icon="plus-small"
