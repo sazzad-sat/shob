@@ -8,12 +8,23 @@ const __dirname = path.dirname(__filename);
 
 export const WINDOWS_APP_ID = app.isPackaged ? "app.shob.desktop" : "app.shob.desktop.dev";
 
+function firstExisting(candidates: string[]) {
+  for (const candidate of candidates) {
+    if (fsSync.existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+function iconCandidates(base: string, name: string, fallbackExts: string[]) {
+  return fallbackExts.map((ext) => path.join(base, `${name}${ext}`));
+}
+
 export function resolveAppIconPath(platform: NodeJS.Platform = process.platform) {
   const preferredExt =
     platform === "win32" ? ".ico" :
     platform === "darwin" ? ".icns" :
     ".png";
-  const fallbackExts = [preferredExt, ".png", ".ico", ".icns"];
+  const fallbackExts = Array.from(new Set([preferredExt, ".png", ".ico", ".icns"]));
   const bases = app.isPackaged
     ? [
         path.join(process.resourcesPath, "electron", "icons"),
@@ -24,13 +35,16 @@ export function resolveAppIconPath(platform: NodeJS.Platform = process.platform)
         path.join(process.resourcesPath, "electron", "icons"),
       ];
   const candidates: string[] = [];
+  if (!app.isPackaged) {
+    candidates.push(
+      ...iconCandidates(path.join(__dirname, "..", "electron", "dev-icons"), "olova-dev", fallbackExts),
+      ...iconCandidates(path.join(__dirname, "..", "src", "assets", "icon"), "olova-dev", fallbackExts),
+    );
+  }
   for (const base of bases) {
-    for (const ext of fallbackExts) candidates.push(path.join(base, `icon${ext}`));
+    candidates.push(...iconCandidates(base, "icon", fallbackExts));
   }
-  for (const candidate of candidates) {
-    if (fsSync.existsSync(candidate)) return candidate;
-  }
-  return undefined;
+  return firstExisting(candidates);
 }
 
 export function applyWindowsAppIdentity() {
@@ -55,6 +69,12 @@ export function applyWindowIcon(mainWindow: BrowserWindow) {
   if (process.platform === "win32") {
     mainWindow.setAppDetails({
       appId: WINDOWS_APP_ID,
+      ...(appIconPath && path.extname(appIconPath).toLowerCase() === ".ico"
+        ? {
+            appIconPath,
+            appIconIndex: 0,
+          }
+        : {}),
       relaunchDisplayName: "shob",
     });
   }

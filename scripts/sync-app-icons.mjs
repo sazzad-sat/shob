@@ -9,10 +9,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 
 const sourceIcon = path.join(rootDir, "src", "assets", "icon", "shob.png");
+const devSourceIcon = path.join(rootDir, "src", "assets", "icon", "olova-dev.png");
 const iconDir = path.join(rootDir, "electron", "icons");
+const devIconDir = path.join(rootDir, "electron", "dev-icons");
 const iconPng = path.join(iconDir, "icon.png");
 const iconIco = path.join(iconDir, "icon.ico");
 const iconIcns = path.join(iconDir, "icon.icns");
+const devIconPng = path.join(devIconDir, "olova-dev.png");
+const devIconIco = path.join(devIconDir, "olova-dev.ico");
 
 async function ensureSourceIcon() {
   if (!fsSync.existsSync(sourceIcon)) {
@@ -28,6 +32,17 @@ async function syncPng() {
 async function syncIco() {
   const ico = await pngToIco(sourceIcon);
   await fs.writeFile(iconIco, ico);
+}
+
+async function syncDevTaskbarIcon() {
+  if (!fsSync.existsSync(devSourceIcon)) {
+    console.warn(`[icons] dev taskbar icon not found: ${devSourceIcon}`);
+    return;
+  }
+  await fs.mkdir(devIconDir, { recursive: true });
+  await fs.copyFile(devSourceIcon, devIconPng);
+  const ico = await pngToIco(devSourceIcon);
+  await fs.writeFile(devIconIco, ico);
 }
 
 async function syncIcns() {
@@ -66,6 +81,7 @@ async function main() {
   await syncPng();
   await syncIco();
   await syncIcns();
+  await syncDevTaskbarIcon();
   console.log("[icons] synced app icons from src/assets/icon/shob.png");
 }
 
