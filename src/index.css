@@ -1623,8 +1623,9 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
 .agent-terminal-buffer > .agent-terminal-turn,
 .agent-terminal-buffer > .agent-terminal-assistant {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 220px;
+  /* Keep real row heights available so browser scroll anchoring stays stable in long chats. */
+  content-visibility: visible;
+  contain-intrinsic-size: none;
 }
 
 .agent-terminal-buffer > .agent-terminal-assistant[data-active="true"] {
@@ -1675,6 +1676,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-view [data-component="assistant-message"] {
+  content-visibility: visible;
   gap: 12px;
   color: var(--terminal-agent-muted);
 }
