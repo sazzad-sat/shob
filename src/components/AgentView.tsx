@@ -48,6 +48,7 @@ import {
   reuseAgentTimelineRows,
   type AgentTimelineRow,
 } from "@/components/agent-timeline-rows"
+import shobLogo from "@/assets/icon/shob.png"
 
 interface AgentViewProps {
   sessionId: string
@@ -1263,6 +1264,7 @@ function AgentViewInner(props: AgentViewProps) {
             <div data-component="session-turn" class="relative min-w-0 w-full">
               <div data-slot="session-turn-message-container" class="w-full">
                 <div data-slot="session-turn-thinking" class="pl-2">
+                  <img data-slot="session-turn-thinking-logo" src={shobLogo} alt="" aria-hidden="true" />
                   <TextShimmer text={thinkingLabel()} class="session-turn-thinking-label" />
                   <Show when={thinkingElapsed()}>
                     <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
