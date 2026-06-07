@@ -5,6 +5,11 @@ import {
   type AssistantPartEntry,
   type AssistantPartGroup,
 } from "../../packages/ui/src/components/message-part-order"
+import {
+  activityKindForVisibleParts,
+  activityTitleForVisibleParts,
+  type ActivityKind,
+} from "../../packages/ui/src/components/session-activity"
 
 type UserMessage = Extract<Message, { role: "user" }>
 
@@ -39,6 +44,8 @@ export type AgentTimelineRow =
       type: "thinking"
       key: string
       userMessageID: string
+      activityKind: ActivityKind
+      activityTitle: string
     }
   | {
       type: "retry"
@@ -92,6 +99,12 @@ export function sameAgentTimelineRow(a: AgentTimelineRow, b: AgentTimelineRow) {
         sameGroup(a.group, b.group)
       )
     case "thinking":
+      return (
+        b.type === "thinking" &&
+        a.userMessageID === b.userMessageID &&
+        a.activityKind === b.activityKind &&
+        a.activityTitle === b.activityTitle
+      )
     case "retry":
     case "diff-summary":
       return b.type === a.type && a.userMessageID === b.userMessageID
@@ -199,6 +212,7 @@ export function buildAgentTimelineTurnRows(input: BuildAgentTimelineTurnRowsInpu
     showReasoningSummaries,
   })
   const visibleEntries = orderAssistantDisplayParts(entries, { live: input.active })
+  const visibleParts = visibleEntries.map((entry) => entry.part)
   const groups = groupAssistantDisplayParts(entries, isContextPart, { live: input.active })
   const rows: AgentTimelineRow[] = [
     {
@@ -221,11 +235,13 @@ export function buildAgentTimelineTurnRows(input: BuildAgentTimelineTurnRowsInpu
     })
   })
 
-  if (input.active && input.status.type !== "retry" && !error && visibleEntries.length === 0) {
+  if (input.active && input.status.type !== "retry" && !error) {
     rows.push({
       type: "thinking",
       key: `thinking:${input.userMessage.id}`,
       userMessageID: input.userMessage.id,
+      activityKind: activityKindForVisibleParts(visibleParts),
+      activityTitle: activityTitleForVisibleParts(visibleParts),
     })
   }
 

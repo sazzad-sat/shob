@@ -63,13 +63,18 @@ function reasoning(id: string, finished = true): Part {
   } as Part
 }
 
-function tool(id: string, status: "pending" | "running" | "completed" | "error" = "completed"): Part {
+function tool(
+  id: string,
+  status: "pending" | "running" | "completed" | "error" = "completed",
+  toolName = "read",
+  input: Record<string, unknown> = {},
+): Part {
   const base = {
     id,
     sessionID,
     messageID: assistantID,
     type: "tool",
-    tool: "read",
+    tool: toolName,
     callID: id,
   }
   return {
@@ -79,7 +84,7 @@ function tool(id: string, status: "pending" | "running" | "completed" | "error" 
         ? { status, input: {}, error: "failed", time: { start: 1, end: 2 } }
         : {
             status,
-            input: {},
+            input,
             output: status === "completed" ? "" : undefined,
             time: status === "completed" ? { start: 1, end: 2 } : { start: 1 },
           },
@@ -109,11 +114,21 @@ function assistantPartIDs(result: ReturnType<typeof rows>) {
     .flatMap((row) => (row.group.type === "part" ? [row.group.ref.partID] : row.group.refs.map((ref) => ref.partID)))
 }
 
+function thinkingActivity(result: ReturnType<typeof rows>) {
+  const row = result.find((item) => item.type === "thinking")
+  return row?.type === "thinking" ? row.activityKind : undefined
+}
+
+function thinkingTitle(result: ReturnType<typeof rows>) {
+  const row = result.find((item) => item.type === "thinking")
+  return row?.type === "thinking" ? row.activityTitle : undefined
+}
+
 describe("agent timeline rows", () => {
   test("live unfinished reasoning hides later tool and text rows", () => {
     const result = rows({ parts: [reasoning("reasoning_1", false), tool("tool_1", "running"), text("text_1", false)] })
 
-    expect(result.map((row) => row.type)).toEqual(["user", "assistant-part"])
+    expect(result.map((row) => row.type)).toEqual(["user", "assistant-part", "thinking"])
     expect(assistantPartIDs(result)).toEqual(["reasoning_1"])
   })
 
@@ -126,16 +141,52 @@ describe("agent timeline rows", () => {
   test("running tool hides later text", () => {
     const result = rows({ parts: [tool("tool_1", "running"), text("text_1", false)] })
 
-    expect(result.map((row) => row.type)).toEqual(["user", "assistant-part"])
+    expect(result.map((row) => row.type)).toEqual(["user", "assistant-part", "thinking"])
     expect(assistantPartIDs(result)).toEqual(["tool_1"])
   })
 
-  test("thinking row appears only before assistant content exists", () => {
+  test("thinking row stays visible for the active busy turn", () => {
     expect(rows({ parts: [] }).map((row) => row.type)).toEqual(["user", "thinking"])
     expect(rows({ parts: [reasoning("reasoning_1", false)] }).map((row) => row.type)).toEqual([
       "user",
       "assistant-part",
+      "thinking",
     ])
+  })
+
+  test("thinking row activity prioritizes visible inspected group over later reasoning", () => {
+    const result = rows({
+      parts: [
+        tool("tool_1", "completed", "read", { filePath: "src/routes/profile/+page.svelte" }),
+        tool("tool_2", "completed", "read", { filePath: "src/app.css" }),
+        reasoning("reasoning_1", false),
+      ],
+    })
+
+    expect(assistantPartIDs(result)).toEqual(["tool_1", "tool_2", "reasoning_1"])
+    expect(thinkingActivity(result)).toBe("inspecting")
+    expect(thinkingTitle(result)).toBe("Inspecting 2 items")
+  })
+
+  test("thinking row activity follows the visible current action", () => {
+    const read = rows({ parts: [tool("tool_read", "running", "read", { filePath: "src/app.css" })] })
+    const search = rows({ parts: [tool("tool_search", "running", "grep", { pattern: "createMemo" })] })
+    const edit = rows({ parts: [tool("tool_edit", "running", "edit", { filePath: "src/index.css" })] })
+    const run = rows({ parts: [tool("tool_run", "running", "bash", { description: "tests" })] })
+
+    expect(thinkingActivity(read)).toBe("reading")
+    expect(thinkingTitle(read)).toBe("Reading app.css")
+    expect(thinkingActivity(search)).toBe("inspecting")
+    expect(thinkingTitle(search)).toBe("Searching createMemo")
+    expect(thinkingActivity(edit)).toBe("editing")
+    expect(thinkingTitle(edit)).toBe("Editing index.css")
+    expect(thinkingActivity(run)).toBe("running")
+    expect(thinkingTitle(run)).toBe("Running tests")
+    expect(thinkingActivity(rows({ parts: [tool("tool_patch", "running", "apply_patch")] }))).toBe("patching")
+    expect(thinkingActivity(rows({ parts: [reasoning("reasoning_1", false)] }))).toBe("reasoning")
+    expect(thinkingTitle(rows({ parts: [reasoning("reasoning_1", false)] }))).toBe("Reasoning")
+    expect(thinkingActivity(rows({ parts: [] }))).toBe("working")
+    expect(thinkingTitle(rows({ parts: [] }))).toBe("Working")
   })
 
   test("completed transcripts show all parts even with missing timestamps", () => {
@@ -180,9 +231,10 @@ describe("agent timeline rows", () => {
 
     expect(second[0]).toBe(first[0])
     expect(second[1]).toBe(first[1])
+    expect(second[2]).toBe(first[2])
     expect(changed[0]).toBe(first[0])
     expect(changed[1]).not.toBe(first[1])
-    expect(changed).toHaveLength(3)
+    expect(changed).toHaveLength(4)
   })
 
   test("turn builder reads only the active turn assistant parts", () => {
@@ -204,7 +256,7 @@ describe("agent timeline rows", () => {
     })
 
     expect(calls).toEqual([secondAssistant.id])
-    expect(result.map((row) => row.type)).toEqual(["user", "assistant-part"])
+    expect(result.map((row) => row.type)).toEqual(["user", "assistant-part", "thinking"])
     expect(result[0]?.type === "user" ? result[0].previousUserMessage : false).toBe(true)
   })
 

@@ -22,9 +22,40 @@ export type ActivityPart = {
   }
 }
 
-function translate(t: ActivityTranslator, key: string, fallback: string, params?: ActivityParams) {
-  const value = t(key, params)
-  return value && value !== key ? value : fallback
+export type ActivityKind =
+  | "working"
+  | "reasoning"
+  | "reading"
+  | "inspecting"
+  | "editing"
+  | "running"
+  | "patching"
+  | "delegating"
+  | "waiting"
+  | "loading"
+
+const ACTIVITY_LABELS = {
+  working: "Working",
+  reasoning: "Reasoning",
+  reading: "Reading",
+  inspecting: "Inspecting",
+  editing: "Editing",
+  running: "Running",
+  patching: "Patching",
+  delegating: "Delegating",
+  waiting: "Waiting",
+  loading: "Loading",
+} satisfies Record<ActivityKind, string>
+
+export const SPINNER_VERBS = Object.values(ACTIVITY_LABELS)
+
+function cleanTopic(value: string) {
+  return value
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
+    .replace(/[*_~]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -39,16 +70,7 @@ function stringValue(input: Record<string, unknown>, keys: string[]) {
   }
 }
 
-function cleanTopic(value: string) {
-  return value
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
-    .replace(/[*_~]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function compact(value: string | undefined, max = 48) {
+function compact(value: string | undefined, max = 46) {
   if (!value) return
   const clean = cleanTopic(value)
   if (!clean) return
@@ -74,6 +96,10 @@ function host(url: string | undefined) {
 
 function withTarget(label: string, target: string | undefined) {
   return target ? `${label} ${target}` : label
+}
+
+function plural(count: number, word: string) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`
 }
 
 function fileCount(value: unknown) {
@@ -109,97 +135,175 @@ export function extractReasoningTopic(text: string) {
   }
 }
 
-function activeTool(part: ActivityPart): part is ActivityPart & { tool: string } {
-  return (
-    part.type === "tool" &&
-    typeof part.tool === "string" &&
-    (part.state?.status === "pending" || part.state?.status === "running")
-  )
+function isTool(part: ActivityPart): part is ActivityPart & { tool: string } {
+  return part.type === "tool" && typeof part.tool === "string"
 }
 
-function toolActivityLabel(part: ActivityPart & { tool: string }, t: ActivityTranslator) {
+const INSPECT_TOOLS = new Set(["list", "glob", "grep", "codesearch", "webfetch", "websearch"])
+
+export function activityLabel(kind: ActivityKind | undefined = "working") {
+  return ACTIVITY_LABELS[kind]
+}
+
+export function activityKindForPart(part: ActivityPart | undefined): ActivityKind | undefined {
+  if (!part) return
+
+  if (isTool(part)) {
+    switch (part.tool) {
+      case "read":
+        return "reading"
+      case "list":
+      case "glob":
+      case "grep":
+      case "codesearch":
+      case "webfetch":
+      case "websearch":
+        return "inspecting"
+      case "bash":
+        return "running"
+      case "edit":
+      case "write":
+        return "editing"
+      case "apply_patch":
+        return "patching"
+      case "task":
+        return "delegating"
+      case "question":
+        return "waiting"
+      case "skill":
+        return "loading"
+      default:
+        return "working"
+    }
+  }
+
+  if (part.type === "reasoning" && part.text?.trim()) return "reasoning"
+  if (part.type === "text" && part.text?.trim()) return "working"
+}
+
+export function activityKindForVisibleParts(parts: readonly ActivityPart[]): ActivityKind {
+  const tools = parts.filter(isTool)
+  const latestTool = tools.at(-1)
+  if (latestTool) {
+    const inspectOnly = tools.every((part) => part.tool === "read" || INSPECT_TOOLS.has(part.tool))
+    if (latestTool.tool === "read" && tools.length > 1 && inspectOnly) return "inspecting"
+    return activityKindForPart(latestTool) ?? "working"
+  }
+
+  for (let index = parts.length - 1; index >= 0; index--) {
+    const kind = activityKindForPart(parts[index])
+    if (kind) return kind
+  }
+
+  return "working"
+}
+
+function toolTarget(part: ActivityPart & { tool: string }) {
   const input = record(part.state?.input)
   const metadata = record(part.state?.metadata)
 
   switch (part.tool) {
     case "read":
-      return withTarget("Reading", fileName(stringValue(input, ["filePath", "path"])))
-    case "list":
-      return withTarget("Listing", fileName(stringValue(input, ["path"])))
-    case "glob":
-      return withTarget("Finding", compact(stringValue(input, ["pattern"])))
-    case "grep":
-      return withTarget("Searching", compact(stringValue(input, ["pattern"])))
-    case "codesearch": {
-      const query = compact(stringValue(input, ["query"]))
-      return query ? `Searching code for ${query}` : translate(t, "ui.sessionTurn.status.searchingCodebase", "Searching the codebase")
-    }
-    case "webfetch":
-      return withTarget("Fetching", host(stringValue(input, ["url"])))
-    case "websearch": {
-      const query = compact(stringValue(input, ["query"]))
-      return query ? `Searching web for ${query}` : translate(t, "ui.sessionTurn.status.searchingWeb", "Searching the web")
-    }
-    case "bash": {
-      const command = compact(stringValue(input, ["description", "command"]))
-      return command ? `Running ${command}` : translate(t, "ui.sessionTurn.status.runningCommands", "Running commands")
-    }
     case "edit":
-    case "write": {
-      const file = fileName(stringValue(input, ["filePath", "path"]))
-      return file ? `Editing ${file}` : translate(t, "ui.sessionTurn.status.makingEdits", "Making edits")
-    }
+    case "write":
+      return fileName(stringValue(input, ["filePath", "path"]))
+    case "list":
+      return fileName(stringValue(input, ["path"]))
+    case "glob":
+    case "grep":
+      return compact(stringValue(input, ["pattern"]))
+    case "codesearch":
+    case "websearch":
+      return compact(stringValue(input, ["query"]))
+    case "webfetch":
+      return host(stringValue(input, ["url"]))
+    case "bash":
+      return compact(stringValue(input, ["description", "command"]), 54)
     case "apply_patch": {
       const count = fileCount(input.files) || fileCount(metadata.files)
-      if (count > 0) return `Applying patch to ${count} ${count === 1 ? "file" : "files"}`
-      return "Applying patch"
+      return count > 0 ? plural(count, "file") : undefined
     }
-    case "task": {
-      const description = compact(stringValue(input, ["description", "prompt"]), 64)
-      return description ? `Delegating ${description}` : translate(t, "ui.sessionTurn.status.delegating", "Delegating work")
-    }
-    case "question":
-      return "Waiting for answer"
+    case "task":
+      return compact(stringValue(input, ["description", "prompt"]), 54)
     case "skill":
-      return withTarget("Loading skill", compact(stringValue(input, ["name"]))) || "Loading skill"
-    default:
-      return `Using ${part.tool}`
+      return compact(stringValue(input, ["name"]))
   }
 }
 
-function isStreamingAssistant(message: ActivityMessage) {
-  return message.role === "assistant" && typeof message.time?.completed !== "number"
+function singleToolActivityTitle(part: ActivityPart & { tool: string }) {
+  switch (part.tool) {
+    case "read":
+      return withTarget("Reading", toolTarget(part))
+    case "list":
+      return withTarget("Inspecting", toolTarget(part))
+    case "glob":
+    case "grep":
+      return withTarget("Searching", toolTarget(part))
+    case "codesearch":
+      return toolTarget(part) ? `Searching code for ${toolTarget(part)}` : "Searching code"
+    case "webfetch":
+      return withTarget("Fetching", toolTarget(part))
+    case "websearch":
+      return toolTarget(part) ? `Searching web for ${toolTarget(part)}` : "Searching web"
+    case "bash":
+      return withTarget("Running", toolTarget(part))
+    case "edit":
+    case "write":
+      return withTarget("Editing", toolTarget(part))
+    case "apply_patch":
+      return withTarget("Patching", toolTarget(part))
+    case "task":
+      return withTarget("Delegating", toolTarget(part))
+    case "question":
+      return "Waiting"
+    case "skill":
+      return withTarget("Loading", toolTarget(part))
+    default:
+      return "Working"
+  }
+}
+
+function groupedToolActivityTitle(tools: readonly (ActivityPart & { tool: string })[]) {
+  if (tools.length === 0) return "Working"
+  if (tools.length === 1) return singleToolActivityTitle(tools[0]!)
+
+  const inspectOnly = tools.every((part) => part.tool === "read" || INSPECT_TOOLS.has(part.tool))
+  if (inspectOnly) return `Inspecting ${plural(tools.length, "item")}`
+
+  const editCount = tools.filter((part) => part.tool === "edit" || part.tool === "write" || part.tool === "apply_patch").length
+  if (editCount === tools.length) return `Editing ${plural(tools.length, "file")}`
+
+  const commandCount = tools.filter((part) => part.tool === "bash").length
+  if (commandCount === tools.length) return `Running ${plural(tools.length, "command")}`
+
+  const latest = tools.at(-1)
+  return latest ? singleToolActivityTitle(latest) : "Working"
+}
+
+export function activityTitleForVisibleParts(parts: readonly ActivityPart[]): string {
+  const tools = parts.filter(isTool)
+  if (tools.length > 0) return groupedToolActivityTitle(tools)
+  return activityLabel(activityKindForVisibleParts(parts))
 }
 
 export function getAssistantActivityLabel(input: {
   messages: readonly ActivityMessage[]
   getParts: (messageID: string) => readonly ActivityPart[] | undefined
   t: ActivityTranslator
+  fallback?: string
+  visibleParts?: readonly ActivityPart[]
 }) {
-  let latestTopic: string | undefined
+  if (input.visibleParts) return activityTitleForVisibleParts(input.visibleParts)
 
-  for (let messageIndex = input.messages.length - 1; messageIndex >= 0; messageIndex--) {
+  const parts: ActivityPart[] = []
+
+  for (let messageIndex = 0; messageIndex < input.messages.length; messageIndex++) {
     const message = input.messages[messageIndex]
     if (!message || message.role !== "assistant") continue
-
-    const parts = input.getParts(message.id) ?? []
-    const streaming = isStreamingAssistant(message)
-
-    for (let partIndex = parts.length - 1; partIndex >= 0; partIndex--) {
-      const part = parts[partIndex]
-      if (!part) continue
-
-      if (activeTool(part)) return toolActivityLabel(part, input.t)
-
-      if (streaming && part.type === "text" && part.text?.trim()) return "Working"
-
-      if (part.type === "reasoning" && part.text?.trim()) {
-        latestTopic ??= extractReasoningTopic(part.text)
-        if (streaming) return latestTopic ? `Analyzing ${latestTopic}` : "Analyzing request"
-      }
-    }
+    parts.push(...(input.getParts(message.id) ?? []))
   }
 
-  if (latestTopic) return `Analyzing ${latestTopic}`
-  return translate(input.t, "ui.sessionTurn.status.gatheringContext", "Exploring")
+  if (parts.length > 0) return activityTitleForVisibleParts(parts)
+  if (input.fallback) return input.fallback
+  return "Working"
 }

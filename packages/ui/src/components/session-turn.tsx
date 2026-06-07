@@ -31,7 +31,7 @@ import { TextReveal } from "./text-reveal"
 import { createAutoScroll } from "../hooks"
 import { useI18n } from "../context/i18n"
 import { normalize } from "./session-diff"
-import { extractReasoningTopic, getAssistantActivityLabel } from "./session-activity"
+import { activityTitleForVisibleParts, extractReasoningTopic } from "./session-activity"
 
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -87,7 +87,6 @@ function unwrap(message: string) {
 }
 
 function formatThinkingElapsed(ms: number) {
-  if (ms < 1000) return ""
   const totalSeconds = ms / 1000
   if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`
   const total = Math.floor(totalSeconds)
@@ -307,13 +306,18 @@ export function SessionTurn(
     if (end < start) return undefined
     return end - start
   })
-  const thinkingLabel = createMemo(() =>
-    getAssistantActivityLabel({
-      messages: assistantMessages(),
-      getParts: (messageID) => list(data.store.part?.[messageID], emptyParts),
-      t: (key, params) => i18n.t(key as any, params),
-    }),
+  const [thinkingNow, setThinkingNow] = createSignal(Date.now())
+  const activityTitle = createMemo(() =>
+    activityTitleForVisibleParts(
+      visibleAssistantDisplayPartEntries({
+        messages: assistantMessages(),
+        getParts: (messageID) => list(data.store.part?.[messageID], emptyParts),
+        showReasoningSummaries: showReasoningSummaries(),
+        live: working(),
+      }).map((entry) => entry.part),
+    ),
   )
+  const thinkingLabel = createMemo(() => activityTitle())
   const reasoningHeading = createMemo(() => {
     let reason: string | undefined
     for (const message of assistantMessages()) {
@@ -326,21 +330,11 @@ export function SessionTurn(
     }
     return reason
   })
-  const assistantVisibleContent = createMemo(
-    () =>
-      visibleAssistantDisplayPartEntries({
-        messages: assistantMessages(),
-        getParts: (messageID) => list(data.store.part?.[messageID], emptyParts),
-        showReasoningSummaries: showReasoningSummaries(),
-        live: working(),
-      }).length,
-  )
   const showThinking = createMemo(() => {
     if (!working() || !!error()) return false
     if (status().type === "retry") return false
-    return assistantVisibleContent() === 0
+    return true
   })
-  const [thinkingNow, setThinkingNow] = createSignal(Date.now())
   createEffect(() => {
     if (!showThinking()) return
     setThinkingNow(Date.now())

@@ -7,7 +7,6 @@ import { useSync } from "@/context/sync"
 import { useGlobalSync } from "@/context/global-sync"
 import { useNavigate, useParams } from "@solidjs/router"
 import { AssistantPartGroupView, Message } from "@opencode-ai/ui/message-part"
-import { getAssistantActivityLabel } from "@opencode-ai/ui/session-activity"
 import { DataProvider, FileComponentProvider } from "@opencode-ai/ui/context"
 import { AppIcon } from "@opencode-ai/ui/app-icon"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -90,7 +89,6 @@ const formatCompactNumber = (value: number | null | undefined) => {
 const formatDiffStat = (value: number) => value.toLocaleString()
 
 const formatThinkingElapsed = (ms: number) => {
-  if (ms < 1000) return ""
   const totalSeconds = ms / 1000
   if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`
   const total = Math.floor(totalSeconds)
@@ -1263,13 +1261,7 @@ function AgentViewInner(props: AgentViewProps) {
       case "thinking": {
         const message = createMemo(() => messageByID().get(row.userMessageID))
         const assistants = createMemo(() => assistantByParent().get(row.userMessageID) ?? [])
-        const thinkingLabel = createMemo(() =>
-          getAssistantActivityLabel({
-            messages: assistants(),
-            getParts,
-            t: (key, params) => language.t(key as any, params),
-          }),
-        )
+        const thinkingLabel = createMemo(() => row.activityTitle)
         const thinkingElapsed = createMemo(() => {
           const user = message()
           if (!user) return ""
