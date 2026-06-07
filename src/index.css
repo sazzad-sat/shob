@@ -2156,12 +2156,6 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   overflow: visible;
   padding-top: 0;
   pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--terminal-agent-bg) 0%, transparent) 0%,
-    var(--terminal-agent-bg) 18%,
-    var(--terminal-agent-bg) 100%
-  );
 }
 
 .agent-terminal-composer-docks,
