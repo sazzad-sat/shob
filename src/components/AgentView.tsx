@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, mapArray, onCleanup, onMount, Show } from "solid-js"
-import { Portal } from "solid-js/web"
 import { PromptInput } from "../shob-ported/prompt-input"
 import { sendFollowupDraft, type FollowupDraft } from "@/shob-ported/prompt-input/submit"
 import { MockSessionProviders } from "../shob-ported/mock-session-layout"
@@ -48,6 +47,7 @@ import {
   reuseAgentTimelineRows,
   type AgentTimelineRow,
 } from "@/components/agent-timeline-rows"
+import { SessionContextUsage } from "@/components/session-context-usage"
 import shobLogo from "@/assets/icon/shob.png"
 
 interface AgentViewProps {
@@ -519,20 +519,13 @@ function AgentViewInner(props: AgentViewProps) {
   const [queuedFollowups, setQueuedFollowups] = createSignal<QueuedFollowup[]>([])
   let scrollRef: HTMLDivElement | undefined
   let contentRef: HTMLDivElement | undefined
-  let viewRef: HTMLDivElement | undefined
   let composerRegionRef: HTMLDivElement | undefined
   let composerDockRef: HTMLDivElement | undefined
   let composerRegionHeight = 0
   let composerDockHeightValue = 0
   const [composerHeight, setComposerHeight] = createSignal(132)
   const [composerDockHeight, setComposerDockHeight] = createSignal(0)
-  const [composerFrame, setComposerFrame] = createSignal({
-    left: "0px",
-    width: "100%",
-    bottom: "0px",
-  })
   let rafId: number | undefined
-  let composerFrameRaf: number | undefined
   let composerStickScrollRaf: number | undefined
   let cachedScrollHeight = 0
   let cachedClientHeight = 0
@@ -710,6 +703,12 @@ function AgentViewInner(props: AgentViewProps) {
     setRenameValue(title())
     setSessionMenuOpen(false)
     window.setTimeout(() => setRenameOpen(true), 20)
+  }
+
+  const openContextUsage = () => {
+    const id = activeSessionId()
+    if (!id) return
+    window.dispatchEvent(new CustomEvent("gg-open-context-tab", { detail: { sessionId: id } }))
   }
 
   const submitRename = async () => {
@@ -893,6 +892,41 @@ function AgentViewInner(props: AgentViewProps) {
     return !!(el && nested && nested !== el)
   }
 
+  const nestedScrollableTarget = (target: EventTarget | null) => {
+    const el = scrollRef
+    const current = target instanceof Element ? target : undefined
+    const nested = current?.closest("[data-scrollable]")
+    if (!el || !nested || nested === el || !(nested instanceof HTMLElement)) return
+    return nested
+  }
+
+  const normalizeWheelDelta = (event: WheelEvent, root: HTMLElement) => {
+    if (event.deltaMode === 1) return event.deltaY * 40
+    if (event.deltaMode === 2) return event.deltaY * root.clientHeight
+    return event.deltaY
+  }
+
+  const shouldHandOffNestedScroll = (target: HTMLElement, delta: number) => {
+    const max = target.scrollHeight - target.clientHeight
+    if (max <= 1) return true
+    if (!delta) return false
+    if (delta < 0) return target.scrollTop + delta <= 0
+    return delta > max - target.scrollTop
+  }
+
+  const handOffNestedScroll = (event: WheelEvent | TouchEvent, delta: number) => {
+    const root = scrollRef
+    const nested = nestedScrollableTarget(event.target)
+    if (!root || !nested || !shouldHandOffNestedScroll(nested, delta)) return false
+
+    const before = root.scrollTop
+    root.scrollTop = Math.max(0, root.scrollTop + delta)
+    markScrollGesture(root)
+    scheduleJumpStateUpdate({ measure: true, userScroll: true })
+    if (root.scrollTop !== before && "preventDefault" in event) event.preventDefault()
+    return true
+  }
+
   const markScrollGesture = (target?: EventTarget | null) => {
     if (isNestedScrollableTarget(target ?? null)) return
     scrollGestureAt = Date.now()
@@ -905,20 +939,24 @@ function AgentViewInner(props: AgentViewProps) {
   }
 
   const handleTimelineWheel = (event: WheelEvent) => {
-    if (event.deltaY === 0) return
+    const root = scrollRef
+    const delta = root ? normalizeWheelDelta(event, root) : event.deltaY
+    if (!delta) return
+    if (handOffNestedScroll(event, delta)) return
     markScrollGesture(event.target)
   }
 
   const handleTimelineTouchStart = (event: TouchEvent) => {
-    if (isNestedScrollableTarget(event.target)) return
     touchY = event.touches[0]?.clientY
   }
 
   const handleTimelineTouchMove = (event: TouchEvent) => {
-    if (isNestedScrollableTarget(event.target)) return
     const next = event.touches[0]?.clientY
     if (next === undefined || touchY === undefined) return
-    if (Math.abs(next - touchY) > 2) markScrollGesture(event.target)
+    const delta = touchY - next
+    if (Math.abs(delta) > 2) {
+      if (!handOffNestedScroll(event, delta)) markScrollGesture(event.target)
+    }
     touchY = next
   }
 
@@ -927,7 +965,7 @@ function AgentViewInner(props: AgentViewProps) {
   }
 
   const handleTimelinePointerDown = (event: PointerEvent) => {
-    if (event.target === event.currentTarget) markScrollGesture(event.target)
+    if (!isNestedScrollableTarget(event.target)) markScrollGesture(event.target)
   }
 
   const handleTimelineKeyDown = (event: KeyboardEvent) => {
@@ -1015,37 +1053,6 @@ function AgentViewInner(props: AgentViewProps) {
     updateComposerDockHeight(0)
   })
 
-  const measureComposerFrame = () => {
-    const el = viewRef
-    if (!el) return
-
-    const rect = el.getBoundingClientRect()
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight
-    let left = Math.max(0, Math.min(rect.left, viewportWidth))
-    let right = Math.max(left, Math.min(rect.right, viewportWidth))
-    const bottom = Math.max(0, viewportHeight - Math.min(rect.bottom, viewportHeight))
-
-    if (right - left < 240) {
-      left = 0
-      right = viewportWidth
-    }
-
-    setComposerFrame({
-      left: `${Math.round(left)}px`,
-      width: `${Math.round(right - left)}px`,
-      bottom: `${Math.round(bottom)}px`,
-    })
-  }
-
-  const scheduleComposerFrame = () => {
-    if (composerFrameRaf !== undefined) return
-    composerFrameRaf = requestAnimationFrame(() => {
-      composerFrameRaf = undefined
-      measureComposerFrame()
-    })
-  }
-
   const scheduleComposerStickScroll = () => {
     if (composerStickScrollRaf !== undefined) cancelAnimationFrame(composerStickScrollRaf)
     composerStickScrollRaf = requestAnimationFrame(() => {
@@ -1054,30 +1061,6 @@ function AgentViewInner(props: AgentViewProps) {
       scheduleJumpStateUpdate({ measure: true })
     })
   }
-
-  createResizeObserver(
-    () => viewRef,
-    () => {
-      scheduleComposerFrame()
-    },
-  )
-
-  createEffect(() => {
-    showDockedComposer()
-    scheduleComposerFrame()
-  })
-
-  onMount(() => {
-    scheduleComposerFrame()
-    window.addEventListener("resize", scheduleComposerFrame)
-    window.visualViewport?.addEventListener("resize", scheduleComposerFrame)
-    window.visualViewport?.addEventListener("scroll", scheduleComposerFrame)
-    onCleanup(() => {
-      window.removeEventListener("resize", scheduleComposerFrame)
-      window.visualViewport?.removeEventListener("resize", scheduleComposerFrame)
-      window.visualViewport?.removeEventListener("scroll", scheduleComposerFrame)
-    })
-  })
 
   createEffect(() => {
     const sessionID = activeSessionId()
@@ -1121,14 +1104,8 @@ function AgentViewInner(props: AgentViewProps) {
 
   onCleanup(() => {
     if (rafId !== undefined) cancelAnimationFrame(rafId)
-    if (composerFrameRaf !== undefined) cancelAnimationFrame(composerFrameRaf)
     if (composerStickScrollRaf !== undefined) cancelAnimationFrame(composerStickScrollRaf)
   })
-
-  const setViewRef = (el: HTMLDivElement | undefined) => {
-    viewRef = el
-    if (el) queueMicrotask(scheduleComposerFrame)
-  }
 
   const setScrollRef = (el: HTMLDivElement | undefined) => {
     scrollRef = el
@@ -1504,17 +1481,13 @@ function AgentViewInner(props: AgentViewProps) {
         </Show>
 
         <div
-          ref={setViewRef}
           class="agent-terminal-view relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-stronger text-foreground"
           data-composer-dock-visible={composerDockVisible() ? "true" : "false"}
           data-docked-composer={showDockedComposer() ? "true" : "false"}
           data-new-session={isNewSession() ? "true" : "false"}
           style={{
-            "--agent-composer-bottom": composerFrame().bottom,
             "--agent-composer-dock-height": `${composerDockHeight()}px`,
             "--agent-composer-height": `${composerHeight()}px`,
-            "--agent-composer-left": composerFrame().left,
-            "--agent-composer-width": composerFrame().width,
           }}
         >
           <div class="agent-terminal-scroll-frame relative min-h-0 flex-1 overflow-hidden">
@@ -1546,6 +1519,7 @@ function AgentViewInner(props: AgentViewProps) {
               ref={setScrollRef}
               data-slot="session-turn-content"
               class="agent-terminal-scroll agent-smart-scrollbar h-full min-w-0 overflow-x-hidden overflow-y-auto"
+              tabIndex={0}
               style={{
                 "--session-title-height": "40px",
                 "--sticky-accordion-top": "48px",
@@ -1609,6 +1583,9 @@ function AgentViewInner(props: AgentViewProps) {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      <Show when={activeSessionId()}>
+                        {(id) => <SessionContextUsage sessionId={id()} onClick={openContextUsage} />}
+                      </Show>
                     </div>
                     <div class="ml-auto flex shrink-0 items-center gap-2">
                       <Show when={currentBranchName()}>
@@ -1656,90 +1633,85 @@ function AgentViewInner(props: AgentViewProps) {
           </div>
 
           <Show when={showDockedComposer()}>
-            <Portal>
-              <div
-                ref={setComposerRegionRef}
-                class="agent-terminal-composer-region"
-                data-agent-docked="true"
-                style={{
-                  "--agent-composer-bottom": composerFrame().bottom,
-                  "--agent-composer-dock-height": `${composerDockHeight()}px`,
-                  "--agent-composer-height": `${composerHeight()}px`,
-                  "--agent-composer-left": composerFrame().left,
-                  "--agent-composer-width": composerFrame().width,
-                }}
-              >
-                <Show when={composerDockVisible()}>
-                  <div ref={setComposerDockRef} class="agent-terminal-composer-docks">
-                    <Show when={activeQueuedFollowups().length > 0}>
-                      <div class="agent-terminal-followup-queue" aria-live="polite">
-                        <div class="agent-terminal-followup-queue-header">
-                          <span>Queued follow-ups</span>
-                          <span>{activeQueuedFollowups().length}</span>
-                        </div>
-                        <For each={activeQueuedFollowups()}>
-                          {(item) => (
-                            <div class="agent-terminal-followup-queue-item" data-state={item.state}>
-                              <div class="agent-terminal-followup-queue-copy">
-                                <span>{followupPreview(item)}</span>
-                                <Show when={item.error}>
-                                  <small>{item.error}</small>
-                                </Show>
-                              </div>
-                              <span class="agent-terminal-followup-queue-state">
-                                <Show when={item.state === "sending"} fallback={item.state === "failed" ? "Failed" : "Queued"}>
-                                  Sending
-                                </Show>
-                              </span>
-                              <button
-                                type="button"
-                                disabled={item.state === "sending"}
-                                class="agent-terminal-followup-queue-remove"
-                                onClick={() => removeQueuedFollowup(item.queueID)}
-                                aria-label="Remove queued follow-up"
-                              >
-                                <X size={13} />
-                              </button>
-                            </div>
-                          )}
-                        </For>
+            <div
+              ref={setComposerRegionRef}
+              class="agent-terminal-composer-region"
+              data-agent-docked="true"
+              style={{
+                "--agent-composer-dock-height": `${composerDockHeight()}px`,
+                "--agent-composer-height": `${composerHeight()}px`,
+              }}
+            >
+              <Show when={composerDockVisible()}>
+                <div ref={setComposerDockRef} class="agent-terminal-composer-docks">
+                  <Show when={activeQueuedFollowups().length > 0}>
+                    <div class="agent-terminal-followup-queue" aria-live="polite">
+                      <div class="agent-terminal-followup-queue-header">
+                        <span>Queued follow-ups</span>
+                        <span>{activeQueuedFollowups().length}</span>
                       </div>
-                    </Show>
-                    <Show when={composerState.dock() && composerState.todos().length > 0}>
+                      <For each={activeQueuedFollowups()}>
+                        {(item) => (
+                          <div class="agent-terminal-followup-queue-item" data-state={item.state}>
+                            <div class="agent-terminal-followup-queue-copy">
+                              <span>{followupPreview(item)}</span>
+                              <Show when={item.error}>
+                                <small>{item.error}</small>
+                              </Show>
+                            </div>
+                            <span class="agent-terminal-followup-queue-state">
+                              <Show when={item.state === "sending"} fallback={item.state === "failed" ? "Failed" : "Queued"}>
+                                Sending
+                              </Show>
+                            </span>
+                            <button
+                              type="button"
+                              disabled={item.state === "sending"}
+                              class="agent-terminal-followup-queue-remove"
+                              onClick={() => removeQueuedFollowup(item.queueID)}
+                              aria-label="Remove queued follow-up"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  <Show when={composerState.dock() && composerState.todos().length > 0}>
+                    <div class="agent-terminal-composer-dock-block">
+                      <SessionTodoDock
+                        todos={composerState.todos()}
+                        collapsed={todoCollapsed()}
+                        onToggle={() => setTodoCollapsed((v) => !v)}
+                        collapseLabel={language.t("session.todo.collapse")}
+                        expandLabel={language.t("session.todo.expand")}
+                      />
+                    </div>
+                  </Show>
+                  <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
+                  <Show when={composerState.questionRequest()} keyed>
+                    {(request) => (
                       <div class="agent-terminal-composer-dock-block">
-                        <SessionTodoDock
-                          todos={composerState.todos()}
-                          collapsed={todoCollapsed()}
-                          onToggle={() => setTodoCollapsed((v) => !v)}
-                          collapseLabel={language.t("session.todo.collapse")}
-                          expandLabel={language.t("session.todo.expand")}
+                        <SessionQuestionDock request={request} onSubmit={() => undefined} />
+                      </div>
+                    )}
+                  </Show>
+                  <Show when={composerState.permissionRequest()} keyed>
+                    {(request) => (
+                      <div class="agent-terminal-composer-dock-block">
+                        <SessionPermissionDock
+                          request={request}
+                          responding={composerState.permissionResponding()}
+                          onDecide={composerState.decide}
                         />
                       </div>
-                    </Show>
-                    <AutoCompactStrip context={contextInfo()} compacting={autoCompactingContext()} />
-                    <Show when={composerState.questionRequest()} keyed>
-                      {(request) => (
-                        <div class="agent-terminal-composer-dock-block">
-                          <SessionQuestionDock request={request} onSubmit={() => undefined} />
-                        </div>
                       )}
-                    </Show>
-                    <Show when={composerState.permissionRequest()} keyed>
-                      {(request) => (
-                        <div class="agent-terminal-composer-dock-block">
-                          <SessionPermissionDock
-                            request={request}
-                            responding={composerState.permissionResponding()}
-                            onDecide={composerState.decide}
-                          />
-                        </div>
-                      )}
-                    </Show>
-                  </div>
-                </Show>
-                <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
-              </div>
-            </Portal>
+                  </Show>
+                </div>
+              </Show>
+              <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
+            </div>
           </Show>
         </div>
         </>
