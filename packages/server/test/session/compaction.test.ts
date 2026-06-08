@@ -456,7 +456,11 @@ describe("session.compaction.create", () => {
 
 describe("session.compaction.prune", () => {
   test("compacts old completed tool output", async () => {
-    await using tmp = await tmpdir()
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ compaction: { prune: true } }))
+      },
+    })
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
@@ -586,7 +590,7 @@ describe("session.compaction.process", () => {
     })
   })
 
-  test("uses configured custom compaction profile prompt and context", async () => {
+  test("appends plugin-provided compaction context to anchored summary prompt", async () => {
     let seenPrompt = ""
     const captureProcessor = Layer.succeed(
       SessionProcessorModule.SessionProcessor.Service,
@@ -607,24 +611,15 @@ describe("session.compaction.process", () => {
         ),
       }),
     )
-    await using tmp = await tmpdir({
-      init: async (dir) => {
-        await Bun.write(
-          path.join(dir, "opencode.json"),
-          JSON.stringify({
-            compaction: {
-              profile: "handoff",
-              profiles: {
-                handoff: {
-                  prompt: "CUSTOM HANDOFF PROMPT",
-                  context: ["EXTRA CUSTOM CONTEXT"],
-                },
-              },
-            },
-          }),
-        )
+    const pluginContext = Layer.mock(Plugin.Service)({
+      trigger: <Name extends string, Input, Output>(name: Name, _input: Input, output: Output) => {
+        if (name !== "experimental.session.compacting") return Effect.succeed(output)
+        return Effect.succeed({ ...(output as Record<string, unknown>), context: ["EXTRA CUSTOM CONTEXT"] } as Output)
       },
+      list: () => Effect.succeed([]),
+      init: () => Effect.void,
     })
+    await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
@@ -636,7 +631,7 @@ describe("session.compaction.process", () => {
             Layer.provide(captureProcessor),
             Layer.provide(Agent.defaultLayer),
             Layer.provide(SessionMemory.defaultLayer),
-            Layer.provide(Plugin.defaultLayer),
+            Layer.provide(pluginContext),
             Layer.provide(bus),
             Layer.provide(Config.defaultLayer),
           ),
@@ -656,9 +651,84 @@ describe("session.compaction.process", () => {
             ),
           )
 
-          expect(seenPrompt).toContain("CUSTOM HANDOFF PROMPT")
+          expect(seenPrompt).toContain("Create a new anchored summary")
           expect(seenPrompt).toContain("EXTRA CUSTOM CONTEXT")
           expect(seenPrompt).not.toContain("Provide a detailed prompt for continuing")
+        } finally {
+          await rt.dispose()
+        }
+      },
+    })
+  })
+
+  test("summarizes only the head while retaining recent tail marker", async () => {
+    let capturedMessages = ""
+    const captureProcessor = Layer.succeed(
+      SessionProcessorModule.SessionProcessor.Service,
+      SessionProcessorModule.SessionProcessor.Service.of({
+        create: Effect.fn("TestSessionProcessor.create")((input) =>
+          Effect.succeed({
+            ...fake(input, "continue"),
+            process: Effect.fn("TestSessionProcessor.process")((processInput) =>
+              Effect.sync(() => {
+                capturedMessages = JSON.stringify(processInput.messages)
+                return "continue" as const
+              }),
+            ),
+          }),
+        ),
+      }),
+    )
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bus = Bus.layer
+        const rt = ManagedRuntime.make(
+          Layer.mergeAll(SessionCompaction.layer, bus).pipe(
+            Layer.provide(wide().layer),
+            Layer.provide(Session.defaultLayer),
+            Layer.provide(captureProcessor),
+            Layer.provide(Agent.defaultLayer),
+            Layer.provide(SessionMemory.defaultLayer),
+            Layer.provide(Plugin.defaultLayer),
+            Layer.provide(bus),
+            Layer.provide(Config.defaultLayer),
+          ),
+        )
+        const session = await Session.create({})
+        await user(session.id, "older context")
+        const keepOne = await user(session.id, "keep this turn")
+        await user(session.id, "and this one too")
+        await SessionCompaction.create({
+          sessionID: session.id,
+          agent: "build",
+          model: ref,
+          auto: false,
+        })
+        try {
+          const msgs = await Session.messages({ sessionID: session.id })
+          const parentID = msgs.at(-1)?.info.id
+          expect(parentID).toBeTruthy()
+          await rt.runPromise(
+            SessionCompaction.Service.use((svc) =>
+              svc.process({
+                parentID: parentID!,
+                messages: msgs,
+                sessionID: session.id,
+                auto: false,
+              }),
+            ),
+          )
+
+          expect(capturedMessages).toContain("older context")
+          expect(capturedMessages).not.toContain("keep this turn")
+          expect(capturedMessages).not.toContain("and this one too")
+
+          const compaction = (await Session.messages({ sessionID: session.id }))
+            .flatMap((msg) => msg.parts)
+            .find((part): part is MessageV2.CompactionPart => part.type === "compaction")
+          expect(compaction?.tail_start_id).toBe(keepOne.id)
         } finally {
           await rt.dispose()
         }
