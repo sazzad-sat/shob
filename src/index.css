@@ -1567,7 +1567,6 @@ b {
   --agent-font-regular: var(--font-weight-regular, 400);
   --agent-font-medium: var(--font-weight-medium, var(--shob-font-weight-medium, 430));
   --agent-font-semibold: var(--shob-font-weight-semibold, 500);
-  --agent-dock-gap: 8px;
   --terminal-agent-bg: var(--background);
   --terminal-agent-panel: color-mix(in srgb, var(--surface-raised-base) 56%, transparent);
   --terminal-agent-panel-solid: var(--surface-raised-base);
@@ -1629,7 +1628,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   scroll-padding-bottom: calc(
     var(--agent-composer-height, 132px) +
     var(--agent-composer-dock-height, 0px) +
-    var(--agent-dock-gap, 8px) +
+    var(--agent-dock-gap, 44px) +
     32px
   );
 }
@@ -1638,7 +1637,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   padding-bottom: calc(
     var(--agent-composer-height, 132px) +
     var(--agent-composer-dock-height, 0px) +
-    var(--agent-dock-gap, 8px) +
+    var(--agent-dock-gap, 44px) +
     32px
   ) !important;
 }
@@ -1949,56 +1948,6 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   display: none !important;
 }
 
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] {
-  box-sizing: border-box !important;
-  margin: 8px 0 10px !important;
-  overflow: hidden !important;
-  border: 1px solid var(--terminal-agent-border-subtle) !important;
-  border-radius: 8px !important;
-  background: color-mix(in srgb, var(--terminal-agent-panel-solid) 88%, var(--terminal-agent-bg)) !important;
-  box-shadow: none !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] > [data-component="collapsible"].tool-collapsible > [data-slot="collapsible-trigger"] {
-  padding: 9px 12px 5px !important;
-  background: transparent !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] [data-component="tool-trigger"] {
-  min-height: 22px !important;
-  padding: 0 !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] [data-slot="collapsible-content"] {
-  padding: 0 12px 12px !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] [data-component="todos"] {
-  box-sizing: border-box !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 7px !important;
-  width: 100% !important;
-  padding: 5px 0 0 !important;
-  background: transparent !important;
-  color: var(--terminal-agent-muted) !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] [data-component="checkbox"] {
-  min-width: 0 !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] [data-slot="message-part-todo-content"] {
-  color: var(--terminal-agent-dim) !important;
-  font-size: 13px !important;
-  line-height: 1.45 !important;
-  overflow-wrap: anywhere !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="todowrite"] [data-slot="message-part-todo-content"][data-completed="completed"] {
-  color: var(--terminal-agent-weaker) !important;
-}
-
 .agent-terminal-view [data-component="context-tool-group"] > [data-slot="collapsible-content"] {
   box-sizing: border-box !important;
   width: 100% !important;
@@ -2139,25 +2088,6 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   contain: layout paint style;
 }
 
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="task"] {
-  margin: 4px 0 !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="task"] [data-component="task-tool-card"] {
-  box-sizing: border-box !important;
-  width: 100% !important;
-  align-items: center !important;
-  padding: 7px 9px !important;
-  border: 1px solid var(--terminal-agent-border-subtle) !important;
-  border-radius: 8px !important;
-  background: color-mix(in srgb, var(--terminal-agent-panel-solid) 76%, var(--terminal-agent-bg)) !important;
-}
-
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="task"] [data-slot="collapsible-trigger"]:hover [data-component="task-tool-card"],
-.agent-terminal-view [data-component="tool-part-wrapper"][data-tool="task"] [data-slot="collapsible-trigger"][aria-expanded="true"] [data-component="task-tool-card"] {
-  background: color-mix(in srgb, var(--terminal-agent-panel-hover) 76%, var(--terminal-agent-bg)) !important;
-}
-
 .agent-terminal-new-session-stage {
   box-sizing: border-box;
   display: flex;
@@ -2237,6 +2167,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-composer-region[data-agent-docked="true"] {
+  --agent-dock-gap: 44px;
   position: absolute;
   right: 0;
   bottom: 0;
@@ -2281,10 +2212,10 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
 .agent-terminal-composer-docks {
   --agent-dock-available-height: calc(
-    100dvh - var(--agent-composer-height, 132px) - var(--agent-dock-gap, 8px) - 24px
+    100dvh - var(--agent-composer-height, 132px) - var(--agent-dock-gap, 18px) - 24px
   );
   position: absolute;
-  bottom: calc(100% + var(--agent-dock-gap, 8px));
+  bottom: calc(100% + var(--agent-dock-gap, 18px));
   left: 50%;
   display: flex;
   flex-direction: column;
@@ -2713,24 +2644,23 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-composer-docks .todo-dock {
-  box-sizing: border-box;
   width: 100%;
-  border: 1px solid var(--terminal-agent-border-subtle) !important;
-  border-radius: 10px !important;
-  background: color-mix(in srgb, var(--terminal-agent-panel-solid) 94%, var(--terminal-agent-bg)) !important;
-  box-shadow: 0 12px 28px color-mix(in srgb, #000 24%, transparent) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   color: var(--terminal-agent-dim);
-  overflow: hidden;
-  padding: 10px 12px 11px;
+  overflow: visible;
+  padding: 0 12px 8px;
 }
 
 .agent-terminal-composer-docks .todo-dock-header {
   display: flex;
   align-items: center;
   min-height: 22px;
-  padding: 0 0 7px;
+  padding: 0 0 5px;
   cursor: pointer;
 }
 
@@ -2761,7 +2691,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  padding: 0;
+  padding: 0 0 0;
   scrollbar-width: none;
 }
 
@@ -2855,7 +2785,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
 .agent-terminal-composer-docks .todo-dock-divider {
   height: 1px;
-  margin: 4px 0 0 22px;
+  margin: 2px 0 0 22px;
   background: var(--terminal-agent-border-subtle);
 }
 
@@ -2989,82 +2919,64 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 .agent-composer-review-strip {
   display: flex;
   min-height: 34px;
-  min-width: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 3px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--terminal-agent-border-subtle) 56%, transparent);
+  gap: 14px;
+  padding: 0 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-weaker-base, var(--border-weak-base)) 36%, transparent);
   border-radius: 22px 22px 0 0;
-  background: #101010;
-  color: var(--agent-prompt-control-muted);
+  background: color-mix(in srgb, var(--terminal-agent-bg, var(--background)) 72%, var(--agent-prompt-input-bg) 28%);
+  color: color-mix(in srgb, var(--text-base, var(--muted-foreground)) 76%, transparent);
+  font-size: 12px;
+  line-height: 1;
 }
 
-.agent-composer-review-summary {
+.agent-composer-review-summary,
+.agent-composer-review-stats {
   display: inline-flex;
   min-width: 0;
-  flex: 1 1 auto;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1.2;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .agent-composer-review-count {
-  min-width: 0;
   overflow: hidden;
-  color: var(--agent-prompt-control-muted);
-  font-weight: var(--agent-font-regular, 400);
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .agent-composer-review-stats {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-family-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: var(--agent-font-medium, 430);
-  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: var(--font-family-mono), ui-monospace, monospace;
+  font-weight: var(--agent-font-medium, 500);
 }
 
 .agent-composer-review-stats [data-kind="add"] {
-  color: var(--agent-diff-add);
+  color: var(--agent-diff-add, var(--text-diff-add-base)) !important;
 }
 
 .agent-composer-review-stats [data-kind="delete"] {
-  color: var(--agent-diff-delete);
+  color: var(--agent-diff-delete, var(--text-diff-delete-base)) !important;
 }
 
 .agent-composer-review-button {
   appearance: none;
   display: inline-flex;
-  min-height: 28px;
+  height: 28px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 8px;
   background: transparent;
   color: var(--text-strong, var(--foreground));
   cursor: pointer;
   font-family: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: var(--agent-font-medium, 430);
+  font-size: 12px;
   line-height: 1;
-  padding: 0 8px;
-  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .agent-composer-review-button:hover {
-  background: #242424;
-}
-
-.agent-composer-review-button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--agent-focus) 45%, transparent);
-  outline-offset: -2px;
+  color: var(--foreground);
 }
 
 .agent-terminal-prompt[data-improving="true"] .agent-terminal-prompt-shell {
@@ -3522,7 +3434,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
   .agent-terminal-composer-docks {
     --agent-dock-available-height: calc(
-      100dvh - var(--agent-composer-height, 112px) - var(--agent-dock-gap, 8px) - 18px
+      100dvh - var(--agent-composer-height, 112px) - var(--agent-dock-gap, 18px) - 18px
     );
     max-height: min(280px, var(--agent-dock-available-height));
   }
@@ -3550,7 +3462,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
   .agent-terminal-composer-docks {
     --agent-dock-available-height: calc(
-      100dvh - var(--agent-composer-height, 96px) - var(--agent-dock-gap, 8px) - 14px
+      100dvh - var(--agent-composer-height, 96px) - var(--agent-dock-gap, 18px) - 14px
     );
     max-height: min(240px, var(--agent-dock-available-height));
   }
@@ -3731,24 +3643,23 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
 /* ── Todo Dock ────────────────────────────────────────── */
 .todo-dock {
-  box-sizing: border-box;
   width: 100%;
-  border: 1px solid var(--terminal-agent-border-subtle, var(--border-weaker-base)) !important;
-  border-radius: 10px !important;
-  background: color-mix(in srgb, var(--terminal-agent-panel-solid, var(--surface-raised-base)) 94%, var(--terminal-agent-bg, var(--background))) !important;
-  box-shadow: 0 12px 28px color-mix(in srgb, #000 24%, transparent) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   color: var(--terminal-agent-dim, var(--text-weak));
-  overflow: hidden;
-  padding: 10px 12px 11px;
+  overflow: visible;
+  padding: 0 12px 8px;
 }
 
 .todo-dock-header {
   display: flex;
   align-items: center;
   min-height: 22px;
-  padding: 0 0 7px;
+  padding: 0 0 5px;
   cursor: pointer;
 }
 
@@ -3864,7 +3775,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
 .todo-dock-divider {
   height: 1px;
-  margin: 4px 0 0 22px;
+  margin: 2px 0 0 22px;
   background: var(--terminal-agent-border-subtle, var(--border-weaker-base));
 }
 
