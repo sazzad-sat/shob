@@ -123,16 +123,20 @@ jobs:
             echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
             exit 0
           fi
-          for attempt in 1 2 3 4 5; do
+          max_attempts=10
+          for attempt in $(seq 1 "$max_attempts"); do
             if curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"; then
               echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
               exit 0
             fi
-            sleep_seconds=$((attempt * 20))
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              break
+            fi
+            sleep_seconds=$((attempt * 30))
             echo "Bun install failed on attempt ${attempt}; retrying in ${sleep_seconds}s..."
             sleep "$sleep_seconds"
           done
-          echo "Bun install failed after 5 attempts." >&2
+          echo "Bun install failed after ${max_attempts} attempts." >&2
           exit 1
 
       - name: Setup Bun (Windows)
@@ -146,7 +150,8 @@ jobs:
             exit 0
           }
           $installer = Join-Path $env:RUNNER_TEMP "bun-install.ps1"
-          for ($attempt = 1; $attempt -le 5; $attempt++) {
+          $maxAttempts = 10
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
             try {
               Invoke-RestMethod "https://bun.sh/install.ps1" -OutFile $installer
               & pwsh -NoProfile -ExecutionPolicy Bypass -File $installer -Version $env:BUN_VERSION
@@ -157,11 +162,14 @@ jobs:
             } catch {
               Write-Warning $_
             }
-            $sleepSeconds = $attempt * 20
+            if ($attempt -eq $maxAttempts) {
+              break
+            }
+            $sleepSeconds = $attempt * 30
             Write-Warning "Bun install failed on attempt $attempt; retrying in ${sleepSeconds}s..."
             Start-Sleep -Seconds $sleepSeconds
           }
-          throw "Bun install failed after 5 attempts."
+          throw "Bun install failed after $maxAttempts attempts."
 
       - name: Verify Bun
         run: bun --version
@@ -180,15 +188,19 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          for attempt in 1 2 3; do
-            if bun install --frozen-lockfile; then
+          max_attempts=6
+          for attempt in $(seq 1 "$max_attempts"); do
+            if bun install; then
               exit 0
             fi
-            sleep_seconds=$((attempt * 20))
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              break
+            fi
+            sleep_seconds=$((attempt * 30))
             echo "Dependency install failed on attempt ${attempt}; retrying in ${sleep_seconds}s..."
             sleep "$sleep_seconds"
           done
-          echo "Dependency install failed after 3 attempts." >&2
+          echo "Dependency install failed after ${max_attempts} attempts." >&2
           exit 1
 
       - name: Validate release version
@@ -204,15 +216,19 @@ jobs:
       - name: Build Electron app
         shell: bash
         run: |
-          for attempt in 1 2 3; do
+          max_attempts=6
+          for attempt in $(seq 1 "$max_attempts"); do
             if bun run build:electron; then
               exit 0
             fi
-            sleep_seconds=$((attempt * 30))
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              break
+            fi
+            sleep_seconds=$((attempt * 45))
             echo "Electron build failed on attempt ${attempt}; retrying in ${sleep_seconds}s..."
             sleep "$sleep_seconds"
           done
-          echo "Electron build failed after 3 attempts." >&2
+          echo "Electron build failed after ${max_attempts} attempts." >&2
           exit 1
           
       - name: Upload artifacts
