@@ -188,20 +188,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          max_attempts=6
-          for attempt in $(seq 1 "$max_attempts"); do
-            if bun install; then
-              exit 0
-            fi
-            if [ "$attempt" -eq "$max_attempts" ]; then
-              break
-            fi
-            sleep_seconds=$((attempt * 30))
-            echo "Dependency install failed on attempt ${attempt}; retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-          done
-          echo "Dependency install failed after ${max_attempts} attempts." >&2
-          exit 1
+          node scripts/ci-run-with-retry.mjs --attempts 6 --timeout 360 --delay-step 30 -- bun install
 
       - name: Validate release version
         shell: bash
@@ -216,20 +203,7 @@ jobs:
       - name: Build Electron app
         shell: bash
         run: |
-          max_attempts=6
-          for attempt in $(seq 1 "$max_attempts"); do
-            if bun run build:electron; then
-              exit 0
-            fi
-            if [ "$attempt" -eq "$max_attempts" ]; then
-              break
-            fi
-            sleep_seconds=$((attempt * 45))
-            echo "Electron build failed on attempt ${attempt}; retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-          done
-          echo "Electron build failed after ${max_attempts} attempts." >&2
-          exit 1
+          node scripts/ci-run-with-retry.mjs --attempts 6 --timeout 1800 --delay-step 45 -- bun run build:electron
           
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
