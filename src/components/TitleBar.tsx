@@ -96,7 +96,7 @@ export function TitleBar() {
 
   return (
     <header
-      class="h-10 shrink-0 bg-background-base relative overflow-hidden flex flex-row border-b border-border-weaker-base"
+      class="shob-titlebar h-10 shrink-0 bg-background-base relative overflow-hidden flex flex-row"
       style={{
         "min-height": `${TITLEBAR_HEIGHT}px`,
         "padding-left": mac() ? (isFullscreen() ? "10px" : "84px") : "0",

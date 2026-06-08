@@ -1299,6 +1299,10 @@ b {
 /* ═══════════════════════════════════════════════════
    SHOB PREMIUM TITLEBAR ICON STYLING
    ═══════════════════════════════════════════════════ */
+.shob-titlebar {
+  border-bottom: 0.5px solid color-mix(in srgb, var(--border-weaker-base, var(--border-weak-base)) 42%, transparent);
+}
+
 .titlebar-icon {
   width: 32px !important;
   height: 24px !important;
