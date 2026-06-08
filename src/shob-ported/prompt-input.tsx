@@ -1,6 +1,18 @@
 import { useFilteredList } from "@opencode-ai/ui/hooks"
 import { useSpring } from "@opencode-ai/ui/motion-spring"
-import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show, Component, createResource } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  Component,
+  createResource,
+  type JSX,
+} from "solid-js"
 import { createStore, reconcile, unwrap } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { selectionFromLines, type SelectedLineRange } from "@/context/file/types"
@@ -72,6 +84,7 @@ interface PromptInputProps {
   newSessionWorktree?: string
   onNewSessionWorktreeReset?: () => void
   edit?: { id: string; prompt: Prompt; context: FollowupDraft["context"] }
+  composerHeader?: JSX.Element
   onEditLoaded?: () => void
   shouldQueue?: () => boolean
   onQueue?: (draft: FollowupDraft) => void
@@ -1758,6 +1771,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         }}
         class="agent-terminal-prompt-shell border border-border/60 rounded-2xl flex flex-col w-full overflow-visible! transition-all duration-300"
       >
+        {props.composerHeader}
         <PromptDragOverlay
           type={store.draggingType}
           label={language.t(store.draggingType === "@mention" ? "prompt.dropzone.file.label" : "prompt.dropzone.label")}

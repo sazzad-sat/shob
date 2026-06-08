@@ -515,6 +515,7 @@ export function MainView() {
       setIsSidePanelHidden(false)
       setIsReviewVisible(true)
       setIsFileTreeVisible(true)
+      setActiveTabId("review")
     }
 
     window.addEventListener(AGENT_REVIEW_OPEN_EVENT, handleReviewWorkspaceOpenRequest)
@@ -797,7 +798,7 @@ export function MainView() {
                       width: sessionPanelStyleWidth(),
                     }}
                   >
-                    <TerminalPanel onNewSession={handleCreateSession} />
+                    <TerminalPanel onNewSession={handleCreateSession} reviewDiffs={reviewDiffs} />
                   </div>
 
                   {projectSessions().length === 0 && (

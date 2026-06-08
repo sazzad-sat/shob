@@ -40,7 +40,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useProviders } from "@/hooks/use-providers"
 import { getSessionContextMetrics, type Context as SessionContextMetricsContext } from "@/components/session/session-context-metrics"
-import { AGENT_REVIEW_OPEN_EVENT, createAgentTurnDiffSummary } from "@/components/agent-turn-diff-summary"
+import {
+  AGENT_REVIEW_OPEN_EVENT,
+  createAgentTurnDiffSummary,
+  type AgentTurnDiff,
+  type AgentTurnDiffSummary,
+} from "@/components/agent-turn-diff-summary"
 import {
   buildAgentTimelineOrphanRows,
   buildAgentTimelineTurnRows,
@@ -53,6 +58,7 @@ import shobLogo from "@/assets/icon/shob.png"
 interface AgentViewProps {
   sessionId: string
   projectPath?: string
+  reviewDiffs?: () => AgentTurnDiff[]
 }
 
 type OpenWithTarget = "vscode" | "explorer" | "terminal" | "git-bash" | "wsl"
@@ -304,6 +310,40 @@ function AgentTurnDiffSummaryCard(props: { message: ChatMessage }) {
   )
 }
 
+function AgentComposerReviewStrip(props: { summary: () => AgentTurnDiffSummary }) {
+  const fileLabel = createMemo(() => (props.summary().count === 1 ? "file" : "files"))
+  const hasStats = createMemo(() => props.summary().additions > 0 || props.summary().deletions > 0)
+
+  const openReview = () => {
+    window.dispatchEvent(new Event(AGENT_REVIEW_OPEN_EVENT))
+  }
+
+  return (
+    <Show when={props.summary().count > 0}>
+      <div class="agent-composer-review-strip" data-component="agent-composer-review-strip">
+        <div class="agent-composer-review-summary">
+          <span class="agent-composer-review-count">
+            {props.summary().count} {fileLabel()} changed
+          </span>
+          <Show when={hasStats()}>
+            <span class="agent-composer-review-stats">
+              <Show when={props.summary().additions > 0}>
+                <span data-kind="add">+{formatDiffStat(props.summary().additions)}</span>
+              </Show>
+              <Show when={props.summary().deletions > 0}>
+                <span data-kind="delete">-{formatDiffStat(props.summary().deletions)}</span>
+              </Show>
+            </span>
+          </Show>
+        </div>
+        <button type="button" class="agent-composer-review-button" onClick={openReview}>
+          Review
+        </button>
+      </div>
+    </Show>
+  )
+}
+
 function OpenWithOptionIcon(props: { option: (typeof openWithOptions)[number] }) {
   if (props.option.icon) {
     return <AppIcon id={props.option.icon} class="size-5 shrink-0 rounded-[4px]" />
@@ -550,6 +590,7 @@ function AgentViewInner(props: AgentViewProps) {
   const messages = createMemo<ChatMessage[]>(() => messageState() ?? [])
   const contextMetrics = createMemo(() => getSessionContextMetrics(messages(), providers.all()))
   const contextInfo = createMemo(() => contextMetrics().context)
+  const composerReviewSummary = createMemo(() => createAgentTurnDiffSummary(props.reviewDiffs?.() ?? [], 0))
   const activeQueuedFollowups = createMemo(() => {
     const sessionID = activeSessionId()
     if (!sessionID) return []
@@ -1710,7 +1751,12 @@ function AgentViewInner(props: AgentViewProps) {
                   </Show>
                 </div>
               </Show>
-              <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
+              <PromptInput
+                composerHeader={<AgentComposerReviewStrip summary={composerReviewSummary} />}
+                shouldQueue={() => working()}
+                onQueue={enqueueFollowup}
+                onSubmit={resumeScroll}
+              />
             </div>
           </Show>
         </div>

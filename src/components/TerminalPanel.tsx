@@ -5,6 +5,7 @@ import { useStore } from "../store"
 
 interface TerminalPanelProps {
   onNewSession: () => void
+  reviewDiffs?: () => Array<{ file: string; additions: number; deletions: number }>
 }
 
 export function TerminalPanel(_props: TerminalPanelProps) {
@@ -23,7 +24,11 @@ export function TerminalPanel(_props: TerminalPanelProps) {
         {(session) => (
           <div class="h-full w-full min-h-0 overflow-hidden">
             <Show when={session().cliTool} fallback={<Terminal sessionId={session().id} />}>
-              <AgentView sessionId={session().id} projectPath={currentProject()?.path} />
+              <AgentView
+                sessionId={session().id}
+                projectPath={currentProject()?.path}
+                reviewDiffs={_props.reviewDiffs}
+              />
             </Show>
           </div>
         )}
