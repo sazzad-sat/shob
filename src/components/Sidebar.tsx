@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
-import { Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Search, Settings, SquarePen, X } from "lucide-solid"
+import { Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Search, Settings, SquarePen, Trash2, X } from "lucide-solid"
 import {
   DragDropProvider,
   DragDropSensors,
@@ -22,6 +22,7 @@ import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { sessionPermissionRequest } from "@/shob-ported/composer/session-request-tree"
 import { findReusableEmptyRootShobSession, sortShobSessionsById } from "@/utils/shob-session"
+import { showToast } from "@opencode-ai/ui/toast"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -326,6 +327,7 @@ function FolderSection(props: {
   onCreateSession: (projectId: string) => void
   onDeleteSession: (projectId: string, sessionId: string) => void
   onDeleteProject: (projectId: string) => void
+  onClearProjectHistory: (projectId: string) => void | Promise<void>
   onSyncShobSessions: (projectId: string, sessions: ShobSession[]) => void
   onRenameSession: (projectId: string, sessionId: string, newName: string) => void
   onRenameProject: (projectId: string, name: string) => void | Promise<void>
@@ -342,8 +344,10 @@ function FolderSection(props: {
   const [showAllSessions, setShowAllSessions] = createSignal(false)
   const [projectMenuOpen, setProjectMenuOpen] = createSignal(false)
   const [renameProjectOpen, setRenameProjectOpen] = createSignal(false)
+  const [clearHistoryOpen, setClearHistoryOpen] = createSignal(false)
   const [renameProjectValue, setRenameProjectValue] = createSignal(props.project.name)
   const [renameProjectSaving, setRenameProjectSaving] = createSignal(false)
+  const [clearHistorySaving, setClearHistorySaving] = createSignal(false)
   const [confirmDeleteSessionId, setConfirmDeleteSessionId] = createSignal<string | null>(null)
   const projectStore = createMemo(() => globalSync.child(props.project.path)[0])
   const shobSessions = createMemo(() => projectStore().session)
@@ -470,6 +474,11 @@ function FolderSection(props: {
     window.setTimeout(() => setRenameProjectOpen(true), 20)
   }
 
+  const openClearHistoryDialog = () => {
+    setProjectMenuOpen(false)
+    window.setTimeout(() => setClearHistoryOpen(true), 20)
+  }
+
   const submitRenameProject = async () => {
     const trimmed = renameProjectValueTrimmed()
     if (!trimmed || trimmed === props.project.name || renameProjectSaving()) return
@@ -480,6 +489,24 @@ function FolderSection(props: {
       setRenameProjectOpen(false)
     } finally {
       setRenameProjectSaving(false)
+    }
+  }
+
+  const submitClearHistory = async () => {
+    if (clearHistorySaving()) return
+
+    setClearHistorySaving(true)
+    try {
+      await props.onClearProjectHistory(props.project.id)
+      setClearHistoryOpen(false)
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Clear history failed",
+        description: error instanceof Error ? error.message : "Could not clear this project's history.",
+      })
+    } finally {
+      setClearHistorySaving(false)
     }
   }
 
@@ -762,6 +789,88 @@ function FolderSection(props: {
         </div>
       </Show>
 
+      <Show when={clearHistoryOpen()}>
+        <div
+          class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`clear-history-title-${props.project.id}`}
+          onClick={() => {
+            if (!clearHistorySaving()) setClearHistoryOpen(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !clearHistorySaving()) setClearHistoryOpen(false)
+          }}
+        >
+          <div
+            class="grid w-full max-w-[420px] gap-0 overflow-hidden rounded-xl border border-border-weak-base bg-surface-raised-base shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div class="border-b border-border-weak-base px-4 pt-4 pb-3">
+              <div class="flex items-center gap-2">
+                <span class="flex size-8 items-center justify-center rounded-md bg-text-diff-delete-base/15 text-icon-critical-base">
+                  <Trash2 size={16} />
+                </span>
+                <div class="min-w-0">
+                  <h2 id={`clear-history-title-${props.project.id}`} class="text-[15px] font-semibold text-text-strong">
+                    Clear history
+                  </h2>
+                  <p class="truncate text-[12px] text-text-weak">
+                    {props.project.name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="ml-auto flex size-7 items-center justify-center rounded-md text-text-weak transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                  aria-label="Close clear history dialog"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!clearHistorySaving()) setClearHistoryOpen(false)
+                  }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+
+            <div class="grid gap-3 px-4 py-4">
+              <p class="text-[13px] leading-5 text-text-base">
+                This permanently deletes all session history saved for this project. Your project files stay untouched.
+              </p>
+              <div class="rounded-md border border-border-weak-base bg-background-stronger px-3 py-2">
+                <div class="text-[11px] font-medium uppercase tracking-wide text-text-weaker">Project path</div>
+                <div class="mt-1 truncate text-[12px] text-text-base">{props.project.path}</div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-border-weak-base bg-background-stronger px-4 py-3">
+              <button
+                type="button"
+                class="inline-flex h-8 items-center justify-center rounded-lg border border-border-weak-base bg-background-stronger px-3 text-[13px] font-medium text-text-base transition-colors hover:bg-surface-raised-base-hover hover:text-text-strong"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!clearHistorySaving()) setClearHistoryOpen(false)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={clearHistorySaving()}
+                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-text-diff-delete-base px-3 text-[13px] font-medium text-white transition-colors hover:bg-text-diff-delete-base/90 disabled:pointer-events-none disabled:opacity-50"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void submitClearHistory()
+                }}
+              >
+                <Trash2 size={14} />
+                {clearHistorySaving() ? "Clearing..." : "Clear history"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
       <div
         class={`group/project flex h-8 items-center justify-between rounded-[5px] pr-1 transition-colors ${
           props.currentProjectId === props.project.id
@@ -833,6 +942,14 @@ function FolderSection(props: {
               >
                 <Pencil size={14} />
                 Rename project
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                data-variant="destructive"
+                class="gap-2 rounded-md px-2 py-1.5 text-[13px] text-icon-critical-base focus:bg-text-diff-delete-base/10 focus:text-icon-critical-base"
+                onClick={(e: MouseEvent) => runProjectMenuAction(e, openClearHistoryDialog)}
+              >
+                <Trash2 size={14} />
+                Clear history
               </DropdownMenuItem>
               <DropdownMenuItem
                 data-variant="destructive"
@@ -909,6 +1026,7 @@ type SortableProjectGroupProps = {
   onCreateSession: (projectId: string) => void
   onDeleteSession: (projectId: string, sessionId: string) => void
   onDeleteProject: (projectId: string) => void
+  onClearProjectHistory: (projectId: string) => void | Promise<void>
   onSyncShobSessions: (projectId: string, sessions: ShobSession[]) => void
   onRenameSession: (projectId: string, sessionId: string, newName: string) => void
   onRenameProject: (projectId: string, name: string) => void | Promise<void>
@@ -954,6 +1072,7 @@ function SortableProjectItems(props: SortableProjectItemsProps) {
           onCreateSession={props.onCreateSession}
           onDeleteSession={props.onDeleteSession}
           onDeleteProject={props.onDeleteProject}
+          onClearProjectHistory={props.onClearProjectHistory}
           onSyncShobSessions={props.onSyncShobSessions}
           onRenameSession={props.onRenameSession}
           onRenameProject={props.onRenameProject}
@@ -997,6 +1116,7 @@ function SortableProjectGroup(props: SortableProjectGroupProps) {
             onCreateSession={props.onCreateSession}
             onDeleteSession={props.onDeleteSession}
             onDeleteProject={props.onDeleteProject}
+            onClearProjectHistory={props.onClearProjectHistory}
             onSyncShobSessions={props.onSyncShobSessions}
             onRenameSession={props.onRenameSession}
             onRenameProject={props.onRenameProject}
@@ -1248,6 +1368,70 @@ export function Sidebar(props: {
     }
   }
 
+  const handleClearProjectHistory = async (projectId: string) => {
+    const project = projects().find((item) => item.id === projectId)
+    if (!project) return
+
+    const client = globalSDK.createClient({ directory: project.path, throwOnError: true })
+    const remoteSessions = await client.session.list({ directory: project.path }).then((response) => response.data ?? [])
+    const remoteSessionIds = Array.from(
+      new Set(remoteSessions.map((session) => session.id).filter((id): id is string => typeof id === "string" && id.length > 0)),
+    )
+    const localSessionIds = project.sessions.map((session) => session.id)
+    const pendingIds = new Set([...remoteSessionIds, ...localSessionIds])
+
+    setPendingDeleteSessionIDs((prev) => {
+      const next = new Set(prev)
+      for (const sessionId of pendingIds) next.add(sessionId)
+      return next
+    })
+
+    try {
+      await Promise.all(localSessionIds.map((sessionId) => nativeApi.terminal().kill(sessionId).catch(() => undefined)))
+
+      const [, setProjectStore] = globalSync.child(project.path)
+      setProjectStore("session", [])
+      setProjectStore("sessionTotal", 0)
+      setProjectStore("session_status", {})
+      setProjectStore("session_error", {})
+      setProjectStore("session_diff", {})
+      setProjectStore("todo", {})
+      setProjectStore("permission", {})
+      setProjectStore("question", {})
+      setProjectStore("message", {})
+      setProjectStore("part", {})
+      setProjectStore("part_text_accum_delta", {})
+
+      await syncShobSessions(projectId, [])
+      if (localSessionIds.includes(activeSessionId() ?? "")) {
+        setActiveSession(null)
+      }
+
+      const deleteResults = await Promise.allSettled(
+        remoteSessionIds.map((sessionID) => client.session.delete({ sessionID, directory: project.path })),
+      )
+      const failed = deleteResults.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected" && !String(result.reason?.message ?? result.reason).toLowerCase().includes("not found"),
+      )
+      if (failed) throw failed.reason
+
+      await globalSync.project.loadSessions(project.path)
+      await syncShobSessions(projectId, [])
+
+      showToast({
+        title: "History cleared",
+        description: `${project.name} has no saved sessions now.`,
+      })
+    } finally {
+      setPendingDeleteSessionIDs((prev) => {
+        const next = new Set(prev)
+        for (const sessionId of pendingIds) next.delete(sessionId)
+        return next
+      })
+    }
+  }
+
   const handleSyncShobSessions = (projectId: string, sessions: ShobSession[]) => {
     const pendingDelete = pendingDeleteSessionIDs()
     const filtered = pendingDelete.size > 0 ? sessions.filter((s) => !pendingDelete.has(s.id)) : sessions
@@ -1395,6 +1579,7 @@ export function Sidebar(props: {
                     onCreateSession={handleCreateSession}
                     onDeleteSession={handleDeleteSession}
                     onDeleteProject={handleDeleteProject}
+                    onClearProjectHistory={handleClearProjectHistory}
                     onSyncShobSessions={handleSyncShobSessions}
                     onRenameSession={renameSession}
                     onRenameProject={handleRenameProject}
@@ -1411,6 +1596,7 @@ export function Sidebar(props: {
                     onCreateSession={handleCreateSession}
                     onDeleteSession={handleDeleteSession}
                     onDeleteProject={handleDeleteProject}
+                    onClearProjectHistory={handleClearProjectHistory}
                     onSyncShobSessions={handleSyncShobSessions}
                     onRenameSession={renameSession}
                     onRenameProject={handleRenameProject}
