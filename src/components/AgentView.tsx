@@ -621,6 +621,10 @@ function AgentViewInner(props: AgentViewProps) {
   let composerDockHeightValue = 0
   const [composerHeight, setComposerHeight] = createSignal(132)
   const [composerDockHeight, setComposerDockHeight] = createSignal(0)
+  const composerDockGap = createMemo(() => {
+    const height = composerHeight()
+    return Math.max(4, Math.min(8, Math.round(height * 0.045)))
+  })
   let rafId: number | undefined
   let composerStickScrollRaf: number | undefined
   let cachedScrollHeight = 0
@@ -1585,6 +1589,7 @@ function AgentViewInner(props: AgentViewProps) {
           style={{
             "--agent-composer-dock-height": `${composerDockHeight()}px`,
             "--agent-composer-height": `${composerHeight()}px`,
+            "--agent-dock-gap": `${composerDockGap()}px`,
           }}
         >
           <div class="agent-terminal-scroll-frame relative min-h-0 flex-1 overflow-hidden">
@@ -1748,6 +1753,7 @@ function AgentViewInner(props: AgentViewProps) {
               style={{
                 "--agent-composer-dock-height": `${composerDockHeight()}px`,
                 "--agent-composer-height": `${composerHeight()}px`,
+                "--agent-dock-gap": `${composerDockGap()}px`,
               }}
             >
               <Show when={composerDockVisible()}>

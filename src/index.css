@@ -1617,27 +1617,27 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-view[data-docked-composer="true"] .agent-terminal-scroll {
-  scroll-padding-bottom: calc(var(--agent-composer-height, 132px) + 32px);
+  scroll-padding-bottom: calc(var(--agent-composer-height, 0px) + 32px);
 }
 
 .agent-terminal-view[data-docked-composer="true"] .agent-terminal-buffer {
-  padding-bottom: calc(var(--agent-composer-height, 132px) + 32px) !important;
+  padding-bottom: calc(var(--agent-composer-height, 0px) + 32px) !important;
 }
 
 .agent-terminal-view[data-docked-composer="true"][data-composer-dock-visible="true"] .agent-terminal-scroll {
   scroll-padding-bottom: calc(
-    var(--agent-composer-height, 132px) +
+    var(--agent-composer-height, 0px) +
     var(--agent-composer-dock-height, 0px) +
-    var(--agent-dock-gap, 44px) +
+    var(--agent-dock-gap, 0px) +
     32px
   );
 }
 
 .agent-terminal-view[data-docked-composer="true"][data-composer-dock-visible="true"] .agent-terminal-buffer {
   padding-bottom: calc(
-    var(--agent-composer-height, 132px) +
+    var(--agent-composer-height, 0px) +
     var(--agent-composer-dock-height, 0px) +
-    var(--agent-dock-gap, 44px) +
+    var(--agent-dock-gap, 0px) +
     32px
   ) !important;
 }
@@ -2184,7 +2184,6 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-composer-region[data-agent-docked="true"] {
-  --agent-dock-gap: 6px;
   position: absolute;
   right: 0;
   bottom: 0;
@@ -2204,7 +2203,12 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   bottom: 0;
   left: 0;
   z-index: 0;
-  height: calc(var(--agent-composer-height, 132px) + 72px);
+  height: calc(
+    var(--agent-composer-height, 0px) +
+    var(--agent-composer-dock-height, 0px) +
+    var(--agent-dock-gap, 0px) +
+    32px
+  );
   background:
     linear-gradient(
       to bottom,
@@ -2229,10 +2233,10 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
 .agent-terminal-composer-docks {
   --agent-dock-available-height: calc(
-    100dvh - var(--agent-composer-height, 132px) - var(--agent-dock-gap, 18px) - 24px
+    100dvh - var(--agent-composer-height, 0px) - var(--agent-dock-gap, 0px) - 24px
   );
   position: absolute;
-  bottom: calc(100% + var(--agent-dock-gap, 18px));
+  bottom: calc(100% + var(--agent-dock-gap, 0px));
   left: 50%;
   display: flex;
   flex-direction: column;
@@ -3472,7 +3476,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
   .agent-terminal-composer-docks {
     --agent-dock-available-height: calc(
-      100dvh - var(--agent-composer-height, 112px) - var(--agent-dock-gap, 18px) - 18px
+      100dvh - var(--agent-composer-height, 0px) - var(--agent-dock-gap, 0px) - 18px
     );
     max-height: min(280px, var(--agent-dock-available-height));
   }
@@ -3500,7 +3504,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 
   .agent-terminal-composer-docks {
     --agent-dock-available-height: calc(
-      100dvh - var(--agent-composer-height, 96px) - var(--agent-dock-gap, 18px) - 14px
+      100dvh - var(--agent-composer-height, 0px) - var(--agent-dock-gap, 0px) - 14px
     );
     max-height: min(240px, var(--agent-dock-available-height));
   }
