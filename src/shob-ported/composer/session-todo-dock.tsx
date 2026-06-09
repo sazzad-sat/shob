@@ -1,6 +1,7 @@
 import type { Todo } from "@opencode-ai/sdk/v2/client"
 import { For, Show, createMemo } from "solid-js"
 import { DockTray } from "@opencode-ai/ui/dock-surface"
+import { ChevronDown } from "lucide-solid"
 
 export function SessionTodoDock(props: {
   todos: Todo[]
@@ -9,21 +10,14 @@ export function SessionTodoDock(props: {
   collapseLabel: string
   expandLabel: string
 }) {
-  const active = createMemo(
-    () =>
-      props.todos.find((todo) => todo.status === "in_progress") ??
-      props.todos.find((todo) => todo.status === "pending") ??
-      props.todos[0],
-  )
   const displayedTodos = createMemo(() => {
-    if (!props.collapsed) return props.todos
-    const todo = active()
-    return todo ? [todo] : []
+    if (props.collapsed) return []
+    return props.todos
   })
   const toggleLabel = createMemo(() => (props.collapsed ? props.expandLabel : props.collapseLabel))
 
   return (
-    <DockTray data-component="session-todo-dock" class="todo-dock">
+    <DockTray data-component="session-todo-dock" class="todo-dock" data-collapsed={props.collapsed ? "true" : "false"}>
       <div
         data-action="session-todo-toggle"
         class="todo-dock-header"
@@ -39,6 +33,7 @@ export function SessionTodoDock(props: {
         }}
       >
         <span class="todo-dock-title">Progress</span>
+        <ChevronDown class="todo-dock-toggle-icon" size={14} aria-hidden="true" />
       </div>
 
       <Show when={displayedTodos().length > 0}>
@@ -51,7 +46,6 @@ export function SessionTodoDock(props: {
               </div>
             )}
           </For>
-          <div class="todo-dock-divider" aria-hidden="true" />
         </div>
       </Show>
     </DockTray>
