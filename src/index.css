@@ -3497,10 +3497,20 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   width: 100% !important;
   height: 100% !important;
   box-sizing: border-box;
+  flex-direction: column;
   min-height: 100% !important;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-block: clamp(16px, 4dvh, 32px) !important;
+  padding-block: 6px 10px !important;
+}
+
+.agent-terminal-view[data-new-session="true"] .agent-terminal-new-session-header {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+}
+
+.agent-terminal-view[data-new-session="true"] .agent-terminal-new-session-header > div {
+  min-height: 32px;
 }
 
 .agent-terminal-view[data-new-session="true"] .agent-terminal-new-session {

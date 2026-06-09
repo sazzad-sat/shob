@@ -1657,6 +1657,17 @@ function AgentViewInner(props: AgentViewProps) {
                   }
                 >
                   <div ref={setContentRef} class="agent-terminal-new-session-stage">
+                    <div class="agent-terminal-new-session-header sticky top-0 z-30 w-full px-1 md:px-1.5">
+                      <div class="flex w-full items-center justify-end gap-1.5">
+                        <Show when={currentBranchName()}>
+                          <div class="agent-header-branch" title={`Current branch: ${currentBranchName()}`} aria-label={`Current branch: ${currentBranchName()}`}>
+                            <Icon name="branch" size="small" />
+                            <span>{currentBranchName()}</span>
+                          </div>
+                        </Show>
+                        <AgentHeaderPanelControls projectPath={props.projectPath ?? currentProject()?.path} />
+                      </div>
+                    </div>
                     <div class="agent-terminal-new-session relative z-10 w-full">
                       <div class="agent-terminal-new-session-heading">
                         <h1>{newSessionTitle()}</h1>
