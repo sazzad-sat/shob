@@ -1702,6 +1702,23 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   color: var(--terminal-agent-muted);
 }
 
+.agent-terminal-view [data-slot="session-turn-thinking-spinner"] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  gap: 1.5px;
+}
+
+.agent-terminal-view [data-slot="session-turn-thinking-spinner-cell"] {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5px;
+  transition: background-color 2s ease-in-out;
+}
+
 .agent-terminal-view [data-component="text-part"] {
   margin-top: 0;
 }

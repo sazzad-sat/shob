@@ -53,7 +53,6 @@ import {
   type AgentTimelineRow,
 } from "@/components/agent-timeline-rows"
 import { SessionContextUsage } from "@/components/session-context-usage"
-import shobLogo from "@/assets/icon/shob.png"
 
 interface AgentViewProps {
   sessionId: string
@@ -127,6 +126,63 @@ const NEW_SESSION_TITLE_KEYS = [
   "session.new.title.improve",
   "session.new.title.ship",
 ] as const
+
+const THINKING_SPINNER_CONFIG = {
+  colors: ["#fca5a5", "#fdba74", "#f97316", "#fb923c", "#f43f5e", "#ef4444"],
+  rotationSpeed: 4.5,
+  colorCycleSpeed: 2000,
+} as const
+
+function ThinkingSpinner() {
+  const [opacities, setOpacities] = createSignal(Array(9).fill(0.1))
+  const [currentColorIndex, setCurrentColorIndex] = createSignal(2)
+
+  onMount(() => {
+    let animationFrameId = 0
+    const startTime = Date.now()
+    const colorTimer = window.setInterval(() => {
+      setCurrentColorIndex((prev) => (prev + 1) % THINKING_SPINNER_CONFIG.colors.length)
+    }, THINKING_SPINNER_CONFIG.colorCycleSpeed)
+
+    const animate = () => {
+      const elapsed = (Date.now() - startTime) / 1000
+      const fx = 1 + Math.cos(elapsed * THINKING_SPINNER_CONFIG.rotationSpeed) * 0.6
+      const fy = 1 + Math.sin(elapsed * THINKING_SPINNER_CONFIG.rotationSpeed) * 0.6
+
+      setOpacities(
+        Array.from({ length: 9 }, (_, i) => {
+          const x = i % 3
+          const y = Math.floor(i / 3)
+          const dist = Math.sqrt((x - fx) ** 2 + (y - fy) ** 2)
+          return Math.min(0.95, Math.max(0.1, 1.2 - dist * 0.85))
+        }),
+      )
+      animationFrameId = window.requestAnimationFrame(animate)
+    }
+
+    animate()
+    onCleanup(() => {
+      window.clearInterval(colorTimer)
+      window.cancelAnimationFrame(animationFrameId)
+    })
+  })
+
+  return (
+    <div data-slot="session-turn-thinking-spinner" aria-hidden="true">
+      <For each={opacities()}>
+        {(opacity) => (
+          <div
+            data-slot="session-turn-thinking-spinner-cell"
+            style={{
+              "background-color": THINKING_SPINNER_CONFIG.colors[currentColorIndex()],
+              opacity,
+            }}
+          />
+        )}
+      </For>
+    </div>
+  )
+}
 
 function isAbortError(error: EventSessionError["properties"]["error"] | undefined) {
   return error?.name === "MessageAbortedError"
@@ -1282,7 +1338,7 @@ function AgentViewInner(props: AgentViewProps) {
             <div data-component="session-turn" class="relative min-w-0 w-full">
               <div data-slot="session-turn-message-container" class="w-full">
                 <div data-slot="session-turn-thinking" class="pl-2">
-                  <img data-slot="session-turn-thinking-logo" src={shobLogo} alt="" aria-hidden="true" />
+                  <ThinkingSpinner />
                   <TextShimmer text={thinkingLabel()} class="session-turn-thinking-label" />
                   <Show when={thinkingElapsed()}>
                     <span data-slot="session-turn-thinking-elapsed">{thinkingElapsed()}</span>
