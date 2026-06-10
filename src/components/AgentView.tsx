@@ -589,6 +589,136 @@ function AgentHeaderPanelControls(props: { projectPath?: string }) {
   )
 }
 
+function BranchSwitcher(props: { projectPath?: string; currentBranch: string; onBranchChanged: (branch: string) => void }) {
+  const [branchMenuOpen, setBranchMenuOpen] = createSignal(false)
+  const [branches, setBranches] = createSignal<string[]>([])
+  const [branchSearch, setBranchSearch] = createSignal("")
+  const [loadingBranches, setLoadingBranches] = createSignal(false)
+  const [branchLoadError, setBranchLoadError] = createSignal("")
+  const [switchingBranch, setSwitchingBranch] = createSignal<string | null>(null)
+  const projectPath = createMemo(() => props.projectPath?.trim() || "")
+  const filteredBranches = createMemo(() => {
+    const query = branchSearch().trim().toLowerCase()
+    if (!query) return branches()
+    return branches().filter((branch) => branch.toLowerCase().includes(query))
+  })
+
+  const withTimeout = <T,>(promise: Promise<T>, ms: number) =>
+    Promise.race([
+      promise,
+      new Promise<T>((_, reject) => window.setTimeout(() => reject(new Error("Timed out loading branches.")), ms)),
+    ])
+
+  const loadBranches = async () => {
+    const path = projectPath()
+    if (!path || loadingBranches()) return
+
+    setBranchLoadError("")
+    setLoadingBranches(true)
+    try {
+      const result = await withTimeout(nativeApi.invoke("get_git_branches", { path }), 8000)
+      const next = [...new Set([...result.branches, props.currentBranch].filter(Boolean))].sort()
+      setBranches(next)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setBranchLoadError(message)
+      showToast({
+        variant: "error",
+        title: "Could not load branches",
+        description: message,
+      })
+    } finally {
+      setLoadingBranches(false)
+    }
+  }
+
+  const handleBranchMenuOpenChange = (open: boolean) => {
+    setBranchMenuOpen(open)
+    if (!open) setBranchSearch("")
+    if (open) void loadBranches()
+  }
+
+  const switchBranch = async (branch: string) => {
+    const path = projectPath()
+    if (!path || switchingBranch() || branch === props.currentBranch) return
+
+    setSwitchingBranch(branch)
+    try {
+      await nativeApi.invoke("switch_git_branch", { path, branch })
+      props.onBranchChanged(branch)
+      setBranchMenuOpen(false)
+      showToast({ title: "Branch switched", description: branch })
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Could not switch branch",
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setSwitchingBranch(null)
+    }
+  }
+
+  return (
+    <DropdownMenu open={branchMenuOpen()} onOpenChange={handleBranchMenuOpenChange} placement="bottom-end" gutter={7}>
+      <div class="agent-header-branch-group">
+        <div class="agent-header-branch" title={`Current branch: ${props.currentBranch}`} aria-label={`Current branch: ${props.currentBranch}`}>
+          <Icon name="branch" size="small" />
+          <span>{props.currentBranch}</span>
+        </div>
+        <DropdownMenuTrigger
+          class="agent-header-branch-trigger"
+          title="Switch branch"
+          aria-label="Choose git branch"
+          disabled={!projectPath() || Boolean(switchingBranch())}
+          onClick={(event: MouseEvent) => event.stopPropagation()}
+        >
+          <ChevronDown size={15} strokeWidth={2.25} class="shrink-0" />
+        </DropdownMenuTrigger>
+      </div>
+      <DropdownMenuContent class="agent-header-branch-menu w-[260px] rounded-xl border border-border-weak-base bg-surface-raised-base/95 p-1.5 text-[13px] shadow-2xl backdrop-blur">
+        <div class="agent-header-branch-search-wrap">
+          <input
+            type="search"
+            class="agent-header-branch-search"
+            value={branchSearch()}
+            onInput={(event) => setBranchSearch(event.currentTarget.value)}
+            placeholder="Search branches..."
+            onClick={(event: MouseEvent) => event.stopPropagation()}
+            onKeyDown={(event: KeyboardEvent) => event.stopPropagation()}
+          />
+        </div>
+        <Show when={!loadingBranches()} fallback={<div class="px-2 py-2 text-[13px] text-text-weaker">Loading branches...</div>}>
+          <Show when={!branchLoadError()} fallback={<div class="px-2 py-2 text-[13px] text-text-weaker">{branchLoadError()}</div>}>
+            <Show when={filteredBranches().length > 0} fallback={<div class="px-2 py-2 text-[13px] text-text-weaker">No matching branches</div>}>
+            <For each={filteredBranches()}>
+              {(branch) => (
+                <DropdownMenuItem
+                  class="min-h-9 gap-2.5 rounded-lg px-2 py-2 text-[13px] text-text-base focus:bg-surface-raised-base-hover disabled:pointer-events-none disabled:opacity-60"
+                  disabled={branch === props.currentBranch || Boolean(switchingBranch())}
+                  onClick={(event: MouseEvent) => {
+                    event.stopPropagation()
+                    void switchBranch(branch)
+                  }}
+                >
+                  <Show
+                    when={switchingBranch() === branch}
+                    fallback={branch === props.currentBranch ? <Check size={15} class="shrink-0 text-text-strong" /> : <Icon name="branch" size="small" />}
+                  >
+                    <span class="size-4 shrink-0 rounded-full border border-text-weaker border-t-text-strong animate-spin" />
+                  </Show>
+                  <span class="truncate font-medium">{branch}</span>
+                </DropdownMenuItem>
+              )}
+            </For>
+            </Show>
+          </Show>
+        </Show>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function AgentViewInner(props: AgentViewProps) {
   const sync = useSync()
   const globalSync = useGlobalSync()
@@ -676,11 +806,15 @@ function AgentViewInner(props: AgentViewProps) {
     return sessionID ? sync.session.get(sessionID) : undefined
   })
   const currentProject = createMemo(() => projects().find((project) => project.id === currentProjectId()) ?? null)
+  const activeProjectPath = createMemo(() => props.projectPath ?? currentProject()?.path)
   const currentLocalSession = createMemo(() => {
     const sessionID = activeSessionId()
     return sessionID ? currentProject()?.sessions.find((session) => session.id === sessionID) ?? null : null
   })
   const currentBranchName = createMemo(() => sync.data.vcs?.branch?.trim() || "")
+  const setCurrentBranchName = (branch: string) => {
+    sync.set("vcs", { ...sync.data.vcs, branch })
+  }
   const title = createMemo(() => currentLocalSession()?.name || sessionTitle(info()?.title) || "New session")
   const statusInfo = createMemo<SessionStatus>(() => {
     const sessionID = activeSessionId()
@@ -1691,12 +1825,9 @@ function AgentViewInner(props: AgentViewProps) {
                     </div>
                     <div class="ml-auto flex shrink-0 items-center gap-2">
                       <Show when={currentBranchName()}>
-                        <div class="agent-header-branch" title={`Current branch: ${currentBranchName()}`} aria-label={`Current branch: ${currentBranchName()}`}>
-                          <Icon name="branch" size="small" />
-                          <span>{currentBranchName()}</span>
-                        </div>
+                        {(branch) => <BranchSwitcher projectPath={activeProjectPath()} currentBranch={branch()} onBranchChanged={setCurrentBranchName} />}
                       </Show>
-                      <AgentHeaderPanelControls projectPath={props.projectPath ?? currentProject()?.path} />
+                      <AgentHeaderPanelControls projectPath={activeProjectPath()} />
                     </div>
                   </div>
                 </div>
@@ -1721,12 +1852,9 @@ function AgentViewInner(props: AgentViewProps) {
                     <div class="agent-terminal-new-session-header sticky top-0 z-30 w-full px-1 md:px-1.5">
                       <div class="flex w-full items-center justify-end gap-1.5">
                         <Show when={currentBranchName()}>
-                          <div class="agent-header-branch" title={`Current branch: ${currentBranchName()}`} aria-label={`Current branch: ${currentBranchName()}`}>
-                            <Icon name="branch" size="small" />
-                            <span>{currentBranchName()}</span>
-                          </div>
+                          {(branch) => <BranchSwitcher projectPath={activeProjectPath()} currentBranch={branch()} onBranchChanged={setCurrentBranchName} />}
                         </Show>
-                        <AgentHeaderPanelControls projectPath={props.projectPath ?? currentProject()?.path} />
+                        <AgentHeaderPanelControls projectPath={activeProjectPath()} />
                       </div>
                     </div>
                     <div class="agent-terminal-new-session relative z-10 w-full">
