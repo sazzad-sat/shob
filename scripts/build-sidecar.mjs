@@ -48,7 +48,7 @@ const result = await Bun.build({
   entrypoints: [path.join(serverDir, "src", "node.ts")],
   outdir,
   format: "esm",
-  sourcemap: "linked",
+  sourcemap: "none",
   external: [
     "jsonc-parser",
   ],

@@ -9,7 +9,7 @@
     "types": ["node", "electron"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "strict": false,
     "skipLibCheck": true,
     "noEmitOnError": false
