@@ -617,11 +617,11 @@ function FolderSection(props: {
           >
             <button
               type="button"
-              class="h-5 rounded-[5px] bg-text-diff-delete-base/15 px-2 text-[11px] font-medium leading-5 text-text-diff-delete-base transition-colors hover:bg-text-diff-delete-base/25"
+              class="flex h-5 items-center justify-center rounded-full bg-red-500/20 px-2.5 transition-colors hover:bg-red-500/30"
               title="Confirm remove session"
               onClick={(e) => handleConfirmDeleteSession(e, session.id)}
             >
-              Confirm
+              <span class="text-[11px] font-medium leading-none text-red-400 whitespace-nowrap">Confirm</span>
             </button>
           </Show>
         </div>
