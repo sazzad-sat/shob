@@ -37,6 +37,22 @@ export type FollowupDraft = {
   browserMode: boolean
 }
 
+export type WorktreePreparation = {
+  directory?: string
+  branch?: string
+  name?: string
+  message: string
+}
+
+export type WorktreeSession = {
+  directory: string
+  session: Partial<Session> & { id: string }
+  baseRef?: string
+  baseCommit?: string
+  branch?: string
+  detached?: boolean
+}
+
 type FollowupSendInput = {
   client: ReturnType<typeof useSDK>["client"]
   globalSync: ReturnType<typeof useGlobalSync>
@@ -195,12 +211,19 @@ type PromptSubmitInput = {
   resetHistoryNavigation: () => void
   setMode: (mode: "normal" | "shell") => void
   setPopover: (popover: "at" | "slash" | null) => void
+  newSession?: Accessor<boolean>
   newSessionWorktree?: Accessor<string | undefined>
+  newSessionWorktreeBaseRef?: Accessor<string | undefined>
+  newSessionWorktreeIncludeLocalChanges?: Accessor<boolean>
   onNewSessionWorktreeReset?: () => void
   shouldQueue?: Accessor<boolean>
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
+  onWorktreePreparing?: (progress: WorktreePreparation) => void
+  onWorktreeSession?: (worktree: WorktreeSession) => Promise<void> | void
+  onWorktreeReady?: (worktree: WorktreeSession) => Promise<void> | void
+  onWorktreeFailed?: (message: string) => void
 }
 
 type CommentItem = {
@@ -327,19 +350,29 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     const projectDirectory = sdk.directory
     const resolvedSession = input.info()
-    const isNewSession = !params.id || !resolvedSession
+    const isNewSession = input.newSession?.() ?? (!params.id || !resolvedSession)
     const shouldAutoAccept = isNewSession && input.autoAccept()
     const worktreeSelection = input.newSessionWorktree?.() || "main"
 
     let sessionDirectory = projectDirectory
     let client = sdk.client
+    let createdWorktree: Awaited<ReturnType<typeof client.worktree.create>>["data"] | undefined
 
     if (isNewSession) {
       if (worktreeSelection === "create") {
-        const createdWorktree = await client.worktree
-          .create({ directory: projectDirectory })
+        input.onWorktreePreparing?.({ message: "[info] Starting worktree creation" })
+        input.onWorktreePreparing?.({ message: "Preparing isolated checkout..." })
+        createdWorktree = await client.worktree
+          .create({
+            directory: projectDirectory,
+            worktreeCreateInput: {
+              baseRef: input.newSessionWorktreeBaseRef?.() || "HEAD",
+              includeLocalChanges: input.newSessionWorktreeIncludeLocalChanges?.() ?? false,
+            },
+          })
           .then((x) => x.data)
           .catch((err) => {
+            input.onWorktreeFailed?.(errorMessage(err))
             showToast({
               title: language.t("prompt.toast.worktreeCreateFailed.title"),
               description: errorMessage(err),
@@ -348,6 +381,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           })
 
         if (!createdWorktree?.directory) {
+          input.onWorktreeFailed?.(language.t("common.requestFailed"))
           showToast({
             title: language.t("prompt.toast.worktreeCreateFailed.title"),
             description: language.t("common.requestFailed"),
@@ -356,6 +390,26 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         }
         WorktreeState.pending(createdWorktree.directory)
         sessionDirectory = createdWorktree.directory
+        input.onWorktreePreparing?.({
+          directory: createdWorktree.directory,
+          branch: createdWorktree.branch,
+          name: createdWorktree.name,
+          message: `Worktree created at ${createdWorktree.directory}`,
+        })
+        input.onWorktreePreparing?.({
+          directory: createdWorktree.directory,
+          branch: createdWorktree.branch,
+          name: createdWorktree.name,
+          message: createdWorktree.detached
+            ? `Detached at ${createdWorktree.baseRef} (${createdWorktree.baseCommit.slice(0, 8)})`
+            : `Branch ${createdWorktree.branch}`,
+        })
+        input.onWorktreePreparing?.({
+          directory: createdWorktree.directory,
+          branch: createdWorktree.branch,
+          name: createdWorktree.name,
+          message: "Waiting for workspace initialization...",
+        })
       }
 
       if (worktreeSelection !== "main" && worktreeSelection !== "create") {
@@ -373,7 +427,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       input.onNewSessionWorktreeReset?.()
     }
 
-    let session = resolvedSession
+    let session = sessionDirectory === projectDirectory ? resolvedSession : undefined
     if (!session && isNewSession) {
       const created = await client.session
         .create()
@@ -392,6 +446,16 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         local.session.promote(sessionDirectory, session.id)
         layout.handoff.setTabs(base64Encode(sessionDirectory), session.id)
         navigate(`/${base64Encode(sessionDirectory)}/session/${session.id}`)
+        if (sessionDirectory !== projectDirectory) {
+          await input.onWorktreeSession?.({
+            directory: sessionDirectory,
+            session: { ...created, directory: sessionDirectory },
+            baseRef: createdWorktree?.baseRef,
+            baseCommit: createdWorktree?.baseCommit,
+            branch: createdWorktree?.branch,
+            detached: createdWorktree?.detached,
+          })
+        }
       }
     }
     if (!session) {
@@ -566,6 +630,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       pending.delete(session.id)
       if (controller.signal.aborted) return false
       if (result.status === "failed") throw new Error(result.message)
+      await input.onWorktreeReady?.({
+        directory: sessionDirectory,
+        session,
+        baseRef: createdWorktree?.baseRef,
+        baseCommit: createdWorktree?.baseCommit,
+        branch: createdWorktree?.branch,
+        detached: createdWorktree?.detached,
+      })
       return true
     }
 
@@ -586,6 +658,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         title: language.t("prompt.toast.promptSendFailed.title"),
         description: errorMessage(err),
       })
+      if (sessionDirectory !== projectDirectory) input.onWorktreeFailed?.(errorMessage(err))
       removeOptimisticMessage()
       restoreCommentItems(commentItems)
       restoreInput()

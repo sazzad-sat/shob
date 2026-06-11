@@ -1664,6 +1664,98 @@ b {
   white-space: nowrap;
 }
 
+.agent-startin-trigger {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  gap: 5px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-weaker);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  outline: none;
+  cursor: pointer;
+}
+
+.agent-startin-trigger:hover,
+.agent-startin-trigger[data-expanded] {
+  background: transparent;
+  color: var(--text-base);
+}
+
+.agent-startin-trigger:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 28%, transparent);
+}
+
+.agent-startin-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.agent-startin-menu {
+  width: 218px !important;
+  min-width: 218px !important;
+  padding: 5px !important;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-weak-base) 72%, transparent);
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--surface-raised-base) 97%, black 3%) !important;
+  color: var(--text-base);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 38%), 0 2px 8px rgb(0 0 0 / 22%) !important;
+  backdrop-filter: blur(18px);
+}
+
+.agent-startin-item {
+  display: flex;
+  align-items: center;
+  gap: 8px !important;
+  width: 100%;
+  height: 29px;
+  min-height: 29px;
+  padding: 0 7px !important;
+  border-radius: 8px !important;
+  color: var(--text-strong) !important;
+  font-size: 13px !important;
+  font-weight: 400;
+  line-height: 1;
+  outline: none;
+  cursor: default;
+  transition: background-color 80ms ease;
+}
+
+.agent-startin-item:hover,
+.agent-startin-item:focus,
+.agent-startin-item:focus-visible {
+  background: color-mix(in srgb, var(--surface-raised-base-hover) 88%, white 2%) !important;
+}
+
+.agent-startin-item-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: var(--text-weak);
+}
+
+.agent-startin-item > span {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-startin-item-end {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--text-weak);
+}
+
 .agent-terminal-buffer {
   padding: 20px 0 20px !important;
 }

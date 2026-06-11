@@ -1,6 +1,11 @@
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, mapArray, onCleanup, onMount, Show } from "solid-js"
 import { PromptInput } from "../shob-ported/prompt-input"
-import { sendFollowupDraft, type FollowupDraft } from "@/shob-ported/prompt-input/submit"
+import {
+  sendFollowupDraft,
+  type FollowupDraft,
+  type WorktreePreparation,
+  type WorktreeSession,
+} from "@/shob-ported/prompt-input/submit"
 import { MockSessionProviders } from "../shob-ported/mock-session-layout"
 import { useSync } from "@/context/sync"
 import { useGlobalSync } from "@/context/global-sync"
@@ -93,6 +98,33 @@ const formatCompactNumber = (value: number | null | undefined) => {
 }
 
 const formatDiffStat = (value: number) => value.toLocaleString()
+
+type WorktreePreparationState = {
+  status: "creating" | "failed"
+  directory?: string
+  branch?: string
+  lines: string[]
+}
+
+function WorktreePreparationView(props: { state: WorktreePreparationState }) {
+  return (
+    <div class="agent-worktree-preparation mx-auto flex w-full max-w-[760px] flex-col gap-4 px-6 py-8">
+      <div class="text-[13px] text-text-weaker">
+        {props.state.status === "failed" ? "Could not start conversation." : "Starting conversation."}
+      </div>
+      <div
+        class="min-h-[300px] rounded-xl border border-border-weak-base bg-surface-base px-3 py-3 font-mono text-[13px] leading-5 text-text-weak shadow-sm"
+        role="status"
+        aria-live="polite"
+      >
+        <For each={props.state.lines}>{(line) => <div class="break-all">{line}</div>}</For>
+        <Show when={props.state.status === "creating"}>
+          <div class="mt-1 h-4 w-2 animate-pulse bg-text-weaker" aria-hidden="true" />
+        </Show>
+      </div>
+    </div>
+  )
+}
 
 const formatThinkingElapsed = (ms: number) => {
   const totalSeconds = ms / 1000
@@ -733,6 +765,7 @@ function AgentViewInner(props: AgentViewProps) {
   const renameSession = useStore((s) => s.renameSession)
   const updateSession = useStore((s) => s.updateSession)
   const syncShobSessions = useStore((s) => s.syncShobSessions)
+  const activateShobSession = useStore((s) => s.activateShobSession)
   const language = useLanguage()
   const [showJump, setShowJump] = createSignal(false)
   const [sessionMenuOpen, setSessionMenuOpen] = createSignal(false)
@@ -743,6 +776,7 @@ function AgentViewInner(props: AgentViewProps) {
   const [autoCompactingContext, setAutoCompactingContext] = createSignal(false)
   const [autoCompactKey, setAutoCompactKey] = createSignal("")
   const [queuedFollowups, setQueuedFollowups] = createSignal<QueuedFollowup[]>([])
+  const [worktreePreparation, setWorktreePreparation] = createSignal<WorktreePreparationState>()
   let scrollRef: HTMLDivElement | undefined
   let contentRef: HTMLDivElement | undefined
   let composerRegionRef: HTMLDivElement | undefined
@@ -814,6 +848,60 @@ function AgentViewInner(props: AgentViewProps) {
   const currentBranchName = createMemo(() => sync.data.vcs?.branch?.trim() || "")
   const setCurrentBranchName = (branch: string) => {
     sync.set("vcs", { ...sync.data.vcs, branch })
+  }
+  const createBranchHere = async () => {
+    const project = currentProject()
+    const session = currentLocalSession()
+    const directory = activeProjectPath()
+    if (!project || !session || !directory) return
+    const suggested = `codex/${session.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "worktree"}`
+    const branch = window.prompt("Create branch here", suggested)?.trim()
+    if (!branch) return
+    try {
+      await nativeApi.invoke("create_git_branch", { path: directory, branch })
+      setCurrentBranchName(branch)
+      await updateSession(project.id, session.id, { worktreeBranch: branch })
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Could not create branch",
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+  const handleWorktreePreparing = (progress: WorktreePreparation) => {
+    setWorktreePreparation((current) => ({
+      status: "creating",
+      directory: progress.directory ?? current?.directory,
+      branch: progress.branch ?? current?.branch,
+      lines: [...(current?.lines ?? []), progress.message],
+    }))
+  }
+  const handleWorktreeReady = async (worktree: WorktreeSession) => {
+    const project = currentProject()
+    if (!project) return
+    setWorktreePreparation((current) => ({
+      status: "creating",
+      directory: worktree.directory,
+      branch: current?.branch,
+      lines: [...(current?.lines ?? []), "Workspace ready. Switching agent to the worktree..."],
+    }))
+    await activateShobSession(project.id, worktree.session, worktree.directory, {
+      workspaceMode: "worktree",
+      managedWorktreeDirectory: worktree.directory,
+      worktreeBaseRef: worktree.baseRef ?? null,
+      worktreeBaseCommit: worktree.baseCommit ?? null,
+      worktreeBranch: worktree.branch ?? null,
+      worktreeState: "ready",
+    })
+  }
+  const handleWorktreeFailed = (message: string) => {
+    setWorktreePreparation((current) => ({
+      status: "failed",
+      directory: current?.directory,
+      branch: current?.branch,
+      lines: [...(current?.lines ?? []), `[error] ${message}`],
+    }))
   }
   const title = createMemo(() => currentLocalSession()?.name || sessionTitle(info()?.title) || "New session")
   const statusInfo = createMemo<SessionStatus>(() => {
@@ -1827,6 +1915,9 @@ function AgentViewInner(props: AgentViewProps) {
                       <Show when={currentBranchName()}>
                         {(branch) => <BranchSwitcher projectPath={activeProjectPath()} currentBranch={branch()} onBranchChanged={setCurrentBranchName} />}
                       </Show>
+                      <Show when={currentLocalSession()?.workspaceMode === "worktree" && !currentBranchName()}>
+                        <Button size="small" variant="ghost" onClick={createBranchHere}>Create branch here</Button>
+                      </Show>
                       <AgentHeaderPanelControls projectPath={activeProjectPath()} />
                     </div>
                   </div>
@@ -1854,17 +1945,38 @@ function AgentViewInner(props: AgentViewProps) {
                         <Show when={currentBranchName()}>
                           {(branch) => <BranchSwitcher projectPath={activeProjectPath()} currentBranch={branch()} onBranchChanged={setCurrentBranchName} />}
                         </Show>
+                        <Show when={currentLocalSession()?.workspaceMode === "worktree" && !currentBranchName()}>
+                          <Button size="small" variant="ghost" onClick={createBranchHere}>Create branch here</Button>
+                        </Show>
                         <AgentHeaderPanelControls projectPath={activeProjectPath()} />
                       </div>
                     </div>
                     <div class="agent-terminal-new-session relative z-10 w-full">
-                      <div class="agent-terminal-new-session-heading">
-                        <h1>{newSessionTitle()}</h1>
-                      </div>
-                      <Show when={showInlineComposer()}>
-                        <div class="agent-terminal-new-session-composer" data-agent-docked="false">
-                          <PromptInput shouldQueue={() => working()} onQueue={enqueueFollowup} onSubmit={resumeScroll} />
-                        </div>
+                      <Show
+                        when={worktreePreparation()}
+                        fallback={
+                          <>
+                            <div class="agent-terminal-new-session-heading">
+                              <h1>{newSessionTitle()}</h1>
+                            </div>
+                            <Show when={showInlineComposer()}>
+                              <div class="agent-terminal-new-session-composer" data-agent-docked="false">
+                                <PromptInput
+                                  newSession={isNewSession()}
+                                  shouldQueue={() => working()}
+                                  onQueue={enqueueFollowup}
+                                  onSubmit={resumeScroll}
+                                  onWorktreePreparing={handleWorktreePreparing}
+                                  onWorktreeSession={handleWorktreeReady}
+                                  onWorktreeReady={handleWorktreeReady}
+                                  onWorktreeFailed={handleWorktreeFailed}
+                                />
+                              </div>
+                            </Show>
+                          </>
+                        }
+                      >
+                        {(state) => <WorktreePreparationView state={state()} />}
                       </Show>
                     </div>
                   </div>
@@ -1953,10 +2065,15 @@ function AgentViewInner(props: AgentViewProps) {
                 </div>
               </Show>
               <PromptInput
+                newSession={isNewSession()}
                 composerHeader={<AgentComposerReviewStrip summary={composerReviewSummary} />}
                 shouldQueue={() => working()}
                 onQueue={enqueueFollowup}
                 onSubmit={resumeScroll}
+                onWorktreePreparing={handleWorktreePreparing}
+                onWorktreeSession={handleWorktreeReady}
+                onWorktreeReady={handleWorktreeReady}
+                onWorktreeFailed={handleWorktreeFailed}
               />
             </div>
           </Show>

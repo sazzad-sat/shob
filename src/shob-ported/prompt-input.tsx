@@ -42,7 +42,13 @@ import { Select } from "@opencode-ai/ui/select"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { DialogSelectModel } from "@/components/dialog-select-model"
 import { useProviders } from "@/hooks/use-providers"
 import { useCommand } from "@/context/command"
@@ -64,7 +70,12 @@ import {
   type PromptHistoryStoredEntry,
   promptLength,
 } from "./prompt-input/history"
-import { createPromptSubmit, type FollowupDraft } from "./prompt-input/submit"
+import {
+  createPromptSubmit,
+  type FollowupDraft,
+  type WorktreePreparation,
+  type WorktreeSession,
+} from "./prompt-input/submit"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
@@ -77,10 +88,12 @@ import { useQueryOptions, pathKey } from "./mock-session-layout"
 import { formatServerError } from "@/utils/server-errors"
 import { uuid } from "@/utils/uuid"
 import type { ElectronBrowserElementSelection } from "@/electron"
+import { nativeApi } from "@/services/native"
 
 interface PromptInputProps {
   class?: string
   ref?: (el: HTMLDivElement) => void
+  newSession?: boolean
   newSessionWorktree?: string
   onNewSessionWorktreeReset?: () => void
   edit?: { id: string; prompt: Prompt; context: FollowupDraft["context"] }
@@ -90,6 +103,10 @@ interface PromptInputProps {
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
+  onWorktreePreparing?: (progress: WorktreePreparation) => void
+  onWorktreeSession?: (worktree: WorktreeSession) => Promise<void> | void
+  onWorktreeReady?: (worktree: WorktreeSession) => Promise<void> | void
+  onWorktreeFailed?: (message: string) => void
 }
 
 const EXAMPLES = [
@@ -1539,12 +1556,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     },
     setMode: (mode) => setStore("mode", mode),
     setPopover: (popover) => setStore("popover", popover),
-    newSessionWorktree: () => props.newSessionWorktree,
-    onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
+    newSession: () => props.newSession ?? false,
+    newSessionWorktree: () => newSessionWorktree(),
+    newSessionWorktreeBaseRef: () => newSessionWorktreeBaseRef(),
+    newSessionWorktreeIncludeLocalChanges: () => includeLocalChanges(),
+    onNewSessionWorktreeReset: () => {
+      setNewSessionWorktree("main")
+      props.onNewSessionWorktreeReset?.()
+    },
     shouldQueue: props.shouldQueue,
     onQueue: props.onQueue,
     onAbort: props.onAbort,
     onSubmit: props.onSubmit,
+    onWorktreePreparing: props.onWorktreePreparing,
+    onWorktreeSession: props.onWorktreeSession,
+    onWorktreeReady: props.onWorktreeReady,
+    onWorktreeFailed: props.onWorktreeFailed,
   })
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1733,6 +1760,36 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     (p) => p,
   )
   const [attachMenuOpen, setAttachMenuOpen] = createSignal(false)
+  const [newSessionWorktree, setNewSessionWorktree] = createSignal<"main" | "create">(
+    (props.newSessionWorktree as "main" | "create" | undefined) ?? "main",
+  )
+  const [localBranches, setLocalBranches] = createSignal<string[]>([])
+  const [currentBranch, setCurrentBranch] = createSignal("HEAD")
+  const [newSessionWorktreeBaseRef, setNewSessionWorktreeBaseRef] = createSignal("HEAD")
+  const [includeLocalChanges, setIncludeLocalChanges] = createSignal(true)
+  const [gitRepository, setGitRepository] = createSignal(true)
+  const worktreeChoiceLabel = () => (newSessionWorktree() === "create" ? "New worktree" : "Work locally")
+
+  createEffect(() => {
+    const directory = sdk.directory
+    if (!props.newSession) return
+    void Promise.all([
+      nativeApi.invoke("get_git_branch", { path: directory }),
+      nativeApi.invoke("get_git_branches", { path: directory }),
+      nativeApi.invoke("is_git_repository", { path: directory }),
+    ]).then(([branch, branches, isGit]) => {
+      setGitRepository(isGit)
+      const current = branch.head?.trim() || "HEAD"
+      setCurrentBranch(current)
+      setNewSessionWorktreeBaseRef(current)
+      setLocalBranches(branches.branches)
+    }).catch(() => {
+      setGitRepository(false)
+      setCurrentBranch("HEAD")
+      setNewSessionWorktreeBaseRef("HEAD")
+      setLocalBranches([])
+    })
+  })
 
   return (
     <div
@@ -1881,7 +1938,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           class="agent-terminal-toolbar flex items-center justify-between gap-2 px-4 py-2.5 min-h-[48px] rounded-b-2xl"
           onMouseDown={(e) => {
             // Prevent toolbar from stealing focus from editor
-            if (e.target instanceof HTMLElement && !e.target.closest('[data-action="prompt-attach"]')) {
+            if (
+              e.target instanceof HTMLElement &&
+              !e.target.closest('[data-action="prompt-attach"], [data-action="prompt-worktree"]')
+            ) {
               e.preventDefault()
             }
           }}
@@ -1965,6 +2025,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </button>
               </DropdownMenuContent>
             </DropdownMenu>
+
+
 
             <Show when={!providersLoading() && store.mode !== "shell"}>
               <TooltipKeybind
@@ -2120,6 +2182,102 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           </div>
         </div>
       </DockShellForm>
+
+      <Show when={props.newSession}>
+        <div class="flex items-center gap-2 mt-2 px-1">
+          <DropdownMenu placement="top-start" gutter={6}>
+            <DropdownMenuTrigger
+              data-action="prompt-worktree"
+              type="button"
+              class="agent-startin-trigger"
+              disabled={improvingPrompt()}
+              aria-label="Choose where to start"
+              title="Start in"
+            >
+              <Icon name={newSessionWorktree() === "create" ? "worktree" : "work-local"} class="size-[15px]" />
+              <span>{worktreeChoiceLabel()}</span>
+              <Icon name="chevron-down" class="size-[14px]" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent class="agent-startin-menu z-[140]">
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  class="agent-startin-item"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setNewSessionWorktree("main")
+                    restoreFocus()
+                  }}
+                >
+                  <Icon name="work-local" class="agent-startin-item-icon" />
+                  <span>Work locally</span>
+                  <Show when={newSessionWorktree() === "main"}>
+                    <Icon name="check-small" class="agent-startin-item-end" />
+                  </Show>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  class="agent-startin-item"
+                  disabled={!gitRepository()}
+                  title={!gitRepository() ? "Worktrees require a Git repository" : undefined}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setNewSessionWorktree("create")
+                    restoreFocus()
+                  }}
+                >
+                  <Icon name="worktree" class="agent-startin-item-icon" />
+                  <span>New worktree</span>
+                  <Show when={newSessionWorktree() === "create"}>
+                    <Icon name="check-small" class="agent-startin-item-end" />
+                  </Show>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Show when={newSessionWorktree() === "create"}>
+            <DropdownMenu placement="top-start" gutter={6}>
+              <DropdownMenuTrigger type="button" class="agent-startin-trigger" aria-label="Choose starting branch">
+                <Icon name="branch" class="size-[15px]" />
+                <span>{includeLocalChanges() ? `${newSessionWorktreeBaseRef()} + changes` : newSessionWorktreeBaseRef()}</span>
+                <Icon name="chevron-down" class="size-[14px]" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent class="agent-startin-menu z-[140]">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    class="agent-startin-item"
+                    onClick={() => {
+                      setNewSessionWorktreeBaseRef(currentBranch())
+                      setIncludeLocalChanges(true)
+                    }}
+                  >
+                    <Icon name="branch" class="agent-startin-item-icon" />
+                    <span>{currentBranch()} with local changes</span>
+                    <Show when={includeLocalChanges()}><Icon name="check-small" class="agent-startin-item-end" /></Show>
+                  </DropdownMenuItem>
+                  <For each={localBranches()}>
+                    {(branch) => (
+                      <DropdownMenuItem
+                        class="agent-startin-item"
+                        onClick={() => {
+                          setNewSessionWorktreeBaseRef(branch)
+                          setIncludeLocalChanges(false)
+                        }}
+                      >
+                        <Icon name="branch" class="agent-startin-item-icon" />
+                        <span>{branch}</span>
+                        <Show when={!includeLocalChanges() && newSessionWorktreeBaseRef() === branch}>
+                          <Icon name="check-small" class="agent-startin-item-end" />
+                        </Show>
+                      </DropdownMenuItem>
+                    )}
+                  </For>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </Show>
+        </div>
+      </Show>
 
     </div>
   )

@@ -26,6 +26,7 @@ import type { ProjectMeta } from "./global-sync/types"
 import { SESSION_RECENT_LIMIT } from "./global-sync/types"
 import { sanitizeProject } from "./global-sync/utils"
 import { formatServerError } from "@/utils/server-errors"
+import { Worktree as WorktreeState } from "@/utils/worktree"
 
 type GlobalStore = {
   ready: boolean
@@ -284,6 +285,12 @@ function createGlobalSync() {
     const directory = e.name
     const event = e.details
     const recent = bootingRoot || Date.now() - bootedAt < 1500
+
+    if (event.type === "worktree.ready") WorktreeState.ready(directory)
+    if (event.type === "worktree.failed") {
+      const properties = event.properties as { message?: string } | undefined
+      WorktreeState.failed(directory, properties?.message ?? "Worktree preparation failed")
+    }
 
     if (directory === "global") {
       applyGlobalEvent({

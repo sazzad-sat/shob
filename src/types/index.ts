@@ -11,6 +11,13 @@ export interface Project {
 export interface Session {
   id: string;
   name: string;
+  workspaceMode?: "local" | "worktree";
+  workspaceDirectory?: string | null;
+  managedWorktreeDirectory?: string | null;
+  worktreeBaseRef?: string | null;
+  worktreeBaseCommit?: string | null;
+  worktreeBranch?: string | null;
+  worktreeState?: "creating" | "ready" | "missing" | "archived";
   parentSessionId?: string | null;
   shell: string;
   cliTool?: string | null;

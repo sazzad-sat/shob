@@ -2050,6 +2050,9 @@ export type WorktreeError = {
 
 export type WorktreeCreateInput = {
   name?: string
+  baseRef?: string
+  baseCommit?: string
+  includeLocalChanges?: boolean
   /**
    * Additional startup script to run after the project's start command
    */
@@ -2060,6 +2063,10 @@ export type Worktree = {
   name: string
   branch?: string
   directory: string
+  baseRef: string
+  baseCommit: string
+  detached: boolean
+  setupStatus: "pending" | "ready"
 }
 
 export type WorktreeRemoveInput = {

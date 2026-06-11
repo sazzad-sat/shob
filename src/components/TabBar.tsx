@@ -40,10 +40,11 @@ export function TabBar() {
   const handleDeleteSession = async (projectId: string, sessionId: string) => {
     const project = projects().find((item) => item.id === projectId)
     if (!project) return
+    const directory = project.sessions.find((session) => session.id === sessionId)?.workspaceDirectory ?? project.path
 
     if (sessionId.startsWith("ses")) {
       try {
-        await globalSDK.createClient({ directory: project.path, throwOnError: true }).session.delete({ sessionID: sessionId })
+        await globalSDK.createClient({ directory, throwOnError: true }).session.delete({ sessionID: sessionId })
       } catch (error) {
         showToast({
           variant: "error",
@@ -55,10 +56,10 @@ export function TabBar() {
     }
 
     await removeSession(projectId, sessionId)
-    removePersistedSessionState({ directory: project.path, sessionId, platform })
+    removePersistedSessionState({ directory, sessionId, platform })
 
     if (sessionId.startsWith("ses")) {
-      await globalSync.project.loadSessions(project.path)
+      await globalSync.project.loadSessions(directory)
     }
   }
 

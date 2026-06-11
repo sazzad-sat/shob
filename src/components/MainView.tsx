@@ -227,6 +227,7 @@ export function MainView() {
     s.projects.find((project) => project.id === s.currentProjectId) ?? null,
   )
   const currentProjectId = useStore((s) => s.currentProjectId)
+  const activeSessionId = useStore((s) => s.activeSessionId)
   const [activeFilePath, setActiveFilePath] = createSignal<string | null>(null)
   const [reviewFiles, setReviewFiles] = createSignal<string[]>([])
   const [isReviewVisible, setIsReviewVisible] = createSignal(false)
@@ -256,7 +257,12 @@ export function MainView() {
   let reviewSnapFrame: number | undefined
   let sidePanelWarmToken = 0
 
-  const projectPath = createMemo(() => currentProject()?.path ?? '')
+  const activeSession = createMemo(() =>
+    currentProject()?.sessions.find((session) => session.id === activeSessionId()) ?? null,
+  )
+  const projectPath = createMemo(() =>
+    activeSession()?.workspaceDirectory ?? currentProject()?.path ?? '',
+  )
   const sidePanelHasContent = createMemo(() => isReviewVisible() || isFileTreeVisible() || !!contextTabSessionId() || browserTabOpen())
   const sidePanelMainHasContent = createMemo(() =>
     isReviewVisible() || !!contextTabSessionId() || reviewFiles().length > 0 || terminalTabs().length > 0 || browserTabOpen(),
@@ -449,15 +455,17 @@ export function MainView() {
   })
 
   createEffect(() => {
-    const project = currentProject()
-    if (!project) return
+    const path = projectPath()
+    if (!path) return
+
+    void nativeApi.invoke("set_project_watch", { path })
 
     let timer: number | undefined
     const unlistenPromise = nativeApi.listen<{ projectPath: string; paths: string[] }>("project-fs-event", (event) => {
-      if (event.payload.projectPath !== project.path) return
+      if (event.payload.projectPath !== path) return
       if (timer) window.clearTimeout(timer)
       timer = window.setTimeout(() => {
-        void loadGitDiffState(project.path)
+        void loadGitDiffState(path)
       }, 160)
     })
 

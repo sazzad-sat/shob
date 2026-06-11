@@ -14,13 +14,18 @@ import {
 } from '../utils';
 import { CLI_CATALOG, DEFAULT_CLI_ID, type CliProbeResult } from '../config/check';
 import type { Project, Session, CliTool } from '../types';
-import { toLocalShobSession } from '@/utils/shob-session';
+import {
+  preserveIsolatedWorkspaceSessions,
+  sameWorkspaceDirectory,
+  toLocalShobSession,
+} from '@/utils/shob-session';
 
 const SESSION_ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 let launchSessionQueue: Promise<unknown> = Promise.resolve();
 
 type ShobSession = {
   id: string;
+  directory?: string;
   parentID?: string;
   title?: string;
   time?: {
@@ -62,15 +67,26 @@ const normalizeProjects = (projects: Project[]): Project[] =>
     color: project.color ?? null,
     logoPath: project.logoPath ?? null,
     pinned: Boolean(project.pinned),
-    sessions: sortSessions(project.sessions.map((session) => ({
-      ...session,
-      name: sanitizeSessionName(session.name) || session.name,
-      pinned: Boolean(session.pinned),
-      createdAt: inferSessionCreatedAt(session),
-      lastActiveAt: inferSessionLastActiveAt(session),
-      commandCount: normalizeSessionCounter(session.commandCount),
-      startupDurationMs: normalizeOptionalDuration(session.startupDurationMs),
-    }))),
+    sessions: sortSessions(project.sessions.map((session) => {
+      const directory = session.workspaceDirectory ?? null;
+      const workspaceMode = session.workspaceMode ?? (
+        directory && !sameWorkspaceDirectory(directory, project.path) ? "worktree" : "local"
+      );
+      return {
+        ...session,
+        name: sanitizeSessionName(session.name) || session.name,
+        pinned: Boolean(session.pinned),
+        createdAt: inferSessionCreatedAt(session),
+        lastActiveAt: inferSessionLastActiveAt(session),
+        commandCount: normalizeSessionCounter(session.commandCount),
+        startupDurationMs: normalizeOptionalDuration(session.startupDurationMs),
+        workspaceMode,
+        workspaceDirectory: directory ?? project.path,
+        managedWorktreeDirectory:
+          session.managedWorktreeDirectory ?? (workspaceMode === "worktree" ? directory : null),
+        worktreeState: workspaceMode === "worktree" ? session.worktreeState ?? "ready" : undefined,
+      };
+    })),
   }));
 
 const sortProjects = (projects: Project[]): Project[] =>
@@ -132,6 +148,19 @@ interface AppActions {
   updateSession: (projectId: string, sessionId: string, updates: Partial<Session>) => Promise<void>;
   removeSession: (projectId: string, sessionId: string) => Promise<void>;
   syncShobSessions: (projectId: string, sessions: ShobSession[]) => Promise<void>;
+  activateShobSession: (
+    projectId: string,
+    session: ShobSession,
+    workspaceDirectory: string,
+    workspace?: Partial<Pick<Session,
+      | "workspaceMode"
+      | "managedWorktreeDirectory"
+      | "worktreeBaseRef"
+      | "worktreeBaseCommit"
+      | "worktreeBranch"
+      | "worktreeState"
+    >>,
+  ) => Promise<void>;
   setActiveSession: (sessionId: string | null) => void;
   recordSessionActivity: (projectId: string, sessionId: string, at?: number) => Promise<void>;
   recordSessionCommand: (projectId: string, sessionId: string, at?: number) => Promise<void>;
@@ -580,15 +609,33 @@ export const actions: AppActions = {
     if (!project) return;
 
     const existingPinned = new Map(project.sessions.map((session) => [session.id, Boolean(session.pinned)]));
-    const normalized = sessions
+    const existingWorkspaceDirectories = new Map(
+      project.sessions.map((session) => [session.id, session.workspaceDirectory ?? null]),
+    );
+    const normalizedIncoming = sessions
       .filter((session) => session.id?.startsWith('ses'))
       .filter((session) => !session.time?.archived)
         .map((session): Session => {
-          return toLocalShobSession(session, {
+          const normalized = toLocalShobSession(session, {
             shell: store.preferredShell ?? (process.platform === 'win32' ? 'powershell.exe' : '/bin/sh'),
             pinned: existingPinned.get(session.id) ?? false,
+            projectDirectory: project.path,
           });
-      })
+          const incomingDirectory = session.directory;
+          const existing = project.sessions.find((item) => item.id === session.id);
+          return {
+            ...normalized,
+            ...existing,
+            name: normalized.name,
+            createdAt: normalized.createdAt,
+            lastActiveAt: normalized.lastActiveAt,
+            workspaceDirectory:
+              incomingDirectory && !sameWorkspaceDirectory(incomingDirectory, project.path)
+                ? incomingDirectory
+                : existingWorkspaceDirectories.get(session.id) ?? null,
+          };
+      });
+    const normalized = preserveIsolatedWorkspaceSessions(project.path, normalizedIncoming, project.sessions)
       .sort((left, right) => {
         if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
         return (right.lastActiveAt ?? 0) - (left.lastActiveAt ?? 0);
@@ -602,6 +649,7 @@ export const actions: AppActions = {
             session.id === next.id &&
             session.name === next.name &&
             Boolean(session.pinned) === Boolean(next.pinned) &&
+            (session.workspaceDirectory ?? null) === (next.workspaceDirectory ?? null) &&
             (session.parentSessionId ?? null) === (next.parentSessionId ?? null) &&
             session.createdAt === next.createdAt &&
             session.lastActiveAt === next.lastActiveAt
@@ -618,6 +666,45 @@ export const actions: AppActions = {
       "projects",
       store.projects.map((item) => (item.id === projectId ? updatedProject : item)),
     );
+
+    api.saveProject(updatedProject).catch(() => undefined);
+  },
+
+  activateShobSession: async (projectId, session, workspaceDirectory, workspace = {}) => {
+    const project = store.projects.find((item) => item.id === projectId);
+    if (!project) return;
+
+    const existing = project.sessions.find((item) => item.id === session.id);
+    const normalized = toLocalShobSession({ ...session, directory: workspaceDirectory }, {
+      shell: existing?.shell ?? store.preferredShell ?? (process.platform === 'win32' ? 'powershell.exe' : '/bin/sh'),
+      pinned: existing?.pinned ?? false,
+      projectDirectory: project.path,
+    });
+    const nextSession: Session = {
+      ...existing,
+      ...normalized,
+      workspaceDirectory,
+      ...workspace,
+    };
+    const updatedProject: Project = {
+      ...project,
+      sessions: sortSessions([
+        nextSession,
+        ...project.sessions.filter((item) => item.id !== session.id),
+      ]),
+    };
+
+    setStoredValue(STORAGE_KEYS.currentProjectId, projectId);
+    setStoredValue(STORAGE_KEYS.activeSessionId, session.id);
+    setStoredValue(STORAGE_KEYS.preferredCliId, nextSession.cliTool ?? store.preferredCliId);
+    batch(() => {
+      setStore({
+        projects: store.projects.map((item) => (item.id === projectId ? updatedProject : item)),
+        currentProjectId: projectId,
+        activeSessionId: session.id,
+        preferredCliId: nextSession.cliTool ?? store.preferredCliId,
+      });
+    });
 
     api.saveProject(updatedProject).catch(() => undefined);
   },

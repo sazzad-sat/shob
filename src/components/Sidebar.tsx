@@ -434,11 +434,12 @@ function FolderSection(props: {
     if (trimmed) {
       props.onRenameSession(props.project.id, sessionId, trimmed)
       if (sessionId.startsWith("ses")) {
+        const directory = props.project.sessions.find((session) => session.id === sessionId)?.workspaceDirectory ?? props.project.path
         await globalSDK
-          .createClient({ directory: props.project.path, throwOnError: true })
+          .createClient({ directory, throwOnError: true })
           .session.update({ sessionID: sessionId, title: trimmed })
           .catch(() => undefined)
-        void globalSync.project.loadSessions(props.project.path)
+        void globalSync.project.loadSessions(directory)
       }
     }
     setEditingSessionId(null)
@@ -1235,10 +1236,11 @@ export function Sidebar(props: {
     try {
       const project = projects().find((item) => item.id === projectId)
       if (!project) return
+      const directory = project.sessions.find((session) => session.id === sessionId)?.workspaceDirectory ?? project.path
 
       if (sessionId.startsWith("ses")) {
         try {
-          await globalSDK.createClient({ directory: project.path, throwOnError: true }).session.delete({ sessionID: sessionId })
+          await globalSDK.createClient({ directory, throwOnError: true }).session.delete({ sessionID: sessionId })
         } catch (error) {
           showToast({
             variant: "error",
@@ -1250,12 +1252,12 @@ export function Sidebar(props: {
       }
 
       await removeSession(projectId, sessionId)
-      removePersistedSessionState({ directory: project.path, sessionId, platform })
+      removePersistedSessionState({ directory, sessionId, platform })
 
       if (sessionId.startsWith("ses")) {
         // Wait for refreshed remote sessions before clearing pending-delete
         // so this item cannot flicker back during sync.
-        await globalSync.project.loadSessions(project.path)
+        await globalSync.project.loadSessions(directory)
       }
     } finally {
       setPendingDeleteSessionIDs((prev) => {

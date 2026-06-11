@@ -245,6 +245,23 @@ export const ExperimentalRoutes = lazy(() =>
         return c.json(sandboxes)
       },
     )
+    .post(
+      "/worktree/branch",
+      describeRoute({
+        summary: "Create branch in worktree",
+        description: "Create and check out a branch in a detached managed worktree.",
+        operationId: "worktree.createBranch",
+        responses: {
+          200: {
+            description: "Branch created",
+            content: { "application/json": { schema: resolver(Worktree.Info) } },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("json", Worktree.CreateBranchInput),
+      async (c) => c.json(await Worktree.createBranch(c.req.valid("json"))),
+    )
     .delete(
       "/worktree",
       describeRoute({

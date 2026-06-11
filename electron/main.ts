@@ -1292,6 +1292,16 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
       await gitOutput(["checkout", branch], cwd);
     }
   },
+  is_git_repository: async ({ path: cwd }) => {
+    const result = (await gitOutput(["rev-parse", "--is-inside-work-tree"], cwd).catch(() => "false")).trim();
+    return result === "true";
+  },
+  create_git_branch: async ({ path: cwd, branch }) => {
+    const name = branch.trim();
+    if (!name) throw new Error("Branch name is required");
+    await gitOutput(["check-ref-format", "--branch", name], cwd);
+    await gitOutput(["switch", "-c", name], cwd);
+  },
   get_git_file_base: async ({ path: filePath }) => {
     const repoRoot = (await gitOutput(["rev-parse", "--show-toplevel"], path.dirname(filePath))).trim();
     const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, "/");

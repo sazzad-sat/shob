@@ -19,13 +19,13 @@ function normalize(input: string) {
 async function waitReady() {
   const { GlobalBus } = await import("../../src/bus/global")
 
-  return await new Promise<{ name: string; branch: string }>((resolve, reject) => {
+  return await new Promise<{ name: string; branch?: string }>((resolve, reject) => {
     const timer = setTimeout(() => {
       GlobalBus.off("event", on)
       reject(new Error("timed out waiting for worktree.ready"))
     }, 10_000)
 
-    function on(evt: { directory?: string; payload: { type: string; properties: { name: string; branch: string } } }) {
+    function on(evt: { directory?: string; payload: { type: string; properties: { name: string; branch?: string } } }) {
       if (evt.payload.type !== Worktree.Event.Ready.type) return
       clearTimeout(timer)
       GlobalBus.off("event", on)
@@ -40,14 +40,17 @@ describe("Worktree", () => {
   afterEach(() => Instance.disposeAll())
 
   describe("makeWorktreeInfo", () => {
-    test("returns info with name, branch, and directory", async () => {
+    test("returns detached info with name, commit, and directory", async () => {
       await using tmp = await tmpdir({ git: true })
 
       const info = await withInstance(tmp.path, () => Worktree.makeWorktreeInfo())
 
       expect(info.name).toBeDefined()
       expect(typeof info.name).toBe("string")
-      expect(info.branch).toBe(`opencode/${info.name}`)
+      expect(info.branch).toBeUndefined()
+      expect(info.detached).toBe(true)
+      expect(info.baseCommit).toMatch(/^[0-9a-f]{40}$/)
+      expect(normalize(info.directory)).toContain(normalize(path.join(".shob", "worktrees")))
       expect(info.directory).toContain(info.name)
     })
 
@@ -57,7 +60,7 @@ describe("Worktree", () => {
       const info = await withInstance(tmp.path, () => Worktree.makeWorktreeInfo("my-feature"))
 
       expect(info.name).toBe("my-feature")
-      expect(info.branch).toBe("opencode/my-feature")
+      expect(info.branch).toBeUndefined()
     })
 
     test("slugifies the provided name", async () => {
@@ -76,13 +79,57 @@ describe("Worktree", () => {
   })
 
   describe("create + remove lifecycle", () => {
+    test("creates distinct detached worktrees", async () => {
+      await using tmp = await tmpdir({ git: true })
+
+      const first = await withInstance(tmp.path, () => Worktree.create())
+      const second = await withInstance(tmp.path, () => Worktree.create())
+
+      expect(first.directory).not.toBe(second.directory)
+      expect(first.baseCommit).toBe(second.baseCommit)
+      expect(first.detached).toBe(true)
+      expect(second.detached).toBe(true)
+
+      await withInstance(tmp.path, () => Worktree.remove({ directory: first.directory }))
+      await withInstance(tmp.path, () => Worktree.remove({ directory: second.directory }))
+    })
+
+    test("copies staged, unstaged, and untracked changes when requested", async () => {
+      await using tmp = await tmpdir({ git: true })
+      const staged = path.join(tmp.path, "staged.txt")
+      const unstaged = path.join(tmp.path, "unstaged.txt")
+      const untracked = path.join(tmp.path, "untracked.txt")
+
+      await fs.writeFile(staged, "base\n")
+      await fs.writeFile(unstaged, "base\n")
+      await $`git add staged.txt unstaged.txt`.cwd(tmp.path).quiet()
+      await $`git commit -m base`.cwd(tmp.path).quiet()
+      await fs.writeFile(staged, "staged change\n")
+      await $`git add staged.txt`.cwd(tmp.path).quiet()
+      await fs.writeFile(unstaged, "unstaged change\n")
+      await fs.writeFile(untracked, "untracked change\n")
+
+      const info = await withInstance(tmp.path, () => Worktree.create({ includeLocalChanges: true }))
+
+      expect((await fs.readFile(path.join(info.directory, "staged.txt"), "utf8")).trim()).toBe("staged change")
+      expect((await fs.readFile(path.join(info.directory, "unstaged.txt"), "utf8")).trim()).toBe("unstaged change")
+      expect((await fs.readFile(path.join(info.directory, "untracked.txt"), "utf8")).trim()).toBe("untracked change")
+      const status = await $`git status --porcelain`.cwd(info.directory).quiet().text()
+      expect(status).toContain("M  staged.txt")
+      expect(status).toContain(" M unstaged.txt")
+      expect(status).toContain("?? untracked.txt")
+
+      await withInstance(tmp.path, () => Worktree.remove({ directory: info.directory }))
+    })
+
     test("create returns worktree info and remove cleans up", async () => {
       await using tmp = await tmpdir({ git: true })
 
       const info = await withInstance(tmp.path, () => Worktree.create())
 
       expect(info.name).toBeDefined()
-      expect(info.branch).toStartWith("opencode/")
+      expect(info.branch).toBeUndefined()
+      expect(info.detached).toBe(true)
       expect(info.directory).toBeDefined()
 
       // Wait for bootstrap to complete
@@ -100,7 +147,7 @@ describe("Worktree", () => {
 
       // create returns before bootstrap completes, but the worktree already exists
       expect(info.name).toBeDefined()
-      expect(info.branch).toStartWith("opencode/")
+      expect(info.branch).toBeUndefined()
 
       const text = await $`git worktree list --porcelain`.cwd(tmp.path).quiet().text()
       const dir = await fs.realpath(info.directory).catch(() => info.directory)
@@ -109,7 +156,7 @@ describe("Worktree", () => {
       // Event.Ready fires after bootstrap finishes in the background
       const props = await ready
       expect(props.name).toBe(info.name)
-      expect(props.branch).toBe(info.branch)
+      expect(props.branch).toBeUndefined()
 
       // Cleanup
       await withInstance(info.directory, () => Instance.dispose())
@@ -124,7 +171,7 @@ describe("Worktree", () => {
       const info = await withInstance(tmp.path, () => Worktree.create({ name: "test-workspace" }))
 
       expect(info.name).toBe("test-workspace")
-      expect(info.branch).toBe("opencode/test-workspace")
+      expect(info.branch).toBeUndefined()
 
       // Cleanup
       await ready

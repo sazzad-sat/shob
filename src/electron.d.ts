@@ -330,7 +330,9 @@ export interface NativeCommandMap {
   get_git_status: { args: { path: string }; result: ElectronGitStatusSummary }
   get_git_branch: { args: { path: string }; result: ElectronGitBranchInfo }
   get_git_branches: { args: { path: string }; result: { branches: string[] } }
+  is_git_repository: { args: { path: string }; result: boolean }
   switch_git_branch: { args: { path: string; branch: string }; result: void }
+  create_git_branch: { args: { path: string; branch: string }; result: void }
   get_git_file_base: { args: { path: string }; result: string }
   get_git_file_state: { args: { path: string }; result: ElectronGitFileState }
   cleanup_runtime: { args: undefined; result: void }

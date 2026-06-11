@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 import {
   findReusableEmptyRootShobSession,
   normalizeShobSessionTitle,
+  preserveIsolatedWorkspaceSessions,
+  sameWorkspaceDirectory,
   sessionHasUserPrompt,
   toLocalShobSession,
   type ShobSessionLike,
@@ -29,6 +31,30 @@ describe("shob session helpers", () => {
     expect(toLocalShobSession(session({ title: "Implement reusable empty sessions" })).name).toBe(
       "Implement reusable empty sessions",
     )
+  })
+
+  test("keeps the worktree directory on the local session", () => {
+    const directory = "C:\\Users\\sera\\.local\\share\\shob\\worktree\\project\\feature"
+    expect(toLocalShobSession(session({ directory })).workspaceDirectory).toBe(directory)
+  })
+
+  test("compares workspace paths across Windows separators and casing", () => {
+    expect(sameWorkspaceDirectory("C:\\Users\\Sera\\shob\\", "c:/users/sera/shob")).toBe(true)
+    expect(sameWorkspaceDirectory("C:\\Users\\Sera\\shob", "C:\\Users\\Sera\\worktree")).toBe(false)
+  })
+
+  test("preserves a worktree session when the main workspace refresh does not include it", () => {
+    const mainDirectory = "C:\\Users\\sera\\Desktop\\shob"
+    const incoming = [{ id: "ses_main", workspaceDirectory: null }]
+    const worktree = {
+      id: "ses_worktree",
+      workspaceDirectory: "C:\\Users\\sera\\.local\\share\\shob\\worktree\\project\\feature",
+    }
+
+    expect(preserveIsolatedWorkspaceSessions(mainDirectory, incoming, [worktree])).toEqual([
+      ...incoming,
+      worktree,
+    ])
   })
 
   test("detects whether a session has a user prompt", () => {

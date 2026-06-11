@@ -16,7 +16,7 @@ export const WorktreeAdaptor: Adaptor = {
     return {
       ...info,
       name: worktree.name,
-      branch: worktree.branch,
+      branch: worktree.branch ?? null,
       directory: worktree.directory,
     }
   },
@@ -26,6 +26,10 @@ export const WorktreeAdaptor: Adaptor = {
       name: config.name,
       directory: config.directory,
       branch: config.branch,
+      baseRef: config.branch,
+      baseCommit: config.branch,
+      detached: true,
+      setupStatus: "pending",
     })
   },
   async remove(info) {

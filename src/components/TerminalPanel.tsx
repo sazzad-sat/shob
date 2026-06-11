@@ -26,7 +26,7 @@ export function TerminalPanel(_props: TerminalPanelProps) {
             <Show when={session().cliTool} fallback={<Terminal sessionId={session().id} />}>
               <AgentView
                 sessionId={session().id}
-                projectPath={currentProject()?.path}
+                projectPath={session().workspaceDirectory ?? currentProject()?.path}
                 reviewDiffs={_props.reviewDiffs}
               />
             </Show>

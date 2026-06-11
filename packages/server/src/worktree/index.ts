@@ -29,7 +29,7 @@ export namespace Worktree {
       "worktree.ready",
       z.object({
         name: z.string(),
-        branch: z.string(),
+        branch: z.string().optional(),
       }),
     ),
     Failed: BusEvent.define(
@@ -43,8 +43,12 @@ export namespace Worktree {
   export const Info = z
     .object({
       name: z.string(),
-      branch: z.string(),
+      branch: z.string().optional(),
       directory: z.string(),
+      baseRef: z.string(),
+      baseCommit: z.string(),
+      detached: z.boolean(),
+      setupStatus: z.enum(["pending", "ready"]),
     })
     .meta({
       ref: "Worktree",
@@ -55,6 +59,9 @@ export namespace Worktree {
   export const CreateInput = z
     .object({
       name: z.string().optional(),
+      baseRef: z.string().optional(),
+      baseCommit: z.string().optional(),
+      includeLocalChanges: z.boolean().optional(),
       startCommand: z
         .string()
         .optional()
@@ -75,6 +82,15 @@ export namespace Worktree {
     })
 
   export type RemoveInput = z.infer<typeof RemoveInput>
+
+  export const CreateBranchInput = z
+    .object({
+      directory: z.string(),
+      branch: z.string(),
+    })
+    .meta({ ref: "WorktreeCreateBranchInput" })
+
+  export type CreateBranchInput = z.infer<typeof CreateBranchInput>
 
   export const ResetInput = z
     .object({
@@ -157,9 +173,10 @@ export namespace Worktree {
   // ---------------------------------------------------------------------------
 
   export interface Interface {
-    readonly makeWorktreeInfo: (name?: string) => Effect.Effect<Info>
+    readonly makeWorktreeInfo: (name?: string, baseRef?: string, baseCommit?: string) => Effect.Effect<Info>
     readonly createFromInfo: (info: Info, startCommand?: string) => Effect.Effect<void>
     readonly create: (input?: CreateInput) => Effect.Effect<Info>
+    readonly createBranch: (input: CreateBranchInput) => Effect.Effect<Info>
     readonly remove: (input: RemoveInput) => Effect.Effect<boolean>
     readonly reset: (input: ResetInput) => Effect.Effect<boolean>
   }
@@ -201,45 +218,99 @@ export namespace Worktree {
       )
 
       const MAX_NAME_ATTEMPTS = 26
-      const candidate = Effect.fn("Worktree.candidate")(function* (root: string, base?: string) {
-        const ctx = yield* InstanceState.context
+      const candidate = Effect.fn("Worktree.candidate")(function* (
+        root: string,
+        baseRef: string,
+        baseCommit: string,
+        base?: string,
+      ) {
         for (const attempt of Array.from({ length: MAX_NAME_ATTEMPTS }, (_, i) => i)) {
           const name = base ? (attempt === 0 ? base : `${base}-${Slug.create()}`) : Slug.create()
-          const branch = `opencode/${name}`
           const directory = pathSvc.join(root, name)
 
           if (yield* fs.exists(directory).pipe(Effect.orDie)) continue
-
-          const ref = `refs/heads/${branch}`
-          const branchCheck = yield* git(["show-ref", "--verify", "--quiet", ref], { cwd: ctx.worktree })
-          if (branchCheck.code === 0) continue
-
-          return Info.parse({ name, branch, directory })
+          return Info.parse({ name, directory, baseRef, baseCommit, detached: true, setupStatus: "pending" })
         }
         throw new NameGenerationFailedError({ message: "Failed to generate a unique worktree name" })
       })
 
-      const makeWorktreeInfo = Effect.fn("Worktree.makeWorktreeInfo")(function* (name?: string) {
+      const makeWorktreeInfo = Effect.fn("Worktree.makeWorktreeInfo")(function* (
+        name?: string,
+        baseRefInput?: string,
+        baseCommitInput?: string,
+      ) {
         const ctx = yield* InstanceState.context
         if (ctx.project.vcs !== "git") {
           throw new NotGitError({ message: "Worktrees are only supported for git projects" })
         }
 
-        const root = pathSvc.join(Global.Path.data, "worktree", ctx.project.id)
+        const root = pathSvc.join(Global.Path.home, ".shob", "worktrees", ctx.project.id)
         yield* fs.makeDirectory(root, { recursive: true }).pipe(Effect.orDie)
 
+        const baseRef = baseRefInput?.trim() || "HEAD"
+        const resolved = yield* git(["rev-parse", "--verify", `${baseCommitInput?.trim() || baseRef}^{commit}`], {
+          cwd: ctx.worktree,
+        })
+        if (resolved.code !== 0 || !resolved.text.trim()) {
+          throw new CreateFailedError({ message: resolved.stderr || resolved.text || `Unable to resolve ${baseRef}` })
+        }
+        const baseCommit = resolved.text.trim()
         const base = name ? slugify(name) : ""
-        return yield* candidate(root, base || undefined)
+        return yield* candidate(root, baseRef, baseCommit, base || undefined)
       })
 
-      const setup = Effect.fnUntraced(function* (info: Info) {
+      const copyLocalChanges = Effect.fnUntraced(function* (source: string, target: string) {
+        const staged = yield* git(["diff", "--binary", "--cached", "HEAD"], { cwd: source })
+        const unstaged = yield* git(["diff", "--binary"], { cwd: source })
+        const apply = Effect.fnUntraced(function* (patch: string, cached: boolean) {
+          if (!patch.trim()) return
+          const patchFile = yield* Effect.promise(async () => {
+            const fsp = await import("fs/promises")
+            const os = await import("os")
+            const directory = await fsp.mkdtemp(pathSvc.join(os.tmpdir(), "shob-worktree-"))
+            const file = pathSvc.join(directory, "changes.patch")
+            await fsp.writeFile(file, patch, "utf8")
+            return file
+          })
+          const applied = yield* git(["apply", ...(cached ? ["--index"] : []), patchFile], { cwd: target })
+          yield* Effect.promise(async () => {
+            const fsp = await import("fs/promises")
+            await fsp.rm(pathSvc.dirname(patchFile), { recursive: true, force: true })
+          })
+          if (applied.code !== 0) {
+            throw new CreateFailedError({
+              message: applied.stderr || applied.text || "Failed to copy local changes into the worktree",
+            })
+          }
+        })
+        yield* apply(staged.text, true)
+        yield* apply(unstaged.text, false)
+
+        const untracked = yield* git(["ls-files", "--others", "--exclude-standard", "-z"], { cwd: source })
+        const files = untracked.text.split("\0").filter(Boolean)
+        if (files.length === 0) return
+        yield* Effect.promise(async () => {
+          const fsp = await import("fs/promises")
+          for (const file of files) {
+            const from = pathSvc.resolve(source, file)
+            const to = pathSvc.resolve(target, file)
+            if (!from.startsWith(pathSvc.resolve(source)) || !to.startsWith(pathSvc.resolve(target))) continue
+            await fsp.mkdir(pathSvc.dirname(to), { recursive: true })
+            await fsp.copyFile(from, to)
+          }
+        })
+      })
+
+      const setup = Effect.fnUntraced(function* (info: Info, includeLocalChanges?: boolean) {
         const ctx = yield* InstanceState.context
-        const created = yield* git(["worktree", "add", "--no-checkout", "-b", info.branch, info.directory], {
+        const created = yield* git(["worktree", "add", "--detach", info.directory, info.baseCommit], {
           cwd: ctx.worktree,
         })
         if (created.code !== 0) {
           throw new CreateFailedError({ message: created.stderr || created.text || "Failed to create git worktree" })
         }
+
+        if (includeLocalChanges) yield* copyLocalChanges(ctx.worktree, info.directory)
 
         yield* project.addSandbox(ctx.project.id, info.directory).pipe(Effect.catch(() => Effect.void))
       })
@@ -249,19 +320,6 @@ export namespace Worktree {
         const workspaceID = yield* InstanceState.workspaceID
         const projectID = ctx.project.id
         const extra = startCommand?.trim()
-
-        const populated = yield* git(["reset", "--hard"], { cwd: info.directory })
-        if (populated.code !== 0) {
-          const message = populated.stderr || populated.text || "Failed to populate worktree"
-          log.error("worktree checkout failed", { directory: info.directory, message })
-          GlobalBus.emit("event", {
-            directory: info.directory,
-            project: ctx.project.id,
-            workspace: workspaceID,
-            payload: { type: Event.Failed.type, properties: { message } },
-          })
-          return
-        }
 
         const booted = yield* Effect.promise(() =>
           Instance.provide({
@@ -303,13 +361,34 @@ export namespace Worktree {
       })
 
       const create = Effect.fn("Worktree.create")(function* (input?: CreateInput) {
-        const info = yield* makeWorktreeInfo(input?.name)
-        yield* setup(info)
+        const info = yield* makeWorktreeInfo(input?.name, input?.baseRef, input?.baseCommit)
+        yield* setup(info, input?.includeLocalChanges)
         yield* boot(info, input?.startCommand).pipe(
           Effect.catchCause((cause) => Effect.sync(() => log.error("worktree bootstrap failed", { cause }))),
           Effect.forkIn(scope),
         )
         return info
+      })
+
+      const createBranch = Effect.fn("Worktree.createBranch")(function* (input: CreateBranchInput) {
+        const branch = input.branch.trim().replace(/^refs\/heads\//, "")
+        if (!branch) throw new CreateFailedError({ message: "Branch name is required" })
+        const valid = yield* git(["check-ref-format", "--branch", branch], { cwd: input.directory })
+        if (valid.code !== 0) throw new CreateFailedError({ message: `Invalid branch name: ${branch}` })
+        const switched = yield* git(["switch", "-c", branch], { cwd: input.directory })
+        if (switched.code !== 0) {
+          throw new CreateFailedError({ message: switched.stderr || switched.text || "Failed to create branch" })
+        }
+        const commit = yield* git(["rev-parse", "HEAD"], { cwd: input.directory })
+        return Info.parse({
+          name: pathSvc.basename(input.directory),
+          branch,
+          directory: input.directory,
+          baseRef: "HEAD",
+          baseCommit: commit.text.trim(),
+          detached: false,
+          setupStatus: "ready",
+        })
       })
 
       const canonical = Effect.fnUntraced(function* (input: string) {
@@ -409,16 +488,6 @@ export namespace Worktree {
         }
 
         yield* cleanDirectory(entry.path)
-
-        const branch = entry.branch?.replace(/^refs\/heads\//, "")
-        if (branch) {
-          const deleted = yield* git(["branch", "-D", branch], { cwd: Instance.worktree })
-          if (deleted.code !== 0) {
-            throw new RemoveFailedError({
-              message: deleted.stderr || deleted.text || "Failed to delete worktree branch",
-            })
-          }
-        }
 
         return true
       })
@@ -586,7 +655,7 @@ export namespace Worktree {
         return true
       })
 
-      return Service.of({ makeWorktreeInfo, createFromInfo, create, remove, reset })
+      return Service.of({ makeWorktreeInfo, createFromInfo, create, createBranch, remove, reset })
     }),
   )
 
@@ -599,8 +668,8 @@ export namespace Worktree {
   )
   const { runPromise } = makeRuntime(Service, defaultLayer)
 
-  export async function makeWorktreeInfo(name?: string) {
-    return runPromise((svc) => svc.makeWorktreeInfo(name))
+  export async function makeWorktreeInfo(name?: string, baseRef?: string, baseCommit?: string) {
+    return runPromise((svc) => svc.makeWorktreeInfo(name, baseRef, baseCommit))
   }
 
   export async function createFromInfo(info: Info, startCommand?: string) {
@@ -609,6 +678,10 @@ export namespace Worktree {
 
   export async function create(input?: CreateInput) {
     return runPromise((svc) => svc.create(input))
+  }
+
+  export async function createBranch(input: CreateBranchInput) {
+    return runPromise((svc) => svc.createBranch(input))
   }
 
   export async function remove(input: RemoveInput) {
