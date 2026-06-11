@@ -1,8 +1,15 @@
 import { Plus, SquareTerminal, X } from 'lucide-solid'
+import { showToast } from "@opencode-ai/ui/toast"
 import { CliAvatar } from './CliAvatar'
 import { getCliDisplayLabel } from '../config/cli-ui'
 import { useStore } from '../store'
 import { Button } from '@/components/ui/button'
+import { useGlobalSDK } from "@/context/global-sdk"
+import { useGlobalSync } from "@/context/global-sync"
+import { useLanguage } from "@/context/language"
+import { usePlatform } from "@/context/platform"
+import { formatServerError } from "@/utils/server-errors"
+import { removePersistedSessionState } from "@/utils/session-persisted-state"
 import {
   Tabs,
   TabsList,
@@ -20,11 +27,40 @@ export function TabBar() {
   const setActiveSession = useStore((s) => s.setActiveSession)
   const launchCliSession = useStore((s) => s.launchCliSession)
   const removeSession = useStore((s) => s.removeSession)
+  const globalSDK = useGlobalSDK()
+  const globalSync = useGlobalSync()
+  const language = useLanguage()
+  const platform = usePlatform()
 
   const currentProject = () => projects().find((project) => project.id === currentProjectId()) ?? null
   const totalTabs = () => currentProject() ? currentProject()!.sessions.length : 0
   const isCompactTabs = () => totalTabs() >= 5
   const sessionTitleLimit = () => isCompactTabs() ? 12 : 24
+
+  const handleDeleteSession = async (projectId: string, sessionId: string) => {
+    const project = projects().find((item) => item.id === projectId)
+    if (!project) return
+
+    if (sessionId.startsWith("ses")) {
+      try {
+        await globalSDK.createClient({ directory: project.path, throwOnError: true }).session.delete({ sessionID: sessionId })
+      } catch (error) {
+        showToast({
+          variant: "error",
+          title: language.t("session.delete.failed.title"),
+          description: formatServerError(error, language.t),
+        })
+        return
+      }
+    }
+
+    await removeSession(projectId, sessionId)
+    removePersistedSessionState({ directory: project.path, sessionId, platform })
+
+    if (sessionId.startsWith("ses")) {
+      await globalSync.project.loadSessions(project.path)
+    }
+  }
 
   return (
     <div class="chrome-tabbar">
@@ -74,7 +110,7 @@ export function TabBar() {
                         onClick={(event) => {
                           event.stopPropagation()
                           const cpid = currentProjectId()
-                          if (cpid) removeSession(cpid, session.id)
+                          if (cpid) void handleDeleteSession(cpid, session.id)
                         }}
                         class={`chrome-tab-close inline-flex h-4 w-4 items-center justify-center rounded-full transition ${
                           isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'

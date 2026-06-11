@@ -8,11 +8,12 @@ import { useGlobalSDK } from "./global-sdk"
 import { useServer } from "./server"
 import { usePlatform } from "./platform"
 import { Project } from "@opencode-ai/sdk/v2"
-import { Persist, persisted, removePersisted } from "@/utils/persist"
+import { Persist, persisted } from "@/utils/persist"
 import { decode64 } from "@/utils/base64"
 import { same } from "@/utils/same"
 import { createScrollPersistence, type SessionScroll } from "./layout-scroll"
 import { createPathHelpers } from "./file/path"
+import { removePersistedSessionStateForKeys } from "@/utils/session-persisted-state"
 
 const AVATAR_COLOR_KEYS = ["pink", "mint", "orange", "purple", "cyan", "lime"] as const
 const DEFAULT_SIDEBAR_WIDTH = 367
@@ -272,26 +273,24 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       used: new Map<string, number>(),
     }
 
-    const SESSION_STATE_KEYS = [
-      { key: "prompt", legacy: "prompt", version: "v2" },
-      { key: "terminal", legacy: "terminal", version: "v1" },
-      { key: "file-view", legacy: "file", version: "v1" },
-    ] as const
+    const clearSessionState = (keys: string[]) => {
+      if (keys.length === 0) return
 
-    const dropSessionState = (keys: string[]) => {
+      setStore(
+        produce((draft) => {
+          for (const key of keys) {
+            delete draft.sessionView[key]
+            delete draft.sessionTabs[key]
+          }
+        }),
+      )
+
+      scroll.drop(keys)
+      removePersistedSessionStateForKeys(keys, platform)
+
       for (const key of keys) {
-        const parts = key.split("/")
-        const dir = parts[0]
-        const session = parts[1]
-        if (!dir) continue
-
-        for (const entry of SESSION_STATE_KEYS) {
-          const target = session ? Persist.session(dir, session, entry.key) : Persist.workspace(dir, entry.key)
-          void removePersisted(target, platform)
-
-          const legacyKey = `${dir}/${entry.legacy}${session ? "/" + session : ""}.${entry.version}`
-          void removePersisted({ key: legacyKey }, platform)
-        }
+        usage.used.delete(key)
+        if (usage.active === key) usage.active = undefined
       }
     }
 
@@ -304,22 +303,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         tabs: Object.keys(store.sessionTabs),
       })
       if (drop.length === 0) return
-
-      setStore(
-        produce((draft) => {
-          for (const key of drop) {
-            delete draft.sessionView[key]
-            delete draft.sessionTabs[key]
-          }
-        }),
-      )
-
-      scroll.drop(drop)
-      dropSessionState(drop)
-
-      for (const key of drop) {
-        usage.used.delete(key)
-      }
+      clearSessionState(drop)
     }
 
     function touch(sessionKey: string) {

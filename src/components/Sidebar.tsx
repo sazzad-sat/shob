@@ -16,12 +16,17 @@ import type { Project } from "../types"
 import { ResizeHandle } from "@/shob-ported/resize-handle"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
+import { useLanguage } from "@/context/language"
+import { usePlatform } from "@/context/platform"
 import type { Session as ShobSession, SessionStatus } from "@opencode-ai/sdk/v2/client"
+import { showToast } from "@opencode-ai/ui/toast"
 import { DotsSpinner } from "./DotsSpinner"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { sessionPermissionRequest } from "@/shob-ported/composer/session-request-tree"
 import { findReusableEmptyRootShobSession, sortShobSessionsById } from "@/utils/shob-session"
+import { formatServerError } from "@/utils/server-errors"
+import { removePersistedSessionState } from "@/utils/session-persisted-state"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1030,6 +1035,8 @@ export function Sidebar(props: {
   const renameSession = useStore((s) => s.renameSession)
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
+  const language = useLanguage()
+  const platform = usePlatform()
   const [isSidebarVisible, setIsSidebarVisible] = createSignal(true)
   const [sidebarWidth, setSidebarWidth] = createSignal(DEFAULT_SIDEBAR_WIDTH)
   const [pendingDeleteSessionIDs, setPendingDeleteSessionIDs] = createSignal<Set<string>>(new Set())
@@ -1226,15 +1233,26 @@ export function Sidebar(props: {
     })
 
     try {
-      // Optimistic local removal for immediate UI feedback.
-      await removeSession(projectId, sessionId)
-
       const project = projects().find((item) => item.id === projectId)
-      if (project && sessionId.startsWith("ses")) {
-        await globalSDK
-          .createClient({ directory: project.path, throwOnError: true })
-          .session.delete({ sessionID: sessionId })
-          .catch(() => undefined)
+      if (!project) return
+
+      if (sessionId.startsWith("ses")) {
+        try {
+          await globalSDK.createClient({ directory: project.path, throwOnError: true }).session.delete({ sessionID: sessionId })
+        } catch (error) {
+          showToast({
+            variant: "error",
+            title: language.t("session.delete.failed.title"),
+            description: formatServerError(error, language.t),
+          })
+          return
+        }
+      }
+
+      await removeSession(projectId, sessionId)
+      removePersistedSessionState({ directory: project.path, sessionId, platform })
+
+      if (sessionId.startsWith("ses")) {
         // Wait for refreshed remote sessions before clearing pending-delete
         // so this item cannot flicker back during sync.
         await globalSync.project.loadSessions(project.path)
