@@ -1,12 +1,19 @@
-# Shob — The Open AI Agent Workspace
-<img width="1536" height="1024" alt="logo" src="https://github.com/user-attachments/assets/ac64b8c9-52cb-4d80-8a69-b2a6bbcd2790" />
+<div align="center">
 
+# Shob — The AI Agent Workspace
 
-<img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/b96f3c9e-7ce8-4d22-8ffa-1b26d4ff7802" />
+<table>
+  <tr>
+    <td><img width="760" alt="Shob Logo" src="https://github.com/user-attachments/assets/ac64b8c9-52cb-4d80-8a69-b2a6bbcd2790" /></td>
+    <td><img width="760" alt="Shob Interface" src="https://github.com/user-attachments/assets/b96f3c9e-7ce8-4d22-8ffa-1b26d4ff7802" /></td>
+  </tr>
+</table>
 
-Build faster. Automate more. Stay in control.
+**Build faster. Automate more. Stay in control.**
 
 Shob is an AI agent workspace designed for developers who want to run multiple AI-powered workflows from a single environment. Instead of juggling conversations, terminals, and tools, Shob helps you manage everything in one place.
+
+</div>
 
 ---
 
@@ -14,7 +21,7 @@ Shob is an AI agent workspace designed for developers who want to run multiple A
 
 ### Parallel AI Sessions
 
-Run multiple AI agents simultaneously within the same project. Work on bug fixes, testing, documentation, refactoring, and feature development—all at the same time.
+Run multiple AI agents simultaneously within the same project. Work on bug fixes, testing, documentation, refactoring, and feature development — all at the same time.
 
 ### Smart Permission System
 
@@ -40,7 +47,7 @@ See exactly what agents are doing. Review terminal output and inspect code chang
 
 ## Our Vision
 
-We believe powerful AI agents should be accessible to everyone—not just large organizations.
+We believe powerful AI agents should be accessible to everyone — not just large organizations.
 
 Our mission is to make AI-powered development and automation affordable, practical, and available to developers, students, freelancers, startups, and teams everywhere.
 
@@ -56,14 +63,6 @@ We are actively improving the platform and building new capabilities based on co
 
 ## Get Started
 
-**GitHub Repository**
-
-https://github.com/shobcoder/shob
+**GitHub Repository:** [https://github.com/shobcoder/shob](https://github.com/shobcoder/shob)
 
 If you find the project useful, consider giving it a star and sharing your feedback.
-
----
-
-## Tags
-
-#Shob #OpenSource #AIAgents #DeveloperTools #Automation #AI #SoftwareDevelopment #Git #Productivity #Engineering #BuildInPublic #Coding #Developers #Tech
