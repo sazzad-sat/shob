@@ -12,6 +12,7 @@ export const ProviderIcon: Component<ProviderIconProps> = (props) => {
   const resolved = createMemo(() => {
     if (local.id === "antigravity") return "google"
     if (local.id === "openclaude") return "openrouter"
+    if (local.id === "mimo-free") return "xiaomi"
     return iconNames.includes(local.id as IconName) ? local.id : "synthetic"
   })
   return (

@@ -59,6 +59,7 @@ import { Installation } from "../installation"
 import { ModelID, ProviderID } from "./schema"
 import { ProviderError } from "./error"
 import { buildClineHeaders } from "../plugin/cline"
+import { createMimoFreeFetch, MIMO_CHAT_URL } from "./mimo-free/fetch"
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })
@@ -897,6 +898,15 @@ export namespace Provider {
           },
         }
       }),
+      "mimo-free": () =>
+        Effect.succeed({
+          autoload: true,
+          options: {
+            apiKey: "mimo-free",
+            baseURL: MIMO_CHAT_URL,
+            fetch: createMimoFreeFetch(),
+          },
+        }),
       qoder: () =>
         Effect.succeed({
           autoload: false,

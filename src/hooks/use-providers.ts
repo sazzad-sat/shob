@@ -12,6 +12,7 @@ export const popularProviders = [
   "openrouter",
   "kilo",
   "vercel",
+  "mimo-free",
 ]
 const popularProviderSet = new Set(popularProviders)
 
