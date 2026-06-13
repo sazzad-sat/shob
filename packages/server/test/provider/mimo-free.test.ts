@@ -50,7 +50,7 @@ test("MiMo Free registers the no-cost mimo-auto model", () => {
     },
   }
   const providers = withMimoFreeModels({ openai: seed })
-  expect(providers["mimo-free"].name).toBe("MiMo Code Free")
+  expect(providers["mimo-free"].name).toBe("MiMo Code")
   expect(Object.keys(providers["mimo-free"].models)).toEqual(["mimo-auto"])
   expect(providers["mimo-free"].models["mimo-auto"].name).toBe("MiMo-V2.5-Pro")
   expect((providers["mimo-free"].models["mimo-auto"] as any).cost.input).toBe(0)

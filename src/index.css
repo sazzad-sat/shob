@@ -3055,14 +3055,13 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-prompt-shell {
-  --agent-prompt-input-bg: #151515;
+  --agent-prompt-input-bg: var(--input-base);
   --agent-prompt-control-muted: var(--text-base, #8a8a8a);
   --agent-prompt-control-weak: var(--text-weak, #5d5d5d);
   --agent-prompt-agent-color: var(--text-interactive-base, var(--icon-agent-build-base, #8a8a8a));
 
   min-width: 0;
   text-align: left !important;
-  border: 0 !important;
   border-radius: 22px !important;
   background: var(--agent-prompt-input-bg) !important;
   background-color: var(--agent-prompt-input-bg) !important;
@@ -3078,7 +3077,6 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-prompt-shell:focus-within {
-  border-color: transparent !important;
   box-shadow: none !important;
 }
 
@@ -3355,7 +3353,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-model-variant"]:enabled:hover,
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-model-variant"][data-expanded],
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-improve"]:enabled:hover {
-  background: #242424 !important;
+  background: var(--surface-base-hover) !important;
 }
 
 .agent-terminal-prompt .agent-terminal-toolbar [data-action="prompt-model"] span,
@@ -3375,13 +3373,13 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
   width: 30px !important;
   height: 30px !important;
   border-radius: 999px !important;
-  background: #8d8d8d !important;
-  color: #161616 !important;
+  background: var(--icon-strong-base) !important;
+  color: var(--icon-invert-base) !important;
   box-shadow: none !important;
 }
 
 .agent-terminal-prompt [data-action="prompt-submit"]:enabled:hover {
-  background: #a0a0a0 !important;
+  background: var(--icon-strong-hover) !important;
 }
 
 .agent-terminal-prompt [data-action="prompt-submit"]:enabled:active {
@@ -3394,15 +3392,15 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-prompt [data-action="prompt-submit"]:disabled {
-  background: #4d4d4d !important;
-  color: #1a1a1a !important;
+  background: var(--icon-strong-disabled) !important;
+  color: var(--icon-invert-base) !important;
   opacity: 1 !important;
 }
 
 .agent-terminal-caret {
-  color: #fff !important;
+  color: var(--text-strong) !important;
   font-weight: 800 !important;
-  text-shadow: 0 0 10px color-mix(in srgb, #fff 22%, transparent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--text-strong) 22%, transparent);
 }
 
 .agent-terminal-prompt-count {
@@ -3805,7 +3803,7 @@ html[data-color-scheme="dark"] .agent-terminal-composer-region {
 }
 
 .agent-terminal-prompt [data-component="prompt-input"]:focus {
-  caret-color: #fff !important;
+  caret-color: var(--text-strong) !important;
   animation: caret-blink 1.2s ease-in-out infinite;
 }
 

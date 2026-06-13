@@ -51,7 +51,7 @@ export function withMimoFreeModels<TProvider extends BaseProvider & Record<strin
     ...result,
     "mimo-free": {
       id: "mimo-free",
-      name: "MiMo Code Free",
+      name: "MiMo Code",
       env: [],
       models: { "mimo-auto": model },
     } as unknown as TProvider,
