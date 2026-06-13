@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
-import { Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Search, Settings, SquarePen, X } from "lucide-solid"
+import { Check, FolderOpen, MoreHorizontal, Pencil, Pin, Plus, Search, Settings, SquarePen, X, Home } from "lucide-solid"
 import {
   DragDropProvider,
   DragDropSensors,
@@ -1027,6 +1027,7 @@ function SortableProjectGroup(props: SortableProjectGroupProps) {
 export function Sidebar(props: {
   onOpenSettingsPage?: () => void
   onOpenWorkspacePage?: () => void
+  onOpenHomePage?: () => void
 }) {
   const projects = useStore((s) => s.projects)
   const currentProjectId = useStore((s) => s.currentProjectId)
@@ -1365,6 +1366,12 @@ export function Sidebar(props: {
           <MacSidebarHeader />
           <div class="sticky top-0 z-20 shrink-0 bg-background-stronger/95 px-1.5 pb-3 pt-2 backdrop-blur">
             <nav class="flex flex-col gap-0.5">
+              <SidebarActionButton
+                label="Home"
+                title="Go to home"
+                icon={Home}
+                onClick={() => props.onOpenHomePage?.()}
+              />
               <SidebarActionButton
                 label="New session"
                 title="Start a new session"

@@ -237,7 +237,7 @@ export function MainView() {
   const [activeTabId, setActiveTabId] = createSignal<string>("review")
   const [terminalTabs, setTerminalTabs] = createSignal<Array<{ id: string; session: Session }>>([])
   const [browserTabOpen, setBrowserTabOpen] = createSignal(false)
-  const [activePage, setActivePage] = createSignal<'workspace' | 'settings'>('workspace')
+  const [activePage, setActivePage] = createSignal<'workspace' | 'settings' | 'home'>('workspace')
   const [sessionPanelWidth, setSessionPanelWidth] = createSignal(DEFAULT_SESSION_PANEL_WIDTH)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
   const [gitKinds, setGitKinds] = createSignal<ReadonlyMap<string, DiffKind>>(new Map())
@@ -781,6 +781,7 @@ export function MainView() {
       <Sidebar
         onOpenSettingsPage={() => setActivePage('settings')}
         onOpenWorkspacePage={() => setActivePage('workspace')}
+        onOpenHomePage={() => setActivePage('home')}
       />
       <div class="flex h-full min-h-0 max-h-full min-w-0 flex-1 flex-col overflow-hidden bg-background">
         {activePage() === 'workspace' ? (
@@ -881,11 +882,34 @@ export function MainView() {
               </Show>
             </div>
           </LayoutProvider>
-        ) : (
+        ) : activePage() === 'settings' ? (
           <>
             <MacSidebarRevealRow />
             <SettingsPage />
           </>
+        ) : (
+          <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <MacSidebarRevealRow />
+            <div class="min-h-0 flex-1 overflow-hidden">
+              <WelcomeScreen
+                projects={projects()}
+                currentProject={currentProject()}
+                onOpenFolder={handleOpenFolder}
+                onCreateSession={() => {
+                  setActivePage('workspace')
+                  void handleCreateSession()
+                }}
+                onSelectProject={(id) => {
+                  appStore.setCurrentProject(id)
+                  setActivePage('workspace')
+                }}
+                onToggleFileTree={() => {
+                  setActivePage('workspace')
+                  handleToggleFileTree()
+                }}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
