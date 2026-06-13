@@ -338,6 +338,8 @@ function FolderSection(props: {
   onToggleProjectPin: (projectId: string) => void | Promise<void>
   isOpen: boolean
   onToggleProjectOpen: (projectId: string) => void
+  showAllSessions: boolean
+  onToggleShowAllSessions: (projectId: string) => void
   hidePinnedSessions?: boolean
 }) {
   const globalSync = useGlobalSync()
@@ -345,7 +347,6 @@ function FolderSection(props: {
   const notification = useNotification()
   const permission = usePermission()
 
-  const [showAllSessions, setShowAllSessions] = createSignal(false)
   const [projectMenuOpen, setProjectMenuOpen] = createSignal(false)
   const [renameProjectOpen, setRenameProjectOpen] = createSignal(false)
   const [renameProjectValue, setRenameProjectValue] = createSignal(props.project.name)
@@ -507,7 +508,7 @@ function FolderSection(props: {
   const sessionTree = (sessionId: string) => sessionsByParent().map.get(sessionId) ?? []
   const rootSessions = createMemo(() => sessionsByParent().map.get(sessionsByParent().ROOT) ?? [])
   const visibleRootSessions = createMemo(() =>
-    showAllSessions() ? rootSessions() : rootSessions().slice(0, PROJECT_SESSION_PREVIEW_LIMIT),
+    props.showAllSessions ? rootSessions() : rootSessions().slice(0, PROJECT_SESSION_PREVIEW_LIMIT),
   )
   const hiddenRootSessionCount = createMemo(() => Math.max(0, rootSessions().length - PROJECT_SESSION_PREVIEW_LIMIT))
 
@@ -893,10 +894,10 @@ function FolderSection(props: {
                 class="shob-sidebar-main-label h-8 rounded-[5px] pl-[34px] pr-3 text-left text-[13px] font-normal text-text-weaker transition-colors hover:bg-surface-raised-base-hover hover:text-text-base"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setShowAllSessions((current) => !current)
+                  props.onToggleShowAllSessions(props.project.id)
                 }}
               >
-                {showAllSessions() ? "Show less" : "Show more"}
+                {props.showAllSessions ? "Show less" : "Show more"}
               </button>
             </Show>
           </Show>
@@ -921,6 +922,8 @@ type SortableProjectGroupProps = {
   onToggleProjectPin: (projectId: string) => void | Promise<void>
   isProjectOpen: (projectId: string) => boolean
   onToggleProjectOpen: (projectId: string) => void
+  showsAllSessions: (projectId: string) => boolean
+  onToggleShowAllSessions: (projectId: string) => void
   onReorderProjects: (groupProjectIds: string[], reorderedGroupIds: string[]) => void
 }
 
@@ -966,6 +969,8 @@ function SortableProjectItems(props: SortableProjectItemsProps) {
           onToggleProjectPin={props.onToggleProjectPin}
           isOpen={props.isProjectOpen(project.id)}
           onToggleProjectOpen={props.onToggleProjectOpen}
+          showAllSessions={props.showsAllSessions(project.id)}
+          onToggleShowAllSessions={props.onToggleShowAllSessions}
           hidePinnedSessions
         />
       )}
@@ -1009,6 +1014,8 @@ function SortableProjectGroup(props: SortableProjectGroupProps) {
             onToggleProjectPin={props.onToggleProjectPin}
             isProjectOpen={props.isProjectOpen}
             onToggleProjectOpen={props.onToggleProjectOpen}
+            showsAllSessions={props.showsAllSessions}
+            onToggleShowAllSessions={props.onToggleShowAllSessions}
             onSortedProjectIdsChange={(nextProjectIds) => setSortedProjectIds(nextProjectIds)}
           />
         </SortableProvider>
@@ -1045,6 +1052,7 @@ export function Sidebar(props: {
   const [searchQuery, setSearchQuery] = createSignal("")
   const [sidebarNow, setSidebarNow] = createSignal(Date.now())
   const [projectOpenById, setProjectOpenById] = createSignal<Record<string, boolean>>({})
+  const [showAllSessionsByProjectId, setShowAllSessionsByProjectId] = createSignal<Record<string, boolean>>({})
   let sidebarResizeFrame: number | undefined
   let pendingSidebarWidth: number | undefined
 
@@ -1061,11 +1069,19 @@ export function Sidebar(props: {
   const unpinnedProjects = createMemo(() => projects().filter((project) => !project.pinned))
 
   const isProjectOpen = (projectId: string) => projectOpenById()[projectId] ?? true
+  const showsAllSessions = (projectId: string) => showAllSessionsByProjectId()[projectId] ?? false
 
   const handleToggleProjectOpen = (projectId: string) => {
     setProjectOpenById((current) => ({
       ...current,
       [projectId]: !(current[projectId] ?? true),
+    }))
+  }
+
+  const handleToggleShowAllSessions = (projectId: string) => {
+    setShowAllSessionsByProjectId((current) => ({
+      ...current,
+      [projectId]: !(current[projectId] ?? false),
     }))
   }
 
@@ -1421,6 +1437,8 @@ export function Sidebar(props: {
                     onToggleProjectPin={handleToggleProjectPin}
                     isProjectOpen={isProjectOpen}
                     onToggleProjectOpen={handleToggleProjectOpen}
+                    showsAllSessions={showsAllSessions}
+                    onToggleShowAllSessions={handleToggleShowAllSessions}
                     onReorderProjects={handleReorderProjects}
                   />
                   <SortableProjectGroup
@@ -1437,6 +1455,8 @@ export function Sidebar(props: {
                     onToggleProjectPin={handleToggleProjectPin}
                     isProjectOpen={isProjectOpen}
                     onToggleProjectOpen={handleToggleProjectOpen}
+                    showsAllSessions={showsAllSessions}
+                    onToggleShowAllSessions={handleToggleShowAllSessions}
                     onReorderProjects={handleReorderProjects}
                   />
                 </div>
