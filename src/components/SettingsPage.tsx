@@ -1,5 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
-import { Blocks, Boxes, SlidersHorizontal, Box, CircleHelp } from "lucide-solid"
+import { Blocks, Boxes, SlidersHorizontal, Box, CircleHelp, ArrowLeft } from "lucide-solid"
+import { useWindowChrome } from "@/utils/window-chrome"
 import { SettingsProviders } from "./shob-settings/settings-providers"
 import { SettingsModels } from "./shob-settings/settings-models"
 import { SettingsAbout } from "./settings-about"
@@ -91,7 +92,8 @@ function SettingsRow(props: {
   )
 }
 
-export function SettingsPage() {
+export function SettingsPage(props: { onGoBack?: () => void }) {
+  const chrome = useWindowChrome()
   const preferredShell = useStore((s) => s.preferredShell)
   const availableShells = useStore((s) => s.availableShells)
   const setPreferredShell = useStore((s) => s.setPreferredShell)
@@ -179,8 +181,25 @@ export function SettingsPage() {
   }
 
   return (
-    <div class="min-h-0 flex-1 overflow-hidden bg-background text-foreground">
-      <div class="flex h-full min-h-0">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
+      <header
+        class="mac-drag-region flex h-12 shrink-0 items-center gap-1 border-b border-border/50 bg-background px-2"
+        style={{ "padding-left": `${chrome.trafficLightInset()}px` }}
+      >
+        <button
+          type="button"
+          onClick={() => props.onGoBack?.()}
+          class="flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+          title="Go back"
+          aria-label="Go back"
+        >
+          <ArrowLeft class="h-4 w-4 shrink-0" />
+          <span>Back</span>
+        </button>
+        <span class="ml-1 text-[13px] font-semibold text-foreground">Settings</span>
+      </header>
+
+      <div class="flex min-h-0 flex-1">
         <aside class="flex w-[220px] shrink-0 flex-col overflow-hidden border-r border-border/50 bg-background p-3">
           <nav class="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto">
             <div class="px-2 pb-1.5 pt-1 text-[13px] font-medium leading-5 text-muted-foreground/75">Personal</div>

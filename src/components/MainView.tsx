@@ -238,6 +238,14 @@ export function MainView() {
   const [terminalTabs, setTerminalTabs] = createSignal<Array<{ id: string; session: Session }>>([])
   const [browserTabOpen, setBrowserTabOpen] = createSignal(false)
   const [activePage, setActivePage] = createSignal<'workspace' | 'settings' | 'home'>('workspace')
+  const [previousPage, setPreviousPage] = createSignal<'workspace' | 'home'>('workspace')
+
+  const goToSettings = () => {
+    const current = activePage()
+    if (current === 'settings') return
+    setPreviousPage(current === 'home' ? 'home' : 'workspace')
+    setActivePage('settings')
+  }
   const [sessionPanelWidth, setSessionPanelWidth] = createSignal(DEFAULT_SESSION_PANEL_WIDTH)
   const [gitChangedFiles, setGitChangedFiles] = createSignal<string[]>([])
   const [gitKinds, setGitKinds] = createSignal<ReadonlyMap<string, DiffKind>>(new Map())
@@ -777,12 +785,22 @@ export function MainView() {
   })
 
   return (
-    <div class="grid h-full min-h-0 max-h-full flex-1 grid-cols-[auto_minmax(0,1fr)] overflow-hidden bg-background text-foreground">
-      <Sidebar
-        onOpenSettingsPage={() => setActivePage('settings')}
-        onOpenWorkspacePage={() => setActivePage('workspace')}
-        onOpenHomePage={() => setActivePage('home')}
-      />
+    <div
+      class="grid h-full min-h-0 max-h-full flex-1 overflow-hidden bg-background text-foreground"
+      classList={{
+        'grid-cols-[auto_minmax(0,1fr)]': activePage() !== 'settings',
+        'grid-cols-[minmax(0,1fr)]': activePage() === 'settings',
+      }}
+    >
+      {/* Keep the Sidebar mounted to preserve its state, but collapse it on the
+          settings page so settings spans the full window width. */}
+      <div classList={{ contents: activePage() !== 'settings', hidden: activePage() === 'settings' }}>
+        <Sidebar
+          onOpenSettingsPage={goToSettings}
+          onOpenWorkspacePage={() => setActivePage('workspace')}
+          onOpenHomePage={() => setActivePage('home')}
+        />
+      </div>
       <div class="flex h-full min-h-0 max-h-full min-w-0 flex-1 flex-col overflow-hidden bg-background">
         {activePage() === 'workspace' ? (
           <LayoutProvider>
@@ -883,10 +901,7 @@ export function MainView() {
             </div>
           </LayoutProvider>
         ) : activePage() === 'settings' ? (
-          <>
-            <MacSidebarRevealRow />
-            <SettingsPage />
-          </>
+          <SettingsPage onGoBack={() => setActivePage(previousPage())} />
         ) : (
           <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <MacSidebarRevealRow />
