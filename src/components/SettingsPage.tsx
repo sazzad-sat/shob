@@ -8,6 +8,9 @@ import { useStore } from "../store"
 import { applyAppTheme, getThemeById, SHOB_THEME_LIST, resolveThemeMode, type ShobTheme } from "../theme"
 import { Combobox, ComboboxContent, ComboboxControl, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { useSettings } from "@/context/settings"
+import { TASK_SOUND_OPTIONS, playTaskSound } from "@/utils/sound"
 
 type SettingsSection = "general" | "plugins" | "providers" | "models" | "about"
 
@@ -96,7 +99,12 @@ export function SettingsPage() {
   const colorScheme = useStore((s) => s.colorScheme)
   const setThemeId = useStore((s) => s.setThemeId)
   const setColorScheme = useStore((s) => s.setColorScheme)
+  const settings = useSettings()
   const [section, setSection] = createSignal<SettingsSection>("general")
+
+  const selectedTaskSound = createMemo(
+    () => TASK_SOUND_OPTIONS.find((option) => option.id === settings.sounds.taskComplete()) ?? TASK_SOUND_OPTIONS[0],
+  )
 
   const isDark = createMemo(() => {
     const scheme = colorScheme()
@@ -321,6 +329,82 @@ export function SettingsPage() {
                     </Select>
                   </Show>
                 </SettingsRow>
+              </div>
+
+              <div class="text-[13px] font-medium leading-5 text-muted-foreground/75">Sounds</div>
+              <div class="overflow-hidden rounded-lg border border-border/70 bg-card/35">
+                <SettingsRow title="Task complete sound" description="Play a sound when an agent finishes a task">
+                  <div class="flex w-full justify-end">
+                    <Switch
+                      checked={settings.sounds.taskCompleteEnabled()}
+                      onChange={(value) => settings.sounds.setTaskCompleteEnabled(value)}
+                      aria-label="Toggle task complete sound"
+                    />
+                  </div>
+                </SettingsRow>
+
+                <Show when={settings.sounds.taskCompleteEnabled()}>
+                  <Show when={TASK_SOUND_OPTIONS.length > 1}>
+                    <SettingsRow title="Sound" description="Which sound to play on completion">
+                      <Select
+                        options={TASK_SOUND_OPTIONS.map((option) => option.id)}
+                        value={selectedTaskSound().id}
+                        onChange={(id: string | null) => {
+                          if (!id) return
+                          settings.sounds.setTaskComplete(id)
+                          void playTaskSound(id, settings.sounds.taskCompleteVolume())
+                        }}
+                        itemComponent={(props: { item: { rawValue: string } }) => (
+                          <SelectItem
+                            item={props.item}
+                            class="min-h-8 cursor-default px-2 py-1.5 pr-8 text-[13px] font-medium text-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground data-selected:bg-secondary/80 data-selected:text-foreground"
+                          >
+                            <span class="min-w-0 truncate">
+                              {TASK_SOUND_OPTIONS.find((option) => option.id === props.item.rawValue)?.label ??
+                                props.item.rawValue}
+                            </span>
+                          </SelectItem>
+                        )}
+                      >
+                        <SelectTrigger
+                          class="h-8 w-full border-transparent bg-muted/70 px-2.5 text-[13px] font-medium text-foreground hover:bg-muted"
+                          aria-label="Select task complete sound"
+                        >
+                          <SelectValue>{() => selectedTaskSound().label}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent class="max-h-56 w-[var(--kb-select-trigger-width)] rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-2xl" />
+                      </Select>
+                    </SettingsRow>
+                  </Show>
+
+                  <SettingsRow title="Volume" description="How loud the sound plays (0-100)">
+                    <div class="flex w-full items-center justify-end gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={Math.round(settings.sounds.taskCompleteVolume() * 100)}
+                        onInput={(event) => {
+                          const next = Number(event.currentTarget.value)
+                          if (Number.isNaN(next)) return
+                          settings.sounds.setTaskCompleteVolume(next / 100)
+                        }}
+                        class="h-8 w-20 rounded-md border border-border/70 bg-muted/70 px-2.5 text-[13px] font-medium text-foreground tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                        aria-label="Task complete sound volume"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void playTaskSound(settings.sounds.taskComplete(), settings.sounds.taskCompleteVolume())
+                        }
+                        class="shrink-0 rounded-md border border-border/70 bg-muted/70 px-2.5 py-1 text-[12px] font-medium text-foreground outline-none transition-colors hover:bg-muted"
+                      >
+                        Test
+                      </button>
+                    </div>
+                  </SettingsRow>
+                </Show>
               </div>
             </div>
           </Show>
