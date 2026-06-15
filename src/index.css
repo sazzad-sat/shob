@@ -623,6 +623,41 @@ b {
   letter-spacing: 0 !important;
 }
 
+/* Shimmer effect for the currently running session's title */
+.shob-session-shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--text-weak) 0%,
+    var(--text-weak) 35%,
+    var(--text-strong) 50%,
+    var(--text-weak) 65%,
+    var(--text-weak) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: shob-session-shimmer 1.6s linear infinite;
+}
+
+@keyframes shob-session-shimmer {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shob-session-shimmer {
+    animation: none;
+  }
+}
+
+
+
 /* ═══════════════════════════════════════════════════
    WORKSPACE DIVIDER — expand line
    ═══════════════════════════════════════════════════ */

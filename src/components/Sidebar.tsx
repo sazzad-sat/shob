@@ -207,7 +207,7 @@ const PinnedSessionRow = (props: {
       title={`${props.hit.session.name} · ${props.hit.project.name}`}
       onClick={() => props.onSelect(props.hit.project.id, props.hit.session.id)}
     >
-      <span class="shob-sidebar-main-label min-w-0 truncate text-[13px] font-normal leading-4">{props.hit.session.name}</span>
+      <span class={`shob-sidebar-main-label min-w-0 truncate text-[13px] font-normal leading-4 ${isWorking() ? "shob-session-shimmer" : ""}`}>{props.hit.session.name}</span>
       <span class="flex min-w-7 items-center justify-end">
         <Switch
           fallback={
@@ -541,7 +541,15 @@ function FolderSection(props: {
     </Switch>
   )
 
-  const renderSessionNode = (session: Project["sessions"][number], level = 0) => (
+  // starts at `34 + level*22`px; each guide "spine" aligns perfectly with the left edge of the parent text.
+  const GUIDE_SPINE = (level: number) => 12 + level * 22
+
+  const renderSessionNode = (
+    session: Project["sessions"][number],
+    level = 0,
+    ancestorHasNext: boolean[] = [],
+    hasNextSibling = false,
+  ) => (
     <>
       <div
         class={`group/session relative flex h-8 cursor-pointer items-center justify-between rounded-[5px] pr-3 transition-colors border ${
@@ -549,20 +557,50 @@ function FolderSection(props: {
             ? "bg-surface-raised-strong text-text-strong border-border/70 shadow-sm"
             : "text-text-base hover:bg-surface-raised-base-hover hover:text-text-strong border-transparent"
         }`}
-        style={{ "padding-left": `${34 + level * 14}px` }}
+        style={{ "padding-left": `${34 + level * 22}px` }}
         onClick={() => {
           setConfirmDeleteSessionId(null)
           props.onSelectSession(props.project.id, session.id)
         }}
       >
+        <Show when={level > 0}>
+          {/* Continuing vertical lines for ancestors that still have siblings below. */}
+          {ancestorHasNext.map((continues, index) =>
+            continues ? (
+              <span
+                class="pointer-events-none absolute w-px bg-text-weaker opacity-40"
+                style={{ left: `${GUIDE_SPINE(index + 1)}px`, top: "-2px", height: "36px" }}
+                aria-hidden="true"
+              />
+            ) : null,
+          )}
+          {/* Vertical drop for the current node. 
+              If hasNextSibling, it goes all the way through to bridge to the next sibling. 
+              If not, it stops exactly where the curve starts. */}
+          <span
+            class="pointer-events-none absolute w-px bg-text-weaker opacity-40"
+            style={{ 
+              left: `${GUIDE_SPINE(level)}px`, 
+              top: "-2px", 
+              height: hasNextSibling ? "36px" : "8px"
+            }}
+            aria-hidden="true"
+          />
+          {/* Beautiful sweeping curve for every item, creating a smooth branch effect */}
+          <span
+            class="pointer-events-none absolute border-l border-b border-text-weaker opacity-40 rounded-bl-[10px]"
+            style={{ left: `${GUIDE_SPINE(level)}px`, top: "6px", height: "11px", width: "16px" }}
+            aria-hidden="true"
+          />
+        </Show>
         <div class="min-w-0 flex flex-1 items-center">
           <Show
             when={editingSessionId() === session.id}
             fallback={
               <span
                 class={`shob-sidebar-main-label truncate text-[13px] leading-4 ${
-                  props.activeSessionId === session.id ? "font-medium text-text-strong" : "font-normal text-current"
-                }`}
+                  props.activeSessionId === session.id ? "font-medium text-text-strong" : "font-normal text-text-base group-hover/session:text-text-strong transition-colors"
+                } ${isSessionWorking(session.id) ? "shob-session-shimmer" : ""}`}
                 onDblClick={(e) => {
                   e.stopPropagation()
                   setConfirmDeleteSessionId(null)
@@ -634,7 +672,14 @@ function FolderSection(props: {
         </div>
       </div>
       <For each={sessionTree(session.id)}>
-        {(child) => renderSessionNode(child, level + 1)}
+        {(child, index) =>
+          renderSessionNode(
+            child,
+            level + 1,
+            level === 0 ? [] : [...ancestorHasNext, hasNextSibling],
+            index() < sessionTree(session.id).length - 1,
+          )
+        }
       </For>
     </>
   )
