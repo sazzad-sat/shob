@@ -5,7 +5,8 @@
 <table>
   <tr>
     <td><img width="760" alt="Shob Logo" src="https://github.com/user-attachments/assets/ac64b8c9-52cb-4d80-8a69-b2a6bbcd2790" /></td>
-    <td><img width="760" alt="Shob Interface" src="https://github.com/user-attachments/assets/b96f3c9e-7ce8-4d22-8ffa-1b26d4ff7802" /></td>
+    <td><img width="760" alt="Shob Interface" src="https://github.com/user-attachments/assets/d4e6f8f4-fc9b-4a9b-b34c-b263693ef029" /></td>
+
   </tr>
 </table>
 
