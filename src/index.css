@@ -1338,6 +1338,39 @@ b {
   border-bottom: 0.5px solid color-mix(in srgb, var(--border-weaker-base, var(--border-weak-base)) 42%, transparent);
 }
 
+/* Agent header controls relocated into the window titlebar (Windows/Linux).
+   Keep the title cluster compact so it sits on the left of the 40px bar, and
+   align the right-hand control group to the bar's vertical center. */
+.shob-titlebar #shob-titlebar-left .agent-session-title-cluster {
+  flex: 0 1 auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.shob-titlebar #shob-titlebar-left [data-slot="session-title-child"] {
+  font-size: 13px;
+  font-weight: var(--shob-font-weight-semibold);
+  color: var(--text-strong);
+}
+
+.shob-titlebar-agent-controls {
+  height: 100%;
+}
+
+/* Floating panel controls (Open with / terminal / review) anchored to the
+   agent view's top-right corner. A translucent backdrop keeps the transparent
+   toggle buttons legible when they overlap chat content. */
+.shob-agent-corner-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--background-stronger, var(--background)) 78%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
 .titlebar-icon {
   width: 32px !important;
   height: 24px !important;
@@ -1596,6 +1629,49 @@ b {
   font-size: 12px;
   font-weight: var(--agent-font-regular, 400);
   line-height: 1;
+}
+
+/* Minimal branch switcher: plain text trigger, no border/chevron. */
+.agent-header-branch-text {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(30vw, 220px);
+  height: 26px;
+  gap: 6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--terminal-agent-dim, var(--text-weak));
+  font-family: var(--font-family-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: var(--agent-font-regular, 400);
+  line-height: 1;
+  outline: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.agent-header-branch-text > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-header-branch-text:hover:not(:disabled),
+.agent-header-branch-text[data-expanded] {
+  background: color-mix(in srgb, var(--surface-raised-base-hover) 60%, transparent);
+  color: var(--text-strong);
+}
+
+.agent-header-branch-text:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ring) 40%, transparent);
+}
+
+.agent-header-branch-text:disabled {
+  pointer-events: none;
+  opacity: 0.6;
 }
 
 .agent-header-branch-group {

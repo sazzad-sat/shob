@@ -1213,6 +1213,13 @@ export function Sidebar(props: {
     )
   })
 
+  // Publish the live sidebar width (0 when collapsed) so the window titlebar can
+  // align the agent header items with the left edge of the agent view.
+  createEffect(() => {
+    const width = isSidebarVisible() ? sidebarWidth() : 0
+    document.documentElement.style.setProperty("--shob-sidebar-width", `${width}px`)
+  })
+
   onMount(() => {
     const handleSidebarToggleRequest = () => {
       setIsSidebarVisible((current) => !current)
