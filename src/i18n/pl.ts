@@ -90,7 +90,7 @@ export const dict = {
   "dialog.provider.group.popular": "Popularne",
   "dialog.provider.group.other": "Inne",
   "dialog.provider.tag.recommended": "Zalecane",
-  "dialog.provider.shob.note": "Wyselekcjonowane modele, w tym Claude, GPT, Gemini i inne",
+  "dialog.provider.opencode.note": "Wyselekcjonowane modele, w tym Claude, GPT, Gemini i inne",
   "dialog.provider.shob.tagline": "Niezawodne, zoptymalizowane modele",
   "dialog.provider.opencodeGo.tagline": "Tania subskrypcja dla każdego",
   "dialog.provider.anthropic.note": "Bezpośredni dostęp do modeli Claude, w tym Pro i Max",
@@ -120,13 +120,13 @@ export const dict = {
   "provider.connect.apiKey.label": "Klucz API {{provider}}",
   "provider.connect.apiKey.placeholder": "Klucz API",
   "provider.connect.apiKey.required": "Klucz API jest wymagany",
-  "provider.connect.shobZen.line1":
-    "Shob Zen daje dostęp do wybranego zestawu niezawodnych, zoptymalizowanych modeli dla agentów kodujących.",
-  "provider.connect.shobZen.line2":
+  "provider.connect.opencodeZen.line1":
+    "Opencode Zen daje dostęp do wybranego zestawu niezawodnych, zoptymalizowanych modeli dla agentów kodujących.",
+  "provider.connect.opencodeZen.line2":
     "Z jednym kluczem API uzyskasz dostęp do modeli takich jak Claude, GPT, Gemini, GLM i więcej.",
-  "provider.connect.shobZen.visit.prefix": "Odwiedź ",
-  "provider.connect.shobZen.visit.link": "shob.ai/zen",
-  "provider.connect.shobZen.visit.suffix": ", aby odebrać swój klucz API.",
+  "provider.connect.opencodeZen.visit.prefix": "Odwiedź ",
+  "provider.connect.opencodeZen.visit.link": "opencode.ai/zen",
+  "provider.connect.opencodeZen.visit.suffix": ", aby odebrać swój klucz API.",
   "provider.connect.oauth.code.visit.prefix": "Odwiedź ",
   "provider.connect.oauth.code.visit.link": "ten link",
   "provider.connect.oauth.code.visit.suffix":

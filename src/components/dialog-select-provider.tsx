@@ -92,7 +92,7 @@ export const DialogSelectProvider: Component = () => {
               id={i.id === ANTHROPIC_COMPATIBLE_ID ? "anthropic" : i.id}
             />
             <span>{i.name}</span>
-            <Show when={i.id === "shob"}>
+            <Show when={i.id === "opencode"}>
               <div class="text-14-regular text-text-weak">{language.t("dialog.provider.shob.tagline")}</div>
             </Show>
             <Show when={i.id === CUSTOM_ID}>
@@ -101,7 +101,7 @@ export const DialogSelectProvider: Component = () => {
             <Show when={i.id === ANTHROPIC_COMPATIBLE_ID}>
               <Tag>{language.t("settings.providers.tag.custom")}</Tag>
             </Show>
-            <Show when={i.id === "shob"}>
+            <Show when={i.id === "opencode"}>
               <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
             </Show>
             <Show when={note(i.id)}>{(value) => <div class="text-14-regular text-text-weak">{value()}</div>}</Show>

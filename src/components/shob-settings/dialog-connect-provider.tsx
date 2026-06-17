@@ -432,16 +432,16 @@ export function DialogConnectProvider(props: { provider: string }) {
     return (
       <div class="flex flex-col gap-6">
         <Switch>
-          <Match when={provider().id === "shob"}>
+          <Match when={provider().id === "opencode"}>
             <div class="flex flex-col gap-4">
-              <div class="text-14-regular text-text-base">{language.t("provider.connect.shobZen.line1")}</div>
-              <div class="text-14-regular text-text-base">{language.t("provider.connect.shobZen.line2")}</div>
+              <div class="text-14-regular text-text-base">{language.t("provider.connect.opencodeZen.line1")}</div>
+              <div class="text-14-regular text-text-base">{language.t("provider.connect.opencodeZen.line2")}</div>
               <div class="text-14-regular text-text-base">
-                {language.t("provider.connect.shobZen.visit.prefix")}
-                <Link href="https://shob.ai/zen" tabIndex={-1}>
-                  {language.t("provider.connect.shobZen.visit.link")}
+                {language.t("provider.connect.opencodeZen.visit.prefix")}
+                <Link href="https://opencode.ai/zen" tabIndex={-1}>
+                  {language.t("provider.connect.opencodeZen.visit.link")}
                 </Link>
-                {language.t("provider.connect.shobZen.visit.suffix")}
+                {language.t("provider.connect.opencodeZen.visit.suffix")}
               </div>
             </div>
           </Match>

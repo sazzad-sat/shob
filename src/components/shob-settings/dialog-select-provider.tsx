@@ -108,7 +108,7 @@ export const DialogSelectProvider: Component = () => {
               id={i.id === OPENCLAUDE_ID ? "openclaude" : i.id === ANTHROPIC_COMPATIBLE_ID ? "anthropic" : i.id}
             />
             <span>{i.name}</span>
-            <Show when={i.id === "shob"}>
+            <Show when={i.id === "opencode"}>
               <div class="text-14-regular text-text-weak">{language.t("dialog.provider.shob.tagline")}</div>
             </Show>
             <Show when={i.id === CUSTOM_ID}>

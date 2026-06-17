@@ -226,7 +226,7 @@ export namespace Provider {
             },
           },
         }),
-      shob: Effect.fnUntraced(function* (input: Info) {
+      opencode: Effect.fnUntraced(function* (input: Info) {
         const env = Env.all()
         const hasKey = iife(() => {
           if (input.env.some((item) => env[item])) return true
@@ -235,7 +235,7 @@ export namespace Provider {
         const ok =
           hasKey ||
           Boolean(yield* dep.auth(input.id)) ||
-          Boolean((yield* dep.config()).provider?.["shob"]?.options?.apiKey)
+          Boolean((yield* dep.config()).provider?.["opencode"]?.options?.apiKey)
 
         if (!ok) {
           for (const [key, value] of Object.entries(input.models)) {
@@ -1413,7 +1413,7 @@ export namespace Provider {
                           id: ModelID.make(item.id),
                           providerID: kilo,
                           name: item.name,
-                          family: item.shob?.family ?? "",
+                          family: item.opencode?.family ?? "",
                           api: {
                             id: item.id,
                             url: "https://api.kilo.ai/api/gateway",
@@ -1463,8 +1463,8 @@ export namespace Provider {
                         }
 
                         model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
-                        if (item.shob?.variants) {
-                          model.variants = mergeDeep(model.variants, item.shob.variants)
+                        if (item.opencode?.variants) {
+                          model.variants = mergeDeep(model.variants, item.opencode.variants)
                         }
 
                         newModels[item.id] = model
@@ -1885,7 +1885,7 @@ export namespace Provider {
           "gemini-2.5-flash",
           "gpt-5-nano",
         ]
-        if (providerID.startsWith("shob")) {
+        if (providerID.startsWith("opencode")) {
           priority = ["gpt-5-nano"]
         }
         if (providerID.startsWith("github-copilot")) {

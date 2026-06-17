@@ -167,7 +167,7 @@ export const SettingsProviders: Component = () => {
   const connected = createMemo(() =>
     providers
       .connected()
-      .filter((p) => p.id !== "shob" || Object.values(p.models).find((m) => m.cost?.input)),
+      .filter((p) => p.id !== "opencode" || Object.values(p.models).find((m) => m.cost?.input)),
   )
 
   const popular = createMemo(() => {

@@ -768,7 +768,7 @@ export namespace ProviderTransform {
 
     if (
       input.model.providerID === "baseten" ||
-      (input.model.providerID === "shob" && ["kimi-k2-thinking", "glm-4.6"].includes(input.model.api.id))
+      (input.model.providerID === "opencode" && ["kimi-k2-thinking", "glm-4.6"].includes(input.model.api.id))
     ) {
       result["chat_template_args"] = { enable_thinking: true }
     }
@@ -838,7 +838,7 @@ export namespace ProviderTransform {
         result["textVerbosity"] = "low"
       }
 
-      if (input.model.providerID.startsWith("shob")) {
+      if (input.model.providerID.startsWith("opencode")) {
         result["promptCacheKey"] = input.sessionID
         result["include"] = ["reasoning.encrypted_content"]
         result["reasoningSummary"] = "auto"
