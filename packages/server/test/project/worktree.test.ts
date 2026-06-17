@@ -47,7 +47,7 @@ describe("Worktree", () => {
 
       expect(info.name).toBeDefined()
       expect(typeof info.name).toBe("string")
-      expect(info.branch).toBe(`opencode/${info.name}`)
+      expect(info.branch).toBe(`shob/${info.name}`)
       expect(info.directory).toContain(info.name)
     })
 
@@ -57,7 +57,7 @@ describe("Worktree", () => {
       const info = await withInstance(tmp.path, () => Worktree.makeWorktreeInfo("my-feature"))
 
       expect(info.name).toBe("my-feature")
-      expect(info.branch).toBe("opencode/my-feature")
+      expect(info.branch).toBe("shob/my-feature")
     })
 
     test("slugifies the provided name", async () => {
@@ -82,7 +82,7 @@ describe("Worktree", () => {
       const info = await withInstance(tmp.path, () => Worktree.create())
 
       expect(info.name).toBeDefined()
-      expect(info.branch).toStartWith("opencode/")
+      expect(info.branch).toStartWith("shob/")
       expect(info.directory).toBeDefined()
 
       // Wait for bootstrap to complete
@@ -100,7 +100,7 @@ describe("Worktree", () => {
 
       // create returns before bootstrap completes, but the worktree already exists
       expect(info.name).toBeDefined()
-      expect(info.branch).toStartWith("opencode/")
+      expect(info.branch).toStartWith("shob/")
 
       const text = await $`git worktree list --porcelain`.cwd(tmp.path).quiet().text()
       const dir = await fs.realpath(info.directory).catch(() => info.directory)
@@ -124,7 +124,7 @@ describe("Worktree", () => {
       const info = await withInstance(tmp.path, () => Worktree.create({ name: "test-workspace" }))
 
       expect(info.name).toBe("test-workspace")
-      expect(info.branch).toBe("opencode/test-workspace")
+      expect(info.branch).toBe("shob/test-workspace")
 
       // Cleanup
       await ready

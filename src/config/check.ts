@@ -45,13 +45,13 @@ export const CLI_CATALOG: CliCatalogItem[] = [
     installCommand: 'npm install -g @google/gemini-cli',
   },
   {
-    id: 'opencode',
-    label: 'OpenCode',
-    iconKey: 'opencode',
+    id: 'shob',
+    label: 'Shob',
+    iconKey: 'shob',
     priority: 3,
     default: false,
-    commands: ['opencode', 'opencode.cmd', 'opencode.exe'],
-    installCommand: 'npm install -g opencode-ai',
+    commands: ['shob', 'shob.cmd', 'shob.exe'],
+    installCommand: 'npm install -g shob-ai',
   },
   {
     id: 'claude-code',

@@ -31,7 +31,7 @@ export namespace TuiConfig {
   }
 
   function customPath() {
-    return Flag.OPENCODE_TUI_CONFIG
+    return Flag.SHOB_TUI_CONFIG
   }
 
   function normalize(raw: Record<string, unknown>) {
@@ -69,7 +69,7 @@ export namespace TuiConfig {
   }
 
   const state = Instance.state(async () => {
-    let projectFiles = Flag.OPENCODE_DISABLE_PROJECT_CONFIG
+    let projectFiles = Flag.SHOB_DISABLE_PROJECT_CONFIG
       ? []
       : await ConfigPaths.projectFiles("tui", Instance.directory, Instance.worktree)
     const directories = await ConfigPaths.directories(Instance.directory, Instance.worktree)
@@ -77,7 +77,7 @@ export namespace TuiConfig {
     const managed = Config.managedConfigDir()
     await migrateTuiConfig({ directories, custom, managed })
     // Re-compute after migration since migrateTuiConfig may have created new tui.json files
-    projectFiles = Flag.OPENCODE_DISABLE_PROJECT_CONFIG
+    projectFiles = Flag.SHOB_DISABLE_PROJECT_CONFIG
       ? []
       : await ConfigPaths.projectFiles("tui", Instance.directory, Instance.worktree)
 
@@ -99,7 +99,7 @@ export namespace TuiConfig {
     }
 
     for (const dir of unique(directories)) {
-      if (!ConfigPaths.PROJECT_DIRS.some((d) => dir.endsWith(d)) && dir !== Flag.OPENCODE_CONFIG_DIR) continue
+      if (!ConfigPaths.PROJECT_DIRS.some((d) => dir.endsWith(d)) && dir !== Flag.SHOB_CONFIG_DIR) continue
       for (const file of ConfigPaths.fileInDirectory(dir, "tui")) {
         await mergeFile(acc, file)
       }
@@ -124,7 +124,7 @@ export namespace TuiConfig {
     const deps: Promise<void>[] = []
     if (acc.result.plugin?.length) {
       for (const dir of unique(directories)) {
-        if (!ConfigPaths.PROJECT_DIRS.some((d) => dir.endsWith(d)) && dir !== Flag.OPENCODE_CONFIG_DIR) continue
+        if (!ConfigPaths.PROJECT_DIRS.some((d) => dir.endsWith(d)) && dir !== Flag.SHOB_CONFIG_DIR) continue
         deps.push(installDeps(dir))
       }
     }
@@ -158,7 +158,7 @@ export namespace TuiConfig {
     if (!isRecord(raw)) return {}
 
     // Flatten a nested "tui" key so users who wrote `{ "tui": { ... } }` inside tui.json
-    // (mirroring the old opencode.json shape) still get their settings applied.
+    // (mirroring the old shob.json shape) still get their settings applied.
     const normalized = normalize(raw)
 
     const parsed = Info.safeParse(normalized)

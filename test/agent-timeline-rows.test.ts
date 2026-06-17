@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { AssistantMessage, Message, Part, SessionStatus, UserMessage } from "@opencode-ai/sdk/v2/client"
+import type { AssistantMessage, Message, Part, SessionStatus, UserMessage } from "@shob-ai/sdk/v2/client"
 import {
   buildAgentTimelineOrphanRows,
   buildAgentTimelineRows,

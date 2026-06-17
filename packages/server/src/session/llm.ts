@@ -62,7 +62,7 @@ export namespace LLM {
     error: { message: string }
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/LLM") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/LLM") {}
 
   export const layer = Layer.effect(
     Service,
@@ -242,7 +242,7 @@ export namespace LLM {
     }
 
     // Wire up toolExecutor for DWS workflow models so that tool calls
-    // from the workflow service are executed via opencode's tool system
+    // from the workflow service are executed via shob's tool system
     // and results sent back over the WebSocket.
     if (language instanceof GitLabWorkflowLanguageModel) {
       const workflowModel = language as GitLabWorkflowLanguageModel & {
@@ -344,17 +344,17 @@ export namespace LLM {
       maxOutputTokens: params.maxOutputTokens,
       abortSignal: input.abort,
       headers: {
-        ...(input.model.providerID.startsWith("opencode")
+        ...(input.model.providerID.startsWith("shob")
           ? {
-              "x-opencode-project": Instance.project.id,
-              "x-opencode-session": input.sessionID,
-              "x-opencode-request": input.user.id,
-              "x-opencode-client": Flag.OPENCODE_CLIENT,
+              "x-shob-project": Instance.project.id,
+              "x-shob-session": input.sessionID,
+              "x-shob-request": input.user.id,
+              "x-shob-client": Flag.SHOB_CLIENT,
             }
           : {
               "x-session-affinity": input.sessionID,
               ...(input.parentSessionID ? { "x-parent-session-id": input.parentSessionID } : {}),
-              "User-Agent": `opencode/${Installation.VERSION}`,
+              "User-Agent": `shob/${Installation.VERSION}`,
             }),
         ...input.model.headers,
         ...headers,

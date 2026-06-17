@@ -1,6 +1,6 @@
 import path from "path"
 import { describe, expect, test } from "bun:test"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { fileURLToPath } from "url"
 import { Instance } from "../../src/project/instance"
 import { ModelID, ProviderID } from "../../src/provider/schema"
@@ -237,7 +237,7 @@ describe("session.prompt regression", () => {
           return new Response("not found", { status: 404 })
         }
         calls++
-        return new Response(chat("packages/opencode/src/session/processor.ts"), {
+        return new Response(chat("packages/shob/src/session/processor.ts"), {
           status: 200,
           headers: { "Content-Type": "text/event-stream" },
         })
@@ -249,9 +249,9 @@ describe("session.prompt regression", () => {
         git: true,
         init: async (dir) => {
           await Bun.write(
-            path.join(dir, "opencode.json"),
+            path.join(dir, "shob.json"),
             JSON.stringify({
-              $schema: "https://opencode.ai/config.json",
+              $schema: "https://shob.ai/config.json",
               enabled_providers: ["alibaba"],
               provider: {
                 alibaba: {
@@ -318,9 +318,9 @@ describe("session.prompt regression", () => {
         git: true,
         init: async (dir) => {
           await Bun.write(
-            path.join(dir, "opencode.json"),
+            path.join(dir, "shob.json"),
             JSON.stringify({
-              $schema: "https://opencode.ai/config.json",
+              $schema: "https://shob.ai/config.json",
               enabled_providers: ["alibaba"],
               provider: {
                 alibaba: {
@@ -405,7 +405,7 @@ describe("session.prompt agent variant", () => {
           const other = await SessionPrompt.prompt({
             sessionID: session.id,
             agent: "build",
-            model: { providerID: ProviderID.make("opencode"), modelID: ModelID.make("kimi-k2.5-free") },
+            model: { providerID: ProviderID.make("shob"), modelID: ModelID.make("kimi-k2.5-free") },
             noReply: true,
             parts: [{ type: "text", text: "hello" }],
           })

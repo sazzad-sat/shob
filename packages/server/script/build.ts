@@ -14,7 +14,7 @@ process.chdir(dir)
 
 await import("./generate.ts")
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@shob-ai/script"
 import pkg from "../package.json"
 
 // Load migrations from migration directories
@@ -212,12 +212,12 @@ for (const item of targets) {
     },
     entrypoints: ["./src/index.ts", parserWorker, workerPath, ...(embeddedFileMap ? ["better-code-web-ui.gen.ts"] : [])],
     define: {
-      OPENCODE_VERSION: `'${Script.version}'`,
-      OPENCODE_MIGRATIONS: JSON.stringify(migrations),
+      SHOB_VERSION: `'${Script.version}'`,
+      SHOB_MIGRATIONS: JSON.stringify(migrations),
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
-      OPENCODE_WORKER_PATH: workerPath,
-      OPENCODE_CHANNEL: `'${Script.channel}'`,
-      OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
+      SHOB_WORKER_PATH: workerPath,
+      SHOB_CHANNEL: `'${Script.channel}'`,
+      SHOB_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
     },
   })
 

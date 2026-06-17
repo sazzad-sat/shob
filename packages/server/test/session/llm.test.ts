@@ -393,9 +393,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: [providerID],
             provider: {
               [providerID]: {
@@ -484,9 +484,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: [providerID],
             provider: {
               [providerID]: {
@@ -558,9 +558,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: [providerID],
             provider: {
               [providerID]: {
@@ -649,9 +649,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: [providerID],
             provider: {
               [providerID]: {
@@ -760,9 +760,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: ["openai"],
             provider: {
               openai: {
@@ -880,9 +880,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: ["openai"],
             provider: {
               openai: {
@@ -1010,9 +1010,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: [providerID],
             provider: {
               [providerID]: {
@@ -1111,9 +1111,9 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
-            $schema: "https://opencode.ai/config.json",
+            $schema: "https://shob.ai/config.json",
             enabled_providers: [providerID],
             provider: {
               [providerID]: {

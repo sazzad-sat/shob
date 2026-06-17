@@ -11,7 +11,7 @@ import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { UI } from "./cli/ui"
 import { Installation } from "./installation"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { Filesystem } from "./util/filesystem"
@@ -51,7 +51,7 @@ const args = hideBin(process.argv)
 
 function show(out: string) {
   const text = out.trimStart()
-  if (!text.startsWith("opencode ")) {
+  if (!text.startsWith("shob ")) {
     process.stderr.write(UI.logo() + EOL + EOL)
     process.stderr.write(text)
     return
@@ -61,7 +61,7 @@ function show(out: string) {
 
 const cli = yargs(args)
   .parserConfiguration({ "populate--": true })
-  .scriptName("opencode")
+  .scriptName("shob")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -82,7 +82,7 @@ const cli = yargs(args)
   })
   .middleware(async (opts) => {
     if (opts.pure) {
-      process.env.OPENCODE_PURE = "1"
+      process.env.SHOB_PURE = "1"
     }
 
     await Log.init({
@@ -98,15 +98,15 @@ const cli = yargs(args)
     Heap.start()
 
     process.env.AGENT = "1"
-    process.env.OPENCODE = "1"
-    process.env.OPENCODE_PID = String(process.pid)
+    process.env.SHOB = "1"
+    process.env.SHOB_PID = String(process.pid)
 
-    Log.Default.info("opencode", {
+    Log.Default.info("shob", {
       version: Installation.VERSION,
       args: process.argv.slice(2),
     })
 
-    const marker = path.join(Global.Path.data, "opencode.db")
+    const marker = path.join(Global.Path.data, "shob.db")
     if (!(await Filesystem.exists(marker))) {
       const [{ JsonMigration }, { Database }, { drizzle }] = await Promise.all([
         import("./storage/json-migration"),

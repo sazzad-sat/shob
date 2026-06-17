@@ -17,9 +17,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //         }),
 //       )
 //     },
@@ -41,9 +41,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //           provider: {
 //             gitlab: {
 //               options: {
@@ -73,9 +73,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //         }),
 //       )
 //     },
@@ -110,9 +110,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //         }),
 //       )
 //     },
@@ -146,9 +146,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //           provider: {
 //             gitlab: {
 //               options: {
@@ -178,9 +178,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //           provider: {
 //             gitlab: {
 //               options: {
@@ -208,9 +208,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //         }),
 //       )
 //     },
@@ -234,9 +234,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //           provider: {
 //             gitlab: {
 //               options: {
@@ -269,9 +269,9 @@
 //   await using tmp = await tmpdir({
 //     init: async (dir) => {
 //       await Bun.write(
-//         path.join(dir, "opencode.json"),
+//         path.join(dir, "shob.json"),
 //         JSON.stringify({
-//           $schema: "https://opencode.ai/config.json",
+//           $schema: "https://shob.ai/config.json",
 //         }),
 //       )
 //     },
@@ -297,7 +297,7 @@
 //   test("duo-workflow-* model routes through workflowChat", async () => {
 //     await using tmp = await tmpdir({
 //       init: async (dir) => {
-//         await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json" }))
+//         await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ $schema: "https://shob.ai/config.json" }))
 //       },
 //     })
 //     await Instance.provide({
@@ -345,7 +345,7 @@
 //   test("duo-chat-* model routes through agenticChat (not workflow)", async () => {
 //     await using tmp = await tmpdir({
 //       init: async (dir) => {
-//         await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json" }))
+//         await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ $schema: "https://shob.ai/config.json" }))
 //       },
 //     })
 //     await Instance.provide({
@@ -368,7 +368,7 @@
 //   test("model.options merged with provider.options in getLanguage", async () => {
 //     await using tmp = await tmpdir({
 //       init: async (dir) => {
-//         await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json" }))
+//         await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ $schema: "https://shob.ai/config.json" }))
 //       },
 //     })
 //     await Instance.provide({
@@ -392,7 +392,7 @@
 //   test("static duo-chat models always present regardless of discovery", async () => {
 //     await using tmp = await tmpdir({
 //       init: async (dir) => {
-//         await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json" }))
+//         await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ $schema: "https://shob.ai/config.json" }))
 //       },
 //     })
 //     await Instance.provide({

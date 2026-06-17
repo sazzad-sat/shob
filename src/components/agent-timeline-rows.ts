@@ -1,4 +1,4 @@
-import type { AssistantMessage, Message, Part, SessionStatus } from "@opencode-ai/sdk/v2/client"
+import type { AssistantMessage, Message, Part, SessionStatus } from "@shob-ai/sdk/v2/client"
 import {
   groupAssistantDisplayParts,
   orderAssistantDisplayParts,

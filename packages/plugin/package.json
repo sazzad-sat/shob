@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@opencode-ai/plugin",
+  "name": "@shob-ai/plugin",
   "version": "1.15.5",
   "type": "module",
   "license": "MIT",
@@ -17,7 +17,7 @@
     "dist"
   ],
   "dependencies": {
-    "@opencode-ai/sdk": "file:../sdk/js",
+    "@shob-ai/sdk": "file:../sdk/js",
     "effect": "4.0.0-beta.65",
     "zod": "4.4.3"
   },

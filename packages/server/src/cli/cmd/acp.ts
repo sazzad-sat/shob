@@ -1,7 +1,7 @@
 import { Log } from "@/util/log"
 import { cmd } from "./cmd"
 import { AgentSideConnection, ndJsonStream } from "@agentclientprotocol/sdk"
-import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient } from "@shob-ai/sdk/v2"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 
 const log = Log.create({ service: "acp-command" })
@@ -17,7 +17,7 @@ export const AcpCommand = cmd({
     })
   },
   handler: async (args) => {
-    process.env.OPENCODE_CLIENT = "acp"
+    process.env.SHOB_CLIENT = "acp"
     const { bootstrap } = await import("../bootstrap")
     await bootstrap(process.cwd(), async () => {
       const [{ Server }, { ACP }] = await Promise.all([import("@/server/server"), import("@/acp/agent")])

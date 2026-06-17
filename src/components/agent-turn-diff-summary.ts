@@ -1,4 +1,4 @@
-import type { SnapshotFileDiff } from "@opencode-ai/sdk/v2/client"
+import type { SnapshotFileDiff } from "@shob-ai/sdk/v2/client"
 
 export const AGENT_REVIEW_OPEN_EVENT = "gg-open-review-workspace"
 export const AGENT_TURN_DIFF_VISIBLE_LIMIT = 3

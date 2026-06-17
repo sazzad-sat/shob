@@ -1,5 +1,5 @@
-import { useFilteredList } from "@opencode-ai/ui/hooks"
-import { getDirectory, getFilename } from "@opencode-ai/util/path"
+import { useFilteredList } from "@shob-ai/ui/hooks"
+import { getDirectory, getFilename } from "@shob-ai/util/path"
 import { createSignal, For, onMount, Show, splitProps, type JSX } from "solid-js"
 import { Button } from "./button"
 import { FileIcon } from "./file-icon"

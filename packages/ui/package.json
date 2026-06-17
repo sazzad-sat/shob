@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-ai/ui",
+  "name": "@shob-ai/ui",
   "version": "1.4.3",
   "type": "module",
   "license": "MIT",
@@ -43,8 +43,8 @@
   },
   "dependencies": {
     "@kobalte/core": "0.13.11",
-    "@opencode-ai/sdk": "file:../sdk/js",
-    "@opencode-ai/util": "file:../util",
+    "@shob-ai/sdk": "file:../sdk/js",
+    "@shob-ai/util": "file:../util",
     "@pierre/diffs": "1.2.2",
     "@shikijs/transformers": "3.9.2",
     "@solid-primitives/bounds": "0.1.3",

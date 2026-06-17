@@ -53,7 +53,7 @@ export namespace Server {
         if (c.req.method === "OPTIONS") return next()
         const password = Flag.SHOB_SERVER_PASSWORD
         if (!password) return next()
-        const username = Flag.OPENCODE_SERVER_USERNAME ?? "opencode"
+        const username = Flag.SHOB_SERVER_USERNAME ?? "shob"
 
         if (c.req.query("auth_token")) c.req.raw.headers.set("authorization", `Basic ${c.req.query("auth_token")}`)
 
@@ -89,7 +89,7 @@ export namespace Server {
             )
               return input
 
-            if (/^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/.test(input)) return input
+            if (/^https:\/\/([a-z0-9-]+\.)*shob\.ai$/.test(input)) return input
             if (opts?.cors?.includes(input)) return input
           },
         }),
@@ -166,9 +166,9 @@ export namespace Server {
         openAPIRouteHandler(app, {
           documentation: {
             info: {
-              title: "opencode",
+              title: "shob",
               version: "0.0.3",
-              description: "opencode api",
+              description: "shob api",
             },
             openapi: "3.1.1",
           },
@@ -261,9 +261,9 @@ export namespace Server {
     const result = await generateSpecs(app, {
       documentation: {
         info: {
-          title: "opencode",
+          title: "shob",
           version: "1.0.0",
-          description: "opencode api",
+          description: "shob api",
         },
         openapi: "3.1.1",
       },

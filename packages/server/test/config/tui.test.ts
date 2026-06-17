@@ -8,7 +8,7 @@ import { TuiConfig } from "../../src/config/tui"
 import { Global } from "../../src/global"
 import { Filesystem } from "../../src/util/filesystem"
 
-const managedConfigDir = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR!
+const managedConfigDir = process.env.SHOB_TEST_MANAGED_CONFIG_DIR!
 const wintest = process.platform === "win32" ? test : test.skip
 
 beforeEach(async () => {
@@ -16,10 +16,10 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  delete process.env.OPENCODE_CONFIG
-  delete process.env.OPENCODE_TUI_CONFIG
-  await fs.rm(path.join(Global.Path.config, "opencode.json"), { force: true }).catch(() => {})
-  await fs.rm(path.join(Global.Path.config, "opencode.jsonc"), { force: true }).catch(() => {})
+  delete process.env.SHOB_CONFIG
+  delete process.env.SHOB_TUI_CONFIG
+  await fs.rm(path.join(Global.Path.config, "shob.json"), { force: true }).catch(() => {})
+  await fs.rm(path.join(Global.Path.config, "shob.jsonc"), { force: true }).catch(() => {})
   await fs.rm(path.join(Global.Path.config, "tui.json"), { force: true }).catch(() => {})
   await fs.rm(path.join(Global.Path.config, "tui.jsonc"), { force: true }).catch(() => {})
   await fs.rm(managedConfigDir, { force: true, recursive: true }).catch(() => {})
@@ -29,11 +29,11 @@ afterEach(async () => {
 test("keeps server and tui plugin merge semantics aligned", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
-      const local = path.join(dir, ".opencode")
+      const local = path.join(dir, ".shob")
       await fs.mkdir(local, { recursive: true })
 
       await Bun.write(
-        path.join(Global.Path.config, "opencode.json"),
+        path.join(Global.Path.config, "shob.json"),
         JSON.stringify(
           {
             plugin: [["shared-plugin@1.0.0", { source: "global" }], "global-only@1.0.0"],
@@ -54,7 +54,7 @@ test("keeps server and tui plugin merge semantics aligned", async () => {
       )
 
       await Bun.write(
-        path.join(local, "opencode.json"),
+        path.join(local, "shob.json"),
         JSON.stringify(
           {
             plugin: [["shared-plugin@2.0.0", { source: "local" }], "local-only@1.0.0"],
@@ -102,9 +102,9 @@ test("loads tui config with the same precedence order as server config paths", a
     init: async (dir) => {
       await Bun.write(path.join(Global.Path.config, "tui.json"), JSON.stringify({ theme: "global" }, null, 2))
       await Bun.write(path.join(dir, "tui.json"), JSON.stringify({ theme: "project" }, null, 2))
-      await fs.mkdir(path.join(dir, ".opencode"), { recursive: true })
+      await fs.mkdir(path.join(dir, ".shob"), { recursive: true })
       await Bun.write(
-        path.join(dir, ".opencode", "tui.json"),
+        path.join(dir, ".shob", "tui.json"),
         JSON.stringify({ theme: "local", diff_style: "stacked" }, null, 2),
       )
     },
@@ -120,11 +120,11 @@ test("loads tui config with the same precedence order as server config paths", a
   })
 })
 
-test("migrates tui-specific keys from opencode.json when tui.json does not exist", async () => {
+test("migrates tui-specific keys from shob.json when tui.json does not exist", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(
-        path.join(dir, "opencode.json"),
+        path.join(dir, "shob.json"),
         JSON.stringify(
           {
             theme: "migrated-theme",
@@ -150,11 +150,11 @@ test("migrates tui-specific keys from opencode.json when tui.json does not exist
         theme: "migrated-theme",
         scroll_speed: 5,
       })
-      const server = JSON.parse(await Filesystem.readText(path.join(tmp.path, "opencode.json")))
+      const server = JSON.parse(await Filesystem.readText(path.join(tmp.path, "shob.json")))
       expect(server.theme).toBeUndefined()
       expect(server.keybinds).toBeUndefined()
       expect(server.tui).toBeUndefined()
-      expect(await Filesystem.exists(path.join(tmp.path, "opencode.json.tui-migration.bak"))).toBe(true)
+      expect(await Filesystem.exists(path.join(tmp.path, "shob.json.tui-migration.bak"))).toBe(true)
       expect(await Filesystem.exists(path.join(tmp.path, "tui.json"))).toBe(true)
     },
   })
@@ -165,7 +165,7 @@ test("migrates project legacy tui keys even when global tui.json already exists"
     init: async (dir) => {
       await Bun.write(path.join(Global.Path.config, "tui.json"), JSON.stringify({ theme: "global" }, null, 2))
       await Bun.write(
-        path.join(dir, "opencode.json"),
+        path.join(dir, "shob.json"),
         JSON.stringify(
           {
             theme: "project-migrated",
@@ -186,7 +186,7 @@ test("migrates project legacy tui keys even when global tui.json already exists"
       expect(config.scroll_speed).toBe(2)
       expect(await Filesystem.exists(path.join(tmp.path, "tui.json"))).toBe(true)
 
-      const server = JSON.parse(await Filesystem.readText(path.join(tmp.path, "opencode.json")))
+      const server = JSON.parse(await Filesystem.readText(path.join(tmp.path, "shob.json")))
       expect(server.theme).toBeUndefined()
       expect(server.tui).toBeUndefined()
     },
@@ -197,7 +197,7 @@ test("drops unknown legacy tui keys during migration", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(
-        path.join(dir, "opencode.json"),
+        path.join(dir, "shob.json"),
         JSON.stringify(
           {
             theme: "migrated-theme",
@@ -225,11 +225,11 @@ test("drops unknown legacy tui keys during migration", async () => {
   })
 })
 
-test("skips migration when opencode.jsonc is syntactically invalid", async () => {
+test("skips migration when shob.jsonc is syntactically invalid", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(
-        path.join(dir, "opencode.jsonc"),
+        path.join(dir, "shob.jsonc"),
         `{
   "theme": "broken-theme",
   "tui": { "scroll_speed": 2 }
@@ -246,8 +246,8 @@ test("skips migration when opencode.jsonc is syntactically invalid", async () =>
       expect(config.theme).toBeUndefined()
       expect(config.scroll_speed).toBeUndefined()
       expect(await Filesystem.exists(path.join(tmp.path, "tui.json"))).toBe(false)
-      expect(await Filesystem.exists(path.join(tmp.path, "opencode.jsonc.tui-migration.bak"))).toBe(false)
-      const source = await Filesystem.readText(path.join(tmp.path, "opencode.jsonc"))
+      expect(await Filesystem.exists(path.join(tmp.path, "shob.jsonc.tui-migration.bak"))).toBe(false)
+      const source = await Filesystem.readText(path.join(tmp.path, "shob.jsonc"))
       expect(source).toContain('"theme": "broken-theme"')
       expect(source).toContain('"tui": { "scroll_speed": 2 }')
     },
@@ -257,7 +257,7 @@ test("skips migration when opencode.jsonc is syntactically invalid", async () =>
 test("skips migration when tui.json already exists", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
-      await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ theme: "legacy" }, null, 2))
+      await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ theme: "legacy" }, null, 2))
       await Bun.write(path.join(dir, "tui.json"), JSON.stringify({ diff_style: "stacked" }, null, 2))
     },
   })
@@ -269,9 +269,9 @@ test("skips migration when tui.json already exists", async () => {
       expect(config.diff_style).toBe("stacked")
       expect(config.theme).toBeUndefined()
 
-      const server = JSON.parse(await Filesystem.readText(path.join(tmp.path, "opencode.json")))
+      const server = JSON.parse(await Filesystem.readText(path.join(tmp.path, "shob.json")))
       expect(server.theme).toBe("legacy")
-      expect(await Filesystem.exists(path.join(tmp.path, "opencode.json.tui-migration.bak"))).toBe(false)
+      expect(await Filesystem.exists(path.join(tmp.path, "shob.json.tui-migration.bak"))).toBe(false)
     },
   })
 })
@@ -279,11 +279,11 @@ test("skips migration when tui.json already exists", async () => {
 test("continues loading tui config when legacy source cannot be stripped", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
-      await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ theme: "readonly-theme" }, null, 2))
+      await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ theme: "readonly-theme" }, null, 2))
     },
   })
 
-  const source = path.join(tmp.path, "opencode.json")
+  const source = path.join(tmp.path, "shob.json")
   await fs.chmod(source, 0o444)
 
   try {
@@ -307,7 +307,7 @@ test("migration backup preserves JSONC comments", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(
-        path.join(dir, "opencode.jsonc"),
+        path.join(dir, "shob.jsonc"),
         `{
   // top-level comment
   "theme": "jsonc-theme",
@@ -324,7 +324,7 @@ test("migration backup preserves JSONC comments", async () => {
     directory: tmp.path,
     fn: async () => {
       await TuiConfig.get()
-      const backup = await Filesystem.readText(path.join(tmp.path, "opencode.jsonc.tui-migration.bak"))
+      const backup = await Filesystem.readText(path.join(tmp.path, "shob.jsonc.tui-migration.bak"))
       expect(backup).toContain("// top-level comment")
       expect(backup).toContain("// nested comment")
       expect(backup).toContain('"theme": "jsonc-theme"')
@@ -333,13 +333,13 @@ test("migration backup preserves JSONC comments", async () => {
   })
 })
 
-test("migrates legacy tui keys across multiple opencode.json levels", async () => {
+test("migrates legacy tui keys across multiple shob.json levels", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       const nested = path.join(dir, "apps", "client")
       await fs.mkdir(nested, { recursive: true })
-      await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ theme: "root-theme" }, null, 2))
-      await Bun.write(path.join(nested, "opencode.json"), JSON.stringify({ theme: "nested-theme" }, null, 2))
+      await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ theme: "root-theme" }, null, 2))
+      await Bun.write(path.join(nested, "shob.json"), JSON.stringify({ theme: "nested-theme" }, null, 2))
     },
   })
 
@@ -402,13 +402,13 @@ test("top-level keys in tui.json take precedence over nested tui key", async () 
   })
 })
 
-test("project config takes precedence over OPENCODE_TUI_CONFIG (matches OPENCODE_CONFIG)", async () => {
+test("project config takes precedence over SHOB_TUI_CONFIG (matches SHOB_CONFIG)", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(path.join(dir, "tui.json"), JSON.stringify({ theme: "project", diff_style: "auto" }))
       const custom = path.join(dir, "custom-tui.json")
       await Bun.write(custom, JSON.stringify({ theme: "custom", diff_style: "stacked" }))
-      process.env.OPENCODE_TUI_CONFIG = custom
+      process.env.SHOB_TUI_CONFIG = custom
     },
   })
 
@@ -489,12 +489,12 @@ wintest("ignores terminal suspend bindings on Windows", async () => {
   })
 })
 
-test("OPENCODE_TUI_CONFIG provides settings when no project config exists", async () => {
+test("SHOB_TUI_CONFIG provides settings when no project config exists", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       const custom = path.join(dir, "custom-tui.json")
       await Bun.write(custom, JSON.stringify({ theme: "from-env", diff_style: "stacked" }))
-      process.env.OPENCODE_TUI_CONFIG = custom
+      process.env.SHOB_TUI_CONFIG = custom
     },
   })
 
@@ -508,14 +508,14 @@ test("OPENCODE_TUI_CONFIG provides settings when no project config exists", asyn
   })
 })
 
-test("does not derive tui path from OPENCODE_CONFIG", async () => {
+test("does not derive tui path from SHOB_CONFIG", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       const customDir = path.join(dir, "custom")
       await fs.mkdir(customDir, { recursive: true })
-      await Bun.write(path.join(customDir, "opencode.json"), JSON.stringify({ model: "test/model" }))
+      await Bun.write(path.join(customDir, "shob.json"), JSON.stringify({ model: "test/model" }))
       await Bun.write(path.join(customDir, "tui.json"), JSON.stringify({ theme: "should-not-load" }))
-      process.env.OPENCODE_CONFIG = path.join(customDir, "opencode.json")
+      process.env.SHOB_CONFIG = path.join(customDir, "shob.json")
     },
   })
 
@@ -614,11 +614,11 @@ test("loads managed tui config and gives it highest precedence", async () => {
   })
 })
 
-test("loads .opencode/tui.json", async () => {
+test("loads .shob/tui.json", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
-      await fs.mkdir(path.join(dir, ".opencode"), { recursive: true })
-      await Bun.write(path.join(dir, ".opencode", "tui.json"), JSON.stringify({ diff_style: "stacked" }, null, 2))
+      await fs.mkdir(path.join(dir, ".shob"), { recursive: true })
+      await Bun.write(path.join(dir, ".shob", "tui.json"), JSON.stringify({ diff_style: "stacked" }, null, 2))
     },
   })
 

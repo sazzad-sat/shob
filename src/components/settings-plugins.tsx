@@ -45,7 +45,7 @@ import {
   Workflow,
   Wrench,
 } from "lucide-solid"
-import { showToast } from "@opencode-ai/ui/toast"
+import { showToast } from "@shob-ai/ui/toast"
 import { api } from "@/services/api"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"

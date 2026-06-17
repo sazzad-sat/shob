@@ -1,7 +1,7 @@
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import z from "zod"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { Log } from "../util/log"
 import { Process } from "@/util/process"
 
@@ -45,14 +45,14 @@ export namespace Ide {
   }
 
   export function alreadyInstalled() {
-    return process.env["OPENCODE_CALLER"] === "vscode" || process.env["OPENCODE_CALLER"] === "vscode-insiders"
+    return process.env["SHOB_CALLER"] === "vscode" || process.env["SHOB_CALLER"] === "vscode-insiders"
   }
 
   export async function install(ide: (typeof SUPPORTED_IDES)[number]["name"]) {
     const cmd = SUPPORTED_IDES.find((i) => i.name === ide)?.cmd
     if (!cmd) throw new Error(`Unknown IDE: ${ide}`)
 
-    const p = await Process.run([cmd, "--install-extension", "sst-dev.opencode"], {
+    const p = await Process.run([cmd, "--install-extension", "sst-dev.shob"], {
       nothrow: true,
     })
     const stdout = p.stdout.toString()

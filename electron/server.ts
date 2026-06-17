@@ -157,7 +157,7 @@ async function startPackagedServer(
       ...process.env,
       ...platformDataEnv(),
       NODE_PATH: nodePath,
-      OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
+      SHOB_DISABLE_EMBEDDED_WEB_UI: "true",
     },
     serviceName: SIDECAR_SERVICE_NAME,
     stdio: "pipe",
@@ -303,7 +303,7 @@ async function startDevServer(
     env: {
       ...process.env,
       ...platformDataEnv(),
-      OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
+      SHOB_DISABLE_EMBEDDED_WEB_UI: "true",
     },
     stdio: ["ignore", "pipe", "pipe"],
   })
@@ -321,7 +321,7 @@ async function startDevServer(
       process.stderr.write(chunk)
       if (resolved) return
       output += chunk.toString()
-      const match = output.match(/opencode server listening on (https?:\/\/[^\s]+)/)
+      const match = output.match(/shob server listening on (https?:\/\/[^\s]+)/)
       if (match && match[1]) {
         resolved = true
         clearTimeout(timeout)

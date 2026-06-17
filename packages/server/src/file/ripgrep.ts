@@ -9,7 +9,7 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import type { PlatformError } from "effect/PlatformError"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { lazy } from "../util/lazy"
 
 import { Filesystem } from "../util/filesystem"
@@ -291,7 +291,7 @@ export namespace Ripgrep {
     }) => Stream.Stream<string, PlatformError>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/Ripgrep") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/Ripgrep") {}
 
   export const layer: Layer.Layer<Service, never, ChildProcessSpawner | AppFileSystem.Service> = Layer.effect(
     Service,
@@ -362,7 +362,7 @@ export namespace Ripgrep {
 
     const root: Node = { name: "", children: new Map() }
     for (const file of files) {
-      if (file.includes(".opencode")) continue
+      if (file.includes(".shob")) continue
       const parts = file.split(path.sep)
       if (parts.length < 2) continue
       let node = root

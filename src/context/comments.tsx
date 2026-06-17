@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { batch, createMemo, createRoot, onCleanup } from "solid-js"
 import { createStore, reconcile, type SetStoreFunction, type Store } from "solid-js/store"
-import { createSimpleContext } from "@opencode-ai/ui/context"
+import { createSimpleContext } from "@shob-ai/ui/context"
 import { useParams } from "@solidjs/router"
 import { Persist, persisted } from "@/utils/persist"
 import { createScopedCache } from "@/utils/scoped-cache"

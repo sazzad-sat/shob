@@ -10,7 +10,13 @@
     "customConditions": ["browser"],
     "paths": {
       "@/*": ["./src/*"],
-      "@tui/*": ["./src/cli/cmd/tui/*"]
+      "@tui/*": ["./src/cli/cmd/tui/*"],
+      "@shob-ai/plugin": ["../plugin/src/index.ts"],
+      "@shob-ai/plugin/*": ["../plugin/src/*"],
+      "@shob-ai/sdk": ["../sdk/js/src/index.ts"],
+      "@shob-ai/sdk/*": ["../sdk/js/src/*"],
+      "@shob-ai/util": ["../util/src/index.ts"],
+      "@shob-ai/util/*": ["../util/src/*"]
     },
     "plugins": [
       {

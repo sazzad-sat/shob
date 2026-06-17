@@ -1,5 +1,5 @@
 import z from "zod"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
 import { InstanceBootstrap } from "../project/bootstrap"
@@ -8,7 +8,7 @@ import { Database, eq } from "../storage/db"
 import { ProjectTable } from "../project/project.sql"
 import type { ProjectID } from "../project/schema"
 import { Log } from "../util/log"
-import { Slug } from "@opencode-ai/util/slug"
+import { Slug } from "@shob-ai/util/slug"
 import { errorMessage } from "../util/error"
 import { BusEvent } from "@/bus/bus-event"
 import { GlobalBus } from "@/bus/global"
@@ -164,7 +164,7 @@ export namespace Worktree {
     readonly reset: (input: ResetInput) => Effect.Effect<boolean>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/Worktree") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/Worktree") {}
 
   type GitResult = { code: number; text: string; stderr: string }
 
@@ -205,7 +205,7 @@ export namespace Worktree {
         const ctx = yield* InstanceState.context
         for (const attempt of Array.from({ length: MAX_NAME_ATTEMPTS }, (_, i) => i)) {
           const name = base ? (attempt === 0 ? base : `${base}-${Slug.create()}`) : Slug.create()
-          const branch = `opencode/${name}`
+          const branch = `shob/${name}`
           const directory = pathSvc.join(root, name)
 
           if (yield* fs.exists(directory).pipe(Effect.orDie)) continue

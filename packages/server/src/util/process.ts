@@ -145,7 +145,7 @@ export namespace Process {
   }
 
   // Duplicated in `packages/sdk/js/src/process.ts` because the SDK cannot import
-  // `opencode` without creating a cycle. Keep both copies in sync.
+  // `shob` without creating a cycle. Keep both copies in sync.
   export async function stop(proc: ChildProcess) {
     if (proc.exitCode !== null || proc.signalCode !== null) return
 

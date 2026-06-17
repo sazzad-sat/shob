@@ -77,7 +77,7 @@ export function toLocalShobSession(
     name: normalizeShobSessionTitle(session.title),
     parentSessionId: session.parentID ?? null,
     shell: options.shell ?? nativeApi.defaultShell(),
-    cliTool: "opencode",
+    cliTool: "shob",
     pendingLaunchCommand: null,
     pinned: options.pinned ?? false,
     createdAt,

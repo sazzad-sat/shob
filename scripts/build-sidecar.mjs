@@ -53,7 +53,7 @@ const result = await Bun.build({
     "jsonc-parser",
   ],
   define: {
-    OPENCODE_MIGRATIONS: JSON.stringify(migrations),
+    SHOB_MIGRATIONS: JSON.stringify(migrations),
   },
 })
 

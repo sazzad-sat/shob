@@ -1,5 +1,5 @@
 import { createContext, useContext, createEffect } from "solid-js"
-import { base64Encode } from "@opencode-ai/util/encode"
+import { base64Encode } from "@shob-ai/util/encode"
 
 interface MockSessionLayout {
   params: { sessionId: string }

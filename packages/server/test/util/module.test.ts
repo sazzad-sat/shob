@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { Module } from "@opencode-ai/util/module"
+import { Module } from "@shob-ai/util/module"
 import { Filesystem } from "../../src/util/filesystem"
 import { tmpdir } from "../fixture/fixture"
 

@@ -8,7 +8,7 @@ import { DialogPrompt } from "../ui/dialog-prompt"
 import { Link } from "../ui/link"
 import { useTheme } from "../context/theme"
 import { TextAttributes } from "@opentui/core"
-import type { ProviderAuthAuthorization, ProviderAuthMethod } from "@opencode-ai/sdk/v2"
+import type { ProviderAuthAuthorization, ProviderAuthMethod } from "@shob-ai/sdk/v2"
 import { DialogModel } from "./dialog-model"
 import { useKeyboard } from "@opentui/solid"
 import { Clipboard } from "@tui/util/clipboard"
@@ -16,7 +16,7 @@ import { useToast } from "../ui/toast"
 import { isConsoleManagedProvider } from "@tui/util/provider-origin"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
-  opencode: 0,
+  shob: 0,
   "opencode-go": 1,
   openai: 2,
   "github-copilot": 3,
@@ -43,7 +43,7 @@ export function createDialogProviderOptions() {
           title: provider.name,
           value: provider.id,
           description: {
-            opencode: "(Recommended)",
+            shob: "(Recommended)",
             anthropic: "(API key)",
             openai: "(ChatGPT Plus/Pro or API key)",
             antigravity: "(Google OAuth)",
@@ -269,25 +269,25 @@ function ApiMethod(props: ApiMethodProps) {
       placeholder="API key"
       description={
         {
-          opencode: (
+          shob: (
             <box gap={1}>
               <text fg={theme.textMuted}>
-                OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
+                Shob Zen gives you access to all the best coding models at the cheapest prices with a single API
                 key.
               </text>
               <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
+                Go to <span style={{ fg: theme.primary }}>https://shob.ai/zen</span> to get a key
               </text>
             </box>
           ),
           "opencode-go": (
             <box gap={1}>
               <text fg={theme.textMuted}>
-                OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding models
+                Shob Go is a $10 per month subscription that provides reliable access to popular open coding models
                 with generous usage limits.
               </text>
               <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> and enable OpenCode Go
+                Go to <span style={{ fg: theme.primary }}>https://shob.ai/zen</span> and enable Shob Go
               </text>
             </box>
           ),

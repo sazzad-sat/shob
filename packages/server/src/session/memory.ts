@@ -115,7 +115,7 @@ export namespace SessionMemory {
     }) => Effect.Effect<string | undefined>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/SessionMemory") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/SessionMemory") {}
 
   function cleanContent(value: string) {
     const text = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()

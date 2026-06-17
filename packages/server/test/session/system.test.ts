@@ -15,7 +15,7 @@ describe("session.system", () => {
           ["alpha-skill", "Alpha skill."],
           ["middle-skill", "Middle skill."],
         ]) {
-          const skillDir = path.join(dir, ".opencode", "skill", name)
+          const skillDir = path.join(dir, ".shob", "skill", name)
           await Bun.write(
             path.join(skillDir, "SKILL.md"),
             `---
@@ -30,8 +30,8 @@ description: ${description}
       },
     })
 
-    const home = process.env.OPENCODE_TEST_HOME
-    process.env.OPENCODE_TEST_HOME = tmp.path
+    const home = process.env.SHOB_TEST_HOME
+    process.env.SHOB_TEST_HOME = tmp.path
 
     try {
       await Instance.provide({
@@ -53,7 +53,7 @@ description: ${description}
         },
       })
     } finally {
-      process.env.OPENCODE_TEST_HOME = home
+      process.env.SHOB_TEST_HOME = home
     }
   })
 })

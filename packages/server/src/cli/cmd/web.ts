@@ -29,7 +29,7 @@ function getNetworkIPs() {
 export const WebCommand = cmd({
   command: "web",
   builder: (yargs) => withNetworkOptions(yargs),
-  describe: "start opencode server and open web interface",
+  describe: "start shob server and open web interface",
   handler: async (args) => {
     const [{ Server }, { default: open }] = await Promise.all([import("../../server/server"), import("open")])
     if (!Flag.SHOB_SERVER_PASSWORD) {

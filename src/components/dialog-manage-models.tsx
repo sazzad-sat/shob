@@ -1,15 +1,15 @@
-import { Dialog } from "@opencode-ai/ui/dialog"
-import { List } from "@opencode-ai/ui/list"
-import { Switch } from "@opencode-ai/ui/switch"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { Button } from "@opencode-ai/ui/button"
+import { Dialog } from "@shob-ai/ui/dialog"
+import { List } from "@shob-ai/ui/list"
+import { Switch } from "@shob-ai/ui/switch"
+import { Tooltip } from "@shob-ai/ui/tooltip"
+import { Button } from "@shob-ai/ui/button"
 import type { Component } from "solid-js"
 import { useLocal } from "@/context/local"
 import { popularProviders } from "@/hooks/use-providers"
 import { useLanguage } from "@/context/language"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { useDialog } from "@shob-ai/ui/context/dialog"
 import { DialogSelectProvider } from "./dialog-select-provider"
-import { IconButton } from "@opencode-ai/ui/icon-button"
+import { IconButton } from "@shob-ai/ui/icon-button"
 
 export const DialogManageModels: Component = () => {
   const local = useLocal()

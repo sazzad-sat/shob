@@ -4,7 +4,7 @@ import { Process } from "@/util/process"
 
 export const PrCommand = cmd({
   command: "pr <number>",
-  describe: "fetch and checkout a GitHub PR branch, then run opencode",
+  describe: "fetch and checkout a GitHub PR branch, then run shob",
   builder: (yargs) =>
     yargs.positional("number", {
       type: "number",
@@ -95,15 +95,15 @@ export const PrCommand = cmd({
               )
             }
 
-            // Check for opencode session link in PR body
+            // Check for shob session link in PR body
             if (prInfo && prInfo.body) {
               const sessionMatch = prInfo.body.match(/https:\/\/opncd\.ai\/s\/([a-zA-Z0-9_-]+)/)
               if (sessionMatch) {
                 const sessionUrl = sessionMatch[0]
-                UI.println(`Found opencode session: ${sessionUrl}`)
+                UI.println(`Found shob session: ${sessionUrl}`)
                 UI.println(`Importing session...`)
 
-                const importResult = await Process.text(["opencode", "import", sessionUrl], {
+                const importResult = await Process.text(["shob", "import", sessionUrl], {
                   nothrow: true,
                 })
                 if (importResult.code === 0) {
@@ -122,18 +122,18 @@ export const PrCommand = cmd({
 
         UI.println(`Successfully checked out PR #${prNumber} as branch '${localBranchName}'`)
         UI.println()
-        UI.println("Starting opencode...")
+        UI.println("Starting shob...")
         UI.println()
 
-        const opencodeArgs = sessionId ? ["-s", sessionId] : []
-        const opencodeProcess = Process.spawn(["opencode", ...opencodeArgs], {
+        const shobArgs = sessionId ? ["-s", sessionId] : []
+        const shobProcess = Process.spawn(["shob", ...shobArgs], {
           stdin: "inherit",
           stdout: "inherit",
           stderr: "inherit",
           cwd: process.cwd(),
         })
-        const code = await opencodeProcess.exited
-        if (code !== 0) throw new Error(`opencode exited with code ${code}`)
+        const code = await shobProcess.exited
+        if (code !== 0) throw new Error(`shob exited with code ${code}`)
       },
     })
   },

@@ -6,7 +6,7 @@ import { Instance } from "@/project/instance"
 import type { Proc } from "#pty"
 import z from "zod"
 import { Log } from "../util/log"
-import { lazy } from "@opencode-ai/util/lazy"
+import { lazy } from "@shob-ai/util/lazy"
 import { Shell } from "@/shell/shell"
 import { Plugin } from "@/plugin"
 import { PtyID } from "./schema"
@@ -113,7 +113,7 @@ export namespace Pty {
     ) => Effect.Effect<{ onMessage: (message: string | ArrayBuffer) => void; onClose: () => void } | undefined>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/Pty") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/Pty") {}
 
   export const layer = Layer.effect(
     Service,
@@ -188,7 +188,7 @@ export namespace Pty {
           ...input.env,
           ...shell.env,
           TERM: "xterm-256color",
-          OPENCODE_TERMINAL: "1",
+          SHOB_TERMINAL: "1",
         } as Record<string, string>
 
         if (process.platform === "win32") {

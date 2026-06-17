@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput } from "@shob-ai/plugin"
 import { randomBytes } from "node:crypto"
 import { setTimeout as sleep } from "node:timers/promises"
 import { Log } from "../util/log"

@@ -53,7 +53,7 @@ export function ErrorComponent(props: {
     )
   }
 
-  issueURL.searchParams.set("opencode-version", Installation.VERSION)
+  issueURL.searchParams.set("shob-version", Installation.VERSION)
 
   const copyIssueURL = () => {
     Clipboard.copy(issueURL.toString()).then(() => {

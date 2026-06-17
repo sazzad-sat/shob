@@ -24,7 +24,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { Bus } from "../../bus"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { LLM } from "../../session/llm"
 import type { Provider } from "@/provider/provider"
 import { Config } from "@/config/config"
@@ -184,7 +184,7 @@ async function streamTokensIncremental(
     abortSignal: new AbortController().signal,
     headers: {
       "x-session-affinity": sessionID,
-      "User-Agent": `opencode/${Installation.VERSION}`,
+      "User-Agent": `shob/${Installation.VERSION}`,
       ...input.model.headers,
     },
     experimental_telemetry: {
@@ -322,7 +322,7 @@ export const SessionRoutes = lazy(() =>
       "/",
       describeRoute({
         summary: "List sessions",
-        description: "Get a list of all OpenCode sessions, sorted by most recently updated.",
+        description: "Get a list of all Shob sessions, sorted by most recently updated.",
         operationId: "session.list",
         responses: {
           200: {
@@ -390,7 +390,7 @@ export const SessionRoutes = lazy(() =>
       "/:sessionID",
       describeRoute({
         summary: "Get session",
-        description: "Retrieve detailed information about a specific OpenCode session.",
+        description: "Retrieve detailed information about a specific Shob session.",
         tags: ["Session"],
         operationId: "session.get",
         responses: {
@@ -482,7 +482,7 @@ export const SessionRoutes = lazy(() =>
       "/",
       describeRoute({
         summary: "Create session",
-        description: "Create a new OpenCode session for interacting with AI assistants and managing conversations.",
+        description: "Create a new Shob session for interacting with AI assistants and managing conversations.",
         operationId: "session.create",
         responses: {
           ...errors(400),

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@shob-ai/script"
 import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -51,11 +51,11 @@ await Bun.build({
   sourcemap: "linked",
   external: ["jsonc-parser", "@lydell/node-pty"],
   define: {
-    OPENCODE_MIGRATIONS: JSON.stringify(migrations),
-    OPENCODE_CHANNEL: `'${Script.channel}'`,
+    SHOB_MIGRATIONS: JSON.stringify(migrations),
+    SHOB_CHANNEL: `'${Script.channel}'`,
   },
   files: {
-    "opencode-web-ui.gen.ts": "",
+    "shob-web-ui.gen.ts": "",
   },
 })
 

@@ -1,12 +1,12 @@
-import type { Hooks, PluginInput, Plugin as PluginInstance, PluginModule } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput, Plugin as PluginInstance, PluginModule } from "@shob-ai/plugin"
 import { Config } from "../config/config"
 import { Bus } from "../bus"
 import { Log } from "../util/log"
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@shob-ai/sdk"
 import { Flag } from "../flag/flag"
 import { CodexAuthPlugin } from "./codex"
 import { Session } from "../session"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { CopilotAuthPlugin } from "./github-copilot/copilot"
 import { KiloAuthPlugin } from "./kilo"
 import { AntigravityAuthPlugin } from "./antigravity"
@@ -52,7 +52,7 @@ export namespace Plugin {
     readonly init: () => Effect.Effect<void>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/Plugin") { }
+  export class Service extends Context.Service<Service, Interface>()("@shob/Plugin") { }
 
   // Built-in plugins that are directly imported (not installed from npm)
   const INTERNAL_PLUGINS: PluginInstance[] = [
@@ -135,7 +135,7 @@ export namespace Plugin {
             directory: ctx.directory,
             headers: Flag.SHOB_SERVER_PASSWORD
               ? {
-                Authorization: `Basic ${Buffer.from(`${Flag.OPENCODE_SERVER_USERNAME ?? "opencode"}:${Flag.SHOB_SERVER_PASSWORD}`).toString("base64")}`,
+                Authorization: `Basic ${Buffer.from(`${Flag.SHOB_SERVER_USERNAME ?? "shob"}:${Flag.SHOB_SERVER_PASSWORD}`).toString("base64")}`,
               }
               : undefined,
             fetch: async (...args) => Server.Default().app.fetch(...args),
@@ -164,8 +164,8 @@ export namespace Plugin {
             if (init._tag === "Some") hooks.push(init.value)
           }
 
-          const plugins = Flag.OPENCODE_PURE ? [] : (cfg.plugin_origins ?? [])
-          if (Flag.OPENCODE_PURE && cfg.plugin_origins?.length) {
+          const plugins = Flag.SHOB_PURE ? [] : (cfg.plugin_origins ?? [])
+          if (Flag.SHOB_PURE && cfg.plugin_origins?.length) {
             log.info("skipping external plugins in pure mode", { count: cfg.plugin_origins.length })
           }
           if (plugins.length) yield* config.waitForDependencies()

@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput } from "@shob-ai/plugin"
 
 function flattenText(content: any): string {
   if (content == null) return ""

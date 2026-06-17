@@ -1224,7 +1224,7 @@ const handlers: Record<string, (payload?: any) => Promise<any> | any> = {
       return { status: "error", message: error instanceof Error ? error.message : String(error) };
     }
   },
-  opencode_server_start: async () => {
+  shob_server_start: async () => {
     return (await ensureServerStarted()).url;
   },
   browser_action: async (payload) => {
@@ -1381,7 +1381,7 @@ function registerIpc() {
     }
   });
 
-  ipcMain.on("shob:get-opencode-server-url", (event) => {
+  ipcMain.on("shob:get-shob-server-url", (event) => {
     event.returnValue = serverInstance?.url ?? null;
   });
 

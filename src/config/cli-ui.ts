@@ -5,7 +5,7 @@ export const CLI_LOGO_BY_ICON_KEY: Record<string, string> = {
   codex: defaultIcon,
   claude: defaultIcon,
   gemini: defaultIcon,
-  opencode: defaultIcon,
+  shob: defaultIcon,
   droid: defaultIcon,
   kilo: defaultIcon,
   qwen: defaultIcon,

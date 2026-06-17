@@ -1,7 +1,7 @@
 {
-  "$schema": "https://opencode.ai/desktop-theme.json",
-  "name": "OpenCode",
-  "id": "opencode",
+  "$schema": "https://shob.ai/desktop-theme.json",
+  "name": "Shob",
+  "id": "shob",
   "light": {
     "palette": {
       "neutral": "#ffffff",

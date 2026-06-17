@@ -3,13 +3,13 @@ import {
   type SnapshotFileDiff,
   Message as MessageType,
   Part as PartType,
-} from "@opencode-ai/sdk/v2/client"
-import type { SessionStatus } from "@opencode-ai/sdk/v2"
+} from "@shob-ai/sdk/v2/client"
+import type { SessionStatus } from "@shob-ai/sdk/v2"
 import { useData } from "../context"
 import { useFileComponent } from "../context/file"
 
-import { Binary } from "@opencode-ai/util/binary"
-import { getDirectory, getFilename } from "@opencode-ai/util/path"
+import { Binary } from "@shob-ai/util/binary"
+import { getDirectory, getFilename } from "@shob-ai/util/path"
 import { createEffect, createMemo, createSignal, For, on, onCleanup, ParentProps, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"

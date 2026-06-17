@@ -105,9 +105,9 @@ test("first connect to OAuth server shows needs_auth instead of failed", async (
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(
-        `${dir}/opencode.json`,
+        `${dir}/shob.json`,
         JSON.stringify({
-          $schema: "https://opencode.ai/config.json",
+          $schema: "https://shob.ai/config.json",
           mcp: {
             "test-oauth": {
               type: "remote",

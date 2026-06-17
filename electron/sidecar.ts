@@ -63,9 +63,9 @@ process.on("uncaughtException", (error) => {
 async function start(command: StartCommand) {
   try {
     Object.assign(process.env, {
-      OPENCODE_SERVER_USERNAME: "opencode",
-      OPENCODE_SERVER_PASSWORD: command.password,
-      OPENCODE_DISABLE_EMBEDDED_WEB_UI: "true",
+      SHOB_SERVER_USERNAME: "shob",
+      SHOB_SERVER_PASSWORD: command.password,
+      SHOB_DISABLE_EMBEDDED_WEB_UI: "true",
     })
 
     const serverUrl = pathToFileURL(command.serverModulePath).href

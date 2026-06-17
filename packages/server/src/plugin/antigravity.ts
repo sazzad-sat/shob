@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput } from "@shob-ai/plugin"
 import { createServer } from "http"
 import { Log } from "../util/log"
 import { OAUTH_DUMMY_KEY } from "../auth"

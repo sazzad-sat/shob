@@ -1,7 +1,7 @@
-import { Button } from "@opencode-ai/ui/button"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
-import { showToast } from "@opencode-ai/ui/toast"
+import { Button } from "@shob-ai/ui/button"
+import { useDialog } from "@shob-ai/ui/context/dialog"
+import { ProviderIcon } from "@shob-ai/ui/provider-icon"
+import { showToast } from "@shob-ai/ui/toast"
 import { popularProviders, useProviders } from "@/hooks/use-providers"
 import { createMemo, type Component, For, Show, type JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
@@ -167,7 +167,7 @@ export const SettingsProviders: Component = () => {
   const connected = createMemo(() =>
     providers
       .connected()
-      .filter((p) => p.id !== "opencode" || Object.values(p.models).find((m) => m.cost?.input)),
+      .filter((p) => p.id !== "shob" || Object.values(p.models).find((m) => m.cost?.input)),
   )
 
   const popular = createMemo(() => {

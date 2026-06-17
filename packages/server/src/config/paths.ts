@@ -2,17 +2,17 @@ import path from "path"
 import os from "os"
 import z from "zod"
 import { type ParseError as JsoncParseError, parse as parseJsonc, printParseErrorCode } from "jsonc-parser"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import { Filesystem } from "@/util/filesystem"
 import { Flag } from "@/flag/flag"
 import { Global } from "@/global"
 
 export namespace ConfigPaths {
-  /** Project-level config folder names, preferred first (`.shob` wins over legacy `.opencode`). */
-  export const PROJECT_DIRS = [".shob", ".opencode"]
+  /** Project-level config folder names, preferred first (`.shob` wins over legacy `.shob`). */
+  export const PROJECT_DIRS = [".shob", ".shob"]
 
-  /** Config file basenames in merge order — later wins, so `shob` overrides legacy `opencode`. */
-  export const CONFIG_NAMES = ["opencode", "shob"]
+  /** Config file basenames in merge order — later wins, so `shob` overrides legacy `shob`. */
+  export const CONFIG_NAMES = ["shob", "shob"]
 
   export async function projectFiles(name: string, directory: string, worktree: string) {
     return Filesystem.findUp([`${name}.json`, `${name}.jsonc`], directory, worktree, { rootFirst: true })
@@ -21,7 +21,7 @@ export namespace ConfigPaths {
   export async function directories(directory: string, worktree: string) {
     return [
       Global.Path.config,
-      ...(!Flag.OPENCODE_DISABLE_PROJECT_CONFIG
+      ...(!Flag.SHOB_DISABLE_PROJECT_CONFIG
         ? await Array.fromAsync(
             Filesystem.up({
               targets: [...PROJECT_DIRS],
@@ -32,12 +32,12 @@ export namespace ConfigPaths {
         : []),
       ...(await Array.fromAsync(
         Filesystem.up({
-          targets: [".opencode"],
+          targets: [".shob"],
           start: Global.Path.home,
           stop: Global.Path.home,
         }),
       )),
-      ...(Flag.OPENCODE_CONFIG_DIR ? [Flag.OPENCODE_CONFIG_DIR] : []),
+      ...(Flag.SHOB_CONFIG_DIR ? [Flag.SHOB_CONFIG_DIR] : []),
     ]
   }
 

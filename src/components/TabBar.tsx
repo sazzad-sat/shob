@@ -1,5 +1,5 @@
 import { Plus, SquareTerminal, X } from 'lucide-solid'
-import { showToast } from "@opencode-ai/ui/toast"
+import { showToast } from "@shob-ai/ui/toast"
 import { CliAvatar } from './CliAvatar'
 import { getCliDisplayLabel } from '../config/cli-ui'
 import { useStore } from '../store'

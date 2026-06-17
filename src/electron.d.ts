@@ -309,7 +309,7 @@ export interface NativeCommandMap {
     args: undefined
     result: { status: "dev" | "downloading" | "downloaded" | "error" | "manual"; version?: string | null; message?: string; url?: string }
   }
-  opencode_server_start: { args: undefined; result: string }
+  shob_server_start: { args: undefined; result: string }
   browser_action: { args: ElectronBrowserActionRequest; result: ElectronBrowserActionResult }
   get_projects: { args: undefined; result: Project[] }
   save_project: { args: { project: Project }; result: Project }

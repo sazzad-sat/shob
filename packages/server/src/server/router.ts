@@ -50,7 +50,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
   const routes = lazy(() => InstanceRoutes(upgrade))
 
   return async (c) => {
-    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || process.cwd()
+    const raw = c.req.query("directory") || c.req.header("x-shob-directory") || process.cwd()
     const directory = Filesystem.resolve(
       (() => {
         try {
@@ -126,7 +126,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
     }
 
     const headers = new Headers(c.req.raw.headers)
-    headers.delete("x-opencode-workspace")
+    headers.delete("x-shob-workspace")
 
     return ServerProxy.http(
       target,

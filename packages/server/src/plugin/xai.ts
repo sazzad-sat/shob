@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput } from "@shob-ai/plugin"
 import { randomBytes, createHash } from "node:crypto"
 import { OAUTH_DUMMY_KEY } from "../auth"
 import { Log } from "../util/log"

@@ -3,7 +3,7 @@ import { cmd } from "./cmd"
 
 export const RunCommand = cmd({
   command: "run [message..]",
-  describe: "run opencode with a message",
+  describe: "run shob with a message",
   builder: (yargs: Argv) => {
     return yargs
       .positional("message", {
@@ -61,7 +61,7 @@ export const RunCommand = cmd({
       })
       .option("attach", {
         type: "string",
-        describe: "attach to a running opencode server (e.g., http://localhost:4096)",
+        describe: "attach to a running shob server (e.g., http://localhost:4096)",
       })
       .option("password", {
         alias: ["p"],

@@ -17,7 +17,7 @@ function run(target) {
   process.exit(code)
 }
 
-const envPath = process.env.OPENCODE_BIN_PATH
+const envPath = process.env.SHOB_BIN_PATH
 if (envPath) {
   run(envPath)
 }
@@ -25,7 +25,7 @@ if (envPath) {
 const scriptPath = realpathSync(import.meta.filename ?? process.argv[1])
 const scriptDir = dirname(scriptPath)
 
-const cached = join(scriptDir, ".opencode")
+const cached = join(scriptDir, ".shob")
 if (existsSync(cached)) {
   run(cached)
 }
@@ -49,8 +49,8 @@ let arc = archMap[arch()]
 if (!arc) {
   arc = arch()
 }
-const base = "opencode-" + plat + "-" + arc
-const binary = plat === "windows" ? "opencode.exe" : "opencode"
+const base = "shob-" + plat + "-" + arc
+const binary = plat === "windows" ? "shob.exe" : "shob"
 
 function supportsAvx2() {
   if (arc !== "x64") return false
@@ -168,7 +168,7 @@ function findBinary(startDir) {
 const resolved = findBinary(scriptDir)
 if (!resolved) {
   console.error(
-    "It seems that your package manager failed to install the right version of the opencode CLI for your platform. You can try manually installing " +
+    "It seems that your package manager failed to install the right version of the shob CLI for your platform. You can try manually installing " +
       names.map((n) => `\"${n}\"`).join(" or ") +
       " package",
   )

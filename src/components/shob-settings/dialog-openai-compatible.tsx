@@ -1,11 +1,11 @@
-import { Button } from "@opencode-ai/ui/button"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { Dialog } from "@opencode-ai/ui/dialog"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
+import { Button } from "@shob-ai/ui/button"
+import { useDialog } from "@shob-ai/ui/context/dialog"
+import { Dialog } from "@shob-ai/ui/dialog"
+import { IconButton } from "@shob-ai/ui/icon-button"
+import { ProviderIcon } from "@shob-ai/ui/provider-icon"
 import { useMutation } from "@tanstack/solid-query"
-import { TextField } from "@opencode-ai/ui/text-field"
-import { showToast } from "@opencode-ai/ui/toast"
+import { TextField } from "@shob-ai/ui/text-field"
+import { showToast } from "@shob-ai/ui/toast"
 import { batch, createSignal, For, Show } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useGlobalSDK } from "@/context/global-sdk"
@@ -139,7 +139,7 @@ export function DialogOpenAICompatible(props: Props = {}) {
 
     const auth = currentServer.http.password
       ? {
-          Authorization: `Basic ${btoa(`${currentServer.http.username ?? "opencode"}:${currentServer.http.password}`)}`,
+          Authorization: `Basic ${btoa(`${currentServer.http.username ?? "shob"}:${currentServer.http.password}`)}`,
         }
       : {}
     const response = await fetch(`${currentServer.http.url}/provider/${modelFetchRoute()}`, {

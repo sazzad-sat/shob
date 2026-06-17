@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { ACP } from "../../src/acp/agent"
 import type { AgentSideConnection } from "@agentclientprotocol/sdk"
-import type { Event, EventMessagePartUpdated, ToolStatePending, ToolStateRunning } from "@opencode-ai/sdk/v2"
+import type { Event, EventMessagePartUpdated, ToolStatePending, ToolStateRunning } from "@shob-ai/sdk/v2"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 
@@ -210,8 +210,8 @@ function createFakeAgent() {
           data: {
             providers: [
               {
-                id: "opencode",
-                name: "opencode",
+                id: "shob",
+                name: "shob",
                 models: {
                   "big-pickle": { id: "big-pickle", name: "big-pickle" },
                 },
@@ -248,7 +248,7 @@ function createFakeAgent() {
 
   const agent = new ACP.Agent(connection, {
     sdk,
-    defaultModel: { providerID: "opencode", modelID: "big-pickle" },
+    defaultModel: { providerID: "shob", modelID: "big-pickle" },
   } as any)
 
   const stop = () => {
@@ -266,7 +266,7 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, controller, updates, stop } = createFakeAgent()
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
 
         const sessionA = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const sessionB = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
@@ -301,7 +301,7 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, controller, chunks, stop } = createFakeAgent()
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
 
         const sessionA = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const sessionB = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
@@ -353,7 +353,7 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, calls, stop } = createFakeAgent()
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
 
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
 
@@ -380,7 +380,7 @@ describe("acp.agent event subscription", () => {
           permissionReplies.push(params.requestID)
           return { data: true }
         }
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
 
         const sessionA = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
 
@@ -437,7 +437,7 @@ describe("acp.agent event subscription", () => {
           return { data: true }
         }
 
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
 
         const sessionA = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const sessionB = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
@@ -501,7 +501,7 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, controller, sessionUpdates, stop } = createFakeAgent()
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const input = { command: "echo hello", description: "run command" }
 
@@ -535,7 +535,7 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, controller, sessionUpdates, stop } = createFakeAgent()
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
 
         controller.push(
@@ -580,7 +580,7 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, controller, sessionUpdates, stop, sdk } = createFakeAgent()
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const input = { command: "echo hi", description: "run command" }
 
@@ -639,7 +639,7 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, controller, sessionUpdates, stop } = createFakeAgent()
-        const cwd = "/tmp/opencode-acp-test"
+        const cwd = "/tmp/shob-acp-test"
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const input = { command: "echo hello", description: "run command" }
 

@@ -1,4 +1,4 @@
-import type { Part } from "@opencode-ai/sdk/v2"
+import type { Part } from "@shob-ai/sdk/v2"
 
 export type AssistantPartEntry<TPart extends Pick<Part, "id" | "type"> = Part> = {
   messageID: string

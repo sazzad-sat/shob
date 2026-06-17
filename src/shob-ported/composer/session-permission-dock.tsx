@@ -1,5 +1,5 @@
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
-import type { PermissionRequest } from "@opencode-ai/sdk/v2/client"
+import type { PermissionRequest } from "@shob-ai/sdk/v2/client"
 import { useLanguage } from "@/context/language"
 import { SessionChoicePrompt, type SessionChoiceOption } from "./session-choice-prompt"
 

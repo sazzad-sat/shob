@@ -10,13 +10,13 @@ afterEach(async () => {
 })
 
 describe("tool.registry", () => {
-  test("loads tools from .opencode/tool (singular)", async () => {
+  test("loads tools from .shob/tool (singular)", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        const opencodeDir = path.join(dir, ".opencode")
-        await fs.mkdir(opencodeDir, { recursive: true })
+        const shobDir = path.join(dir, ".shob")
+        await fs.mkdir(shobDir, { recursive: true })
 
-        const toolDir = path.join(opencodeDir, "tool")
+        const toolDir = path.join(shobDir, "tool")
         await fs.mkdir(toolDir, { recursive: true })
 
         await Bun.write(
@@ -44,13 +44,13 @@ describe("tool.registry", () => {
     })
   })
 
-  test("loads tools from .opencode/tools (plural)", async () => {
+  test("loads tools from .shob/tools (plural)", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        const opencodeDir = path.join(dir, ".opencode")
-        await fs.mkdir(opencodeDir, { recursive: true })
+        const shobDir = path.join(dir, ".shob")
+        await fs.mkdir(shobDir, { recursive: true })
 
-        const toolsDir = path.join(opencodeDir, "tools")
+        const toolsDir = path.join(shobDir, "tools")
         await fs.mkdir(toolsDir, { recursive: true })
 
         await Bun.write(
@@ -81,32 +81,32 @@ describe("tool.registry", () => {
   test("loads tools with external dependencies without crashing", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        const opencodeDir = path.join(dir, ".opencode")
-        await fs.mkdir(opencodeDir, { recursive: true })
+        const shobDir = path.join(dir, ".shob")
+        await fs.mkdir(shobDir, { recursive: true })
 
-        const toolsDir = path.join(opencodeDir, "tools")
+        const toolsDir = path.join(shobDir, "tools")
         await fs.mkdir(toolsDir, { recursive: true })
 
         await Bun.write(
-          path.join(opencodeDir, "package.json"),
+          path.join(shobDir, "package.json"),
           JSON.stringify({
             name: "custom-tools",
             dependencies: {
-              "@opencode-ai/plugin": "^0.0.0",
+              "@shob-ai/plugin": "^0.0.0",
               cowsay: "^1.6.0",
             },
           }),
         )
 
         await Bun.write(
-          path.join(opencodeDir, "package-lock.json"),
+          path.join(shobDir, "package-lock.json"),
           JSON.stringify({
             name: "custom-tools",
             lockfileVersion: 3,
             packages: {
               "": {
                 dependencies: {
-                  "@opencode-ai/plugin": "^0.0.0",
+                  "@shob-ai/plugin": "^0.0.0",
                   cowsay: "^1.6.0",
                 },
               },
@@ -114,7 +114,7 @@ describe("tool.registry", () => {
           }),
         )
 
-        const cowsayDir = path.join(opencodeDir, "node_modules", "cowsay")
+        const cowsayDir = path.join(shobDir, "node_modules", "cowsay")
         await fs.mkdir(cowsayDir, { recursive: true })
         await Bun.write(
           path.join(cowsayDir, "package.json"),

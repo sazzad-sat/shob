@@ -95,16 +95,16 @@ async function improvePrompt(input: z.infer<typeof PromptImproveBody>) {
     maxOutputTokens,
     providerOptions,
     headers: {
-      ...(model.providerID.startsWith("opencode")
+      ...(model.providerID.startsWith("shob")
         ? {
-            "x-opencode-project": Instance.project.id,
-            "x-opencode-session": sessionID,
-            "x-opencode-request": requestID,
-            "x-opencode-client": Flag.OPENCODE_CLIENT,
+            "x-shob-project": Instance.project.id,
+            "x-shob-session": sessionID,
+            "x-shob-request": requestID,
+            "x-shob-client": Flag.SHOB_CLIENT,
           }
         : {
             "x-session-affinity": sessionID,
-            "User-Agent": `opencode/${Installation.VERSION}`,
+            "User-Agent": `shob/${Installation.VERSION}`,
           }),
       ...model.headers,
     },

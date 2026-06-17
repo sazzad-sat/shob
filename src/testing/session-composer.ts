@@ -1,4 +1,4 @@
-import type { Todo } from "@opencode-ai/sdk/v2"
+import type { Todo } from "@shob-ai/sdk/v2"
 
 export const composerEvent = "shob:e2e:composer"
 

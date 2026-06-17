@@ -1,7 +1,7 @@
 import { ParentProps, createResource, Show } from "solid-js"
-import { I18nProvider } from "@opencode-ai/ui/context"
-import { DialogProvider } from "@opencode-ai/ui/context/dialog"
-import { MarkedProvider } from "@opencode-ai/ui/context/marked"
+import { I18nProvider } from "@shob-ai/ui/context"
+import { DialogProvider } from "@shob-ai/ui/context/dialog"
+import { MarkedProvider } from "@shob-ai/ui/context/marked"
 import { LanguageProvider, useLanguage } from "@/context/language"
 import { PlatformProvider, Platform } from "@/context/platform"
 import { ServerProvider, ServerConnection } from "@/context/server"
@@ -101,7 +101,7 @@ async function resolveSidecarServerUrl() {
   const current = window.shob.getServerUrl()
   if (current) return current
 
-  const result = await nativeApi.invoke("opencode_server_start")
+  const result = await nativeApi.invoke("shob_server_start")
 
   return result
 }

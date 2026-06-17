@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { Part } from "@opencode-ai/sdk/v2"
+import type { Part } from "@shob-ai/sdk/v2"
 import { groupAssistantDisplayParts, orderAssistantDisplayParts, type AssistantPartEntry } from "./message-part-order"
 
 const sessionID = "ses_test"

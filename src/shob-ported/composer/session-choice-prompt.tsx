@@ -1,5 +1,5 @@
 import { For, Show, createEffect, onMount, type JSX } from "solid-js"
-import { Icon } from "@opencode-ai/ui/icon"
+import { Icon } from "@shob-ai/ui/icon"
 
 export type SessionChoiceOption = {
   id: string

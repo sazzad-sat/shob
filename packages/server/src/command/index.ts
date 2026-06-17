@@ -16,7 +16,7 @@ export namespace Command {
 const log = Log.create({ service: "command" })
 
 const PROMPT_CREATE_SKILLS = [
-  "Create new OpenCode skill from user request.",
+  "Create new Shob skill from user request.",
   "",
   "Request:",
   "$ARGUMENTS",
@@ -39,14 +39,14 @@ const PROMPT_CREATE_SKILLS = [
 ].join("\n")
 
 const PROMPT_REMOVE_SKILL = [
-  "Remove OpenCode skill by name.",
+  "Remove Shob skill by name.",
   "",
   "Input skill:",
   "$ARGUMENTS",
   "",
   "Requirements:",
   "- Find matching SKILL.md for given skill name.",
-  "- Delete skill folder safely from skills/<slug>/ or .opencode skill paths in workspace.",
+  "- Delete skill folder safely from skills/<slug>/ or .shob skill paths in workspace.",
   "- Do not touch unrelated files.",
   "- If not found, explain clearly and stop.",
   "",
@@ -113,7 +113,7 @@ const PROMPT_REMOVE_SKILL = [
     readonly list: () => Effect.Effect<Info[]>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/Command") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/Command") {}
 
   export const layer = Layer.effect(
     Service,

@@ -6,7 +6,7 @@ import { MainView } from './components/MainView'
 import { useStore } from './store'
 import { applyAppTheme, getThemeById, resolveThemeMode, type ResolvedThemeMode } from './theme'
 import { ErrorPage } from './pages/error'
-import { Toast, showToast } from '@opencode-ai/ui/toast'
+import { Toast, showToast } from '@shob-ai/ui/toast'
 import { Ico } from './components/Ico'
 
 function App() {

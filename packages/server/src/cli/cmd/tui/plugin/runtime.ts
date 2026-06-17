@@ -8,7 +8,7 @@ import {
   type TuiPluginStatus,
   type TuiSlotPlugin,
   type TuiTheme,
-} from "@opencode-ai/plugin/tui"
+} from "@shob-ai/plugin/tui"
 import path from "path"
 import { fileURLToPath } from "url"
 
@@ -157,9 +157,9 @@ function createThemeInstaller(
     const name = path.basename(src, path.extname(src))
     const source_dir = path.dirname(meta.source)
     const local_dir =
-      path.basename(source_dir) === ".opencode"
+      path.basename(source_dir) === ".shob"
         ? path.join(source_dir, "themes")
-        : path.join(source_dir, ".opencode", "themes")
+        : path.join(source_dir, ".shob", "themes")
     const dest_dir = meta.scope === "local" ? local_dir : path.join(Global.Path.config, "themes")
     const dest = path.join(dest_dir, `${name}.json`)
     const stat = await Filesystem.statAsync(src)
@@ -748,7 +748,7 @@ function defaultPluginOrigin(state: RuntimeState, spec: string): Config.PluginOr
   return {
     spec,
     scope: "local",
-    source: state.api.state.path.config || path.join(state.directory, ".opencode", "tui.json"),
+    source: state.api.state.path.config || path.join(state.directory, ".shob", "tui.json"),
   }
 }
 
@@ -991,8 +991,8 @@ export namespace TuiPluginRuntime {
       directory: cwd,
       fn: async () => {
         const config = await TuiConfig.get()
-        const records = Flag.OPENCODE_PURE ? [] : (config.plugin_origins ?? [])
-        if (Flag.OPENCODE_PURE && config.plugin_origins?.length) {
+        const records = Flag.SHOB_PURE ? [] : (config.plugin_origins ?? [])
+        if (Flag.SHOB_PURE && config.plugin_origins?.length) {
           log.info("skipping external tui plugins in pure mode", { count: config.plugin_origins.length })
         }
 

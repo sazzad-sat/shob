@@ -1,6 +1,6 @@
 # Effect patterns
 
-Practical reference for new and migrated Effect code in `packages/opencode`.
+Practical reference for new and migrated Effect code in `packages/shob`.
 
 ## Choose scope
 
@@ -23,7 +23,7 @@ export namespace Foo {
     readonly get: (id: FooID) => Effect.Effect<FooInfo, FooError>
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/Foo") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/Foo") {}
 
   export const layer = Layer.effect(
     Service,
@@ -243,7 +243,7 @@ Until the tool interface itself returns `Effect`, use this transitional pattern 
 - Keep the bridge at the Promise boundary only. Prefer a single `Effect.runPromise(...)` in the temporary `async execute(...)` implementation, and move the inner logic into `Effect.fn(...)` helpers instead of scattering `runPromise` islands through the tool body.
 - If a tool starts requiring new services, wire them into `ToolRegistry.defaultLayer` so production callers resolve the same dependencies as tests.
 
-Tool tests should use the existing Effect helpers in `packages/opencode/test/lib/effect.ts`:
+Tool tests should use the existing Effect helpers in `packages/shob/test/lib/effect.ts`:
 
 - Use `testEffect(...)` / `it.live(...)` instead of creating fake local wrappers around effectful tools.
 - Yield the real tool export, then initialize it: `const info = yield* ReadTool`, `const tool = yield* Effect.promise(() => info.init())`.

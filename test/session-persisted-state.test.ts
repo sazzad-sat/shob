@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { SyncStorage } from "@solid-primitives/storage"
-import { base64Encode } from "@opencode-ai/util/encode"
+import { base64Encode } from "@shob-ai/util/encode"
 import type { Platform } from "../src/context/platform.tsx"
 import { Persist } from "../src/utils/persist.ts"
 import {

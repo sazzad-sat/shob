@@ -6,7 +6,7 @@ import { LocalContext } from "../util/local-context"
 import { lazy } from "../util/lazy"
 import { Global } from "../global"
 import { Log } from "../util/log"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@shob-ai/util/error"
 import z from "zod"
 import path from "path"
 import { readFileSync, readdirSync, existsSync, renameSync } from "fs"
@@ -16,7 +16,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { iife } from "@/util/iife"
 import { init } from "#db"
 
-declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
+declare const SHOB_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
 
 export const NotFoundError = NamedError.create(
   "NotFoundError",
@@ -29,10 +29,10 @@ const log = Log.create({ service: "db" })
 
 export namespace Database {
   const DB_BASENAME = "shob"
-  const LEGACY_DB_BASENAME = "opencode"
+  const LEGACY_DB_BASENAME = "shob"
 
   function channelDbName(base: string) {
-    if (["latest", "beta", "prod"].includes(CHANNEL) || Flag.OPENCODE_DISABLE_CHANNEL_DB) return `${base}.db`
+    if (["latest", "beta", "prod"].includes(CHANNEL) || Flag.SHOB_DISABLE_CHANNEL_DB) return `${base}.db`
     const safe = CHANNEL.replace(/[^a-zA-Z0-9._-]/g, "-")
     return `${base}-${safe}.db`
   }
@@ -41,7 +41,7 @@ export namespace Database {
     return path.join(Global.Path.data, channelDbName(DB_BASENAME))
   }
 
-  // Earlier builds named the database after "opencode". Rename any legacy file
+  // Earlier builds named the database after "shob". Rename any legacy file
   // (and its -wal/-shm sidecars) to the shob identity in-place so existing
   // history survives updates instead of silently starting from an empty db.
   function migrateLegacyDbName(target: string) {
@@ -62,9 +62,9 @@ export namespace Database {
   }
 
   export const Path = iife(() => {
-    if (Flag.OPENCODE_DB) {
-      if (Flag.OPENCODE_DB === ":memory:" || path.isAbsolute(Flag.OPENCODE_DB)) return Flag.OPENCODE_DB
-      return path.join(Global.Path.data, Flag.OPENCODE_DB)
+    if (Flag.SHOB_DB) {
+      if (Flag.SHOB_DB === ":memory:" || path.isAbsolute(Flag.SHOB_DB)) return Flag.SHOB_DB
+      return path.join(Global.Path.data, Flag.SHOB_DB)
     }
     const target = getChannelPath()
     migrateLegacyDbName(target)
@@ -124,15 +124,15 @@ export namespace Database {
 
     // Apply schema migrations
     const entries =
-      typeof OPENCODE_MIGRATIONS !== "undefined"
-        ? OPENCODE_MIGRATIONS
+      typeof SHOB_MIGRATIONS !== "undefined"
+        ? SHOB_MIGRATIONS
         : migrations(path.join(import.meta.dirname, "../../migration"))
     if (entries.length > 0) {
       log.info("applying migrations", {
         count: entries.length,
-        mode: typeof OPENCODE_MIGRATIONS !== "undefined" ? "bundled" : "dev",
+        mode: typeof SHOB_MIGRATIONS !== "undefined" ? "bundled" : "dev",
       })
-      if (Flag.OPENCODE_SKIP_MIGRATIONS) {
+      if (Flag.SHOB_SKIP_MIGRATIONS) {
         for (const item of entries) {
           item.sql = "select 1;"
         }

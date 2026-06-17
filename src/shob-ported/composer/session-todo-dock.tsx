@@ -1,6 +1,6 @@
-import type { Todo } from "@opencode-ai/sdk/v2/client"
+import type { Todo } from "@shob-ai/sdk/v2/client"
 import { For, Show, createMemo } from "solid-js"
-import { DockTray } from "@opencode-ai/ui/dock-surface"
+import { DockTray } from "@shob-ai/ui/dock-surface"
 import { ChevronDown } from "lucide-solid"
 
 export function SessionTodoDock(props: {

@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput } from "@shob-ai/plugin"
 import { randomBytes, createHash, publicEncrypt, constants, createCipheriv } from "node:crypto"
 import { setTimeout as sleep } from "node:timers/promises"
 import { OAUTH_DUMMY_KEY } from "../auth"

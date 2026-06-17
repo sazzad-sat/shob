@@ -5,7 +5,7 @@ import { Flag } from "../../flag/flag"
 export const ServeCommand = cmd({
   command: "serve",
   builder: (yargs) => withNetworkOptions(yargs),
-  describe: "starts a headless opencode server",
+  describe: "starts a headless shob server",
   handler: async (args) => {
     const { Server } = await import("../../server/server")
     if (!Flag.SHOB_SERVER_PASSWORD) {
@@ -13,7 +13,7 @@ export const ServeCommand = cmd({
     }
     const opts = await resolveNetworkOptions(args)
     const server = await Server.listen(opts)
-    console.log(`opencode server listening on http://${server.hostname}:${server.port}`)
+    console.log(`shob server listening on http://${server.hostname}:${server.port}`)
 
     await new Promise(() => { })
     await server.stop()

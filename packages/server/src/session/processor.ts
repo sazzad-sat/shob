@@ -76,7 +76,7 @@ export namespace SessionProcessor {
 
   type StreamEvent = Event
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/SessionProcessor") {}
+  export class Service extends Context.Service<Service, Interface>()("@shob/SessionProcessor") {}
 
   export const layer: Layer.Layer<
     Service,

@@ -1,5 +1,5 @@
 import { Show, createMemo } from "solid-js"
-import { ProgressCircle } from "@opencode-ai/ui/progress-circle"
+import { ProgressCircle } from "@shob-ai/ui/progress-circle"
 import { useSync } from "@/context/sync"
 import { useProviders } from "@/hooks/use-providers"
 import { getSessionContextMetrics } from "./session/session-context-metrics"

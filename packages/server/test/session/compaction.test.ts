@@ -406,7 +406,7 @@ describe("session.compaction.isOverflow", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "shob.json"),
           JSON.stringify({
             compaction: { auto: false },
           }),
@@ -458,7 +458,7 @@ describe("session.compaction.prune", () => {
   test("compacts old completed tool output", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ compaction: { prune: true } }))
+        await Bun.write(path.join(dir, "shob.json"), JSON.stringify({ compaction: { prune: true } }))
       },
     })
     await Instance.provide({
