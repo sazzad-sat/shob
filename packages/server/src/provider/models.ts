@@ -13,6 +13,7 @@ import { withQoderModels } from "./qoder/models"
 import { withCommandCodeModels } from "./commandcode/models"
 import { withClineModels } from "./cline/models"
 import { withMimoFreeModels } from "./mimo-free/models"
+import { withZaiCodingPlanModels } from "./zai/models"
 
 // Try to import bundled snapshot (generated at build time)
 // Falls back to undefined in dev mode when snapshot doesn't exist
@@ -160,7 +161,7 @@ export namespace ModelsDev {
     const enriched = await withClineModels(
       withCommandCodeModels(withQoderModels(withAntigravityModels(result as Record<string, Provider>))),
     )
-    return withMimoFreeModels(enriched)
+    return withZaiCodingPlanModels(withMimoFreeModels(enriched))
   }
 
   export async function refresh(force = false) {
